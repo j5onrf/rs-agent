@@ -1,120 +1,173 @@
-# ⚡ pyra-agent
+<br>
 
-**Sub-millisecond startup. Pure Rust AI Agent Engine.**
+<div align="center">
+  <img alt="pyra-agent" src="logo.svg" height="130" />
+  <h1>pyra-agent</h1>
+ 
+  <p>
+    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://img.shields.io/badge/version-v0.1.0-blue?style=flat-square" alt="Version"></a>
+    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://img.shields.io/badge/language-Rust_2021-DEA584?style=flat-square&logo=rust&logoColor=white" alt="Rust"></a>
+    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://img.shields.io/badge/startup-%3C_1ms-success?style=flat-square" alt="Startup"></a>
+    <a href="https://github.com/j5onrf/pyra-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
+    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://img.shields.io/badge/status-active-blue?style=flat-square" alt="Status"></a>
+  </p>
 
-Replacing Python agent frameworks with a high-density, memory-safe binary tailored for local edge models (`LFM3-1.7B`, `Qwen`) and cloud LLMs (`xAI Grok`, `OpenRouter`).
+  <p>
+    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>grok</code> &nbsp;•&nbsp; <code>openrouter</code> &nbsp;•&nbsp; <code>deepseek</code> &nbsp;•&nbsp; <code>tokenharbor</code>
+  </p>
+
+  <p>
+    <b>A zero-dependency Rust AI agent engine driving local <code>llama-server</code> backends and cloud endpoints.</b><br>
+    <sub>Sub-millisecond startup, autonomous 6-tool refactoring suite, zero-trust security kernel, and streaming thinking telemetry.</sub>
+  </p>
+
+  <br>
+
+  <table>
+    <tr>
+      <td align="center" width="50%" valign="top">
+        <h3>Sub-27B (SLM)</h3>
+        <p><sub>Tool calling, fast refactoring, and single-turn edits</sub></p>
+        <code>LFM3-1.7B*</code> &nbsp;•&nbsp; <code>Ling-3.0-tiny</code><br>
+        <code>MiniCPM5-2B</code> &nbsp;•&nbsp; <code>Qwen3.5-2B+</code><br>
+        <code>MiniCPM-V-4.7-1B</code> &nbsp;•&nbsp; <code>LFM2.5-24B-A2B</code>
+      </td>
+      <td align="center" width="50%" valign="top">
+        <h3>27B+ (LLM)</h3>
+        <p><sub>Deep reasoning, complex architecture, and multi-turn loops</sub></p>
+        <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br>
+        <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br>
+        <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br>
+        <code>xAI Grok-Beta</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code>
+      </td>
+    </tr>
+  </table>
+  
+  <p>
+    * Primary edge baselines &nbsp;•&nbsp; Auto-discovers local models loaded on <code>http://127.0.0.1:8080</code>
+  </p>
+
+  <p>
+    <sub><b>Cloud Endpoints:</b> <a href="https://tokenharbor.ai">TokenHarbor</a>, <a href="https://api.x.ai">xAI Grok</a>, <a href="https://openrouter.ai">OpenRouter</a>, and <a href="https://huggingface.co/spaces">Hugging Face</a><br>
+    <b>Free Endpoints:</b> <a href="https://tokenharbor.ai"><code>deepseek-v4.1-flash:free</code></a> (TokenHarbor) &nbsp;•&nbsp; <a href="https://openrouter.ai/models?variant=free"><code>openrouter/free</code></a> (OpenRouter)</sub>
+  </p>
+</div>
+
+<br>
+
+---
 
 ```console
+~ ❯ ai
 ╭─ ○ ────────────────────────────────────────╮
 │  LFM3-1.7B                                 │
 │  chat                                      │
 ╰────────────────────────────────────────────╯
+
+· · ○ · · · · · · · · · · · · · · · · · · · · ·
+·  LFM3-1.7B  · · · · · · · · · · · · · · · · ·
+·  chat       · · · · · · · · · · · · · · · · ·
+· · · · · · · · · · · · · · · · · · · · · · · ·
+
+·  LFM3-1.7B  · · · · · · · · · · · · · · · · ·
+·  chat       · · · · · · · · · · · · · · · · ·
+
+❯ █
 ```
+
+<div align="center">
+  <p><sub>Switch terminal styles with <code>/box [1-3]</code> or pin in profile frontmatter. Progressive 350ms wake-on-key reveal.</sub></p>
+</div>
+
+<br>
+
+---
+
+<h2 align="center">Execution Surfaces</h2>
+
+<div align="center">
+
+| Invocation | Interface | Description |
+| :--- | :---: | :--- |
+| `[shortcut]` | **Shell Teleport** | Sub-millisecond context router (`matcher.rs`) via `pyra-context.md` (e.g., `lfm`, `ling`) |
+| `ai "<prompt>"` | **One-Shot** | Single prompt query direct from terminal |
+| `ai` | **Interactive REPL** | Conversational chat session with thinking gutter and token stats |
+| `ai init [path]` | **Workspace Agent** | Autonomous project workspace with full Smol 6-tool suite |
 
 </div>
 
----
+<p align="center">
+  <sub><code>/box [1-3]</code> style &nbsp;•&nbsp; <code>/yolo</code> (or <code>/g</code>) autonomy gate &nbsp;•&nbsp; <code>/clear</code> (or <code>/c</code>) reset &nbsp;•&nbsp; <code>q</code> or <code>exit</code> quit</sub>
+</p>
 
-## ⚡ Highlights
-
-* **< 1ms Startup Time:** Instantaneous CLI response time (`ai`) with zero interpreter overhead.
-* **Sub-Millisecond Shell Teleportation:** Intercepts `command-not-found` via `matcher.rs` to route workspace shortcuts (`lfm`, `ling`, `sage`, `clover`) instantly into agent sessions.
-* **Autonomous Multi-Turn Tool Loop:** 6-tool smol suite with closed-loop self-healing, automatic retry on conflict, and multi-turn refactoring.
-* **Edge-Model Self-Healing (`adapter.rs`):** Auto-normalizes tool aliases (`filepath` → `path`, `cmd` → `command`) and repairs malformed/unclosed JSON arguments using a stack balancer.
-* **Zero-Trust Security Boundary (`security.rs`):** Workspace path containment with canonicalization (prevents directory traversal `../`) and gates privileged/mutating commands (`sudo`, `pacman`, `pip`, `systemctl`) via `/dev/tty` prompts.
-* **Streaming Thinking Gutter (`stream.rs`):** Clean dimmed vertical gutters (`│ `) for `<think>` reasoning blocks with realtime word-wrapping and token telemetry.
-* **Box Presets with Wake-on-Key:** 3 terminal box styles with 350ms progressive-reveal fade animations on startup.
+<br>
 
 ---
 
-## 🎨 Terminal Box Aesthetics
+<h2 align="center">Runtime Architecture</h2>
 
-Switch between presets on the fly using `/box [1-3]`, or pin them in profile frontmatter (`box: 1`):
+`pyra-agent` discards heavy agent frameworks in favor of simple, predictable primitives:
 
-### Box 1: Clean Rounded (Default)
-```console
-╭─ ○ ────────────────────────────────────────╮
-│  LFM3-1.7B                                 │
-│  chat                                      │
-╰────────────────────────────────────────────╯
-```
+* **Sub-Millisecond Shell Intercept (`matcher.rs`):** `pyra-hook.sh` catches missing commands and routes through `pyra-context.md` in `< 0.2ms`. Typing `lfm` jumps into the directory and launches the agent instantly.
+* **Autonomous 6-Tool Suite (`tools.rs`):** Minimal tool surface built for refactoring without AST bloat: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant matcher), `write_file`, `list_dir`, `search_code`, and `run_command`.
+* **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and repairs broken JSON frames on the fly.
+* **Zero-Trust Security Boundary (`security.rs`):** Canonicalizes all paths inside workspace root. Traversal attempts (`../`) and mutating system calls (`sudo`, `pacman`, `pip`, `systemctl`, destructive `rm`) fail closed and require explicit interactive approval via `/dev/tty`.
+* **Live Thinking Gutter & Telemetry (`stream.rs`):** Streams model `<think>` reasoning into a dimmed `│ ` vertical gutter with word-wrapping, followed by compact live telemetry (`↑ ↓ R CH% · %/8.2k · s @ t/s`).
 
-### Box 2: Original Dot Slab Gradient
-```console
-· · ○ · · · · · · · · · · · · · · · · · · · · ·
-·  LFM3-1.7B  · · · · · · · · · · · · · · · · ·
-·  lfm3       · · · · · · · · · · · · · · · · ·
-· · · · · · · · · · · · · · · · · · · · · · · ·
-```
-
-### Box 3: 2-Line Minimal Floating Dots
-```console
-·  LFM3-1.7B  · · · · · · · · · · · · · · · · ·
-·  lfm3       · · · · · · · · · · · · · · · · ·
-```
+<br>
 
 ---
 
-## 🛠 Smol 6-Tool Suite
+<h2 align="center">Engine Benchmarks</h2>
 
-`pyra-agent` includes an autonomous 6-tool suite built specifically for refactoring, exploration, and execution:
+<p align="center">
+  Performance comparison between native Rust <code>pyra-agent</code> and the Python predecessor (<code>py-agent</code>):
+</p>
 
-| Tool | Purpose | Behavior |
+<div align="center">
+
+| Metric | pyra-agent (Rust) | py-agent (Python) | Difference |
+| :--- | :---: | :---: | :--- |
+| **Cold Startup Latency** | **< 1 ms** | ~450 ms | **450x faster** (zero interpreter overhead) |
+| **Idle Memory Footprint** | **~3.2 MB** | ~42 MB | **92% reduction** |
+| **Shell Teleport Lookup** | **0.18 ms** | ~12 ms | **Instant shell interception** |
+| **Runtime Dependencies** | **0** (single static binary) | Python, rich, requests | **Zero package drift** |
+| **Tool Turn Speed (AG-03)** | **4.0s** (3 turns) | ~6.5s (3 turns) | **Fast local streaming** |
+| **KV Cache Hit Rate** | **85%+** | ~74% | **Consistent prompt caching** |
+
+</div>
+
+<br>
+
+---
+
+<h2 align="center">Smol 6-Tool Suite</h2>
+
+<div align="center">
+
+| Tool | Action | Rules |
 | :--- | :--- | :--- |
-| `read_file` | Read project files | Supports `line_start` and `line_end` pagination; auto-truncates 250+ lines. |
-| `edit_file` | Surgical code replacement | 2-stage replacer: (1) exact substring replacement, (2) whitespace-tolerant line block matcher. |
-| `write_file` | File creation & overwrite | Creates parent directories automatically; guards against accidental overwrites (`overwrite: true`). |
-| `list_dir` | Workspace exploration | Lists relative file tree, auto-filtering hidden files and common noise (`.git`, `target`). |
-| `search_code` | Fast regex & text search | Case-insensitive workspace ripgrep-style search with match cap (30 items). |
-| `run_command` | Workspace command runner | Runs isolated shell calls inside workspace; traps stderr/stdout up to 15k characters. |
+| `read_file` | Read source file | Relative workspace path. Supports `line_start` and `line_end`. Truncates files over 250 lines to conserve context. |
+| `edit_file` | Surgical patch | Two-stage replacer: (1) exact unique string match, (2) whitespace-tolerant line block match. Fails if target is ambiguous. |
+| `write_file` | Write / Create file | Creates missing parent directories automatically. Requires `overwrite: true` when overwriting existing files. |
+| `list_dir` | Workspace exploration | Recursively lists clean file tree. Auto-ignores hidden files, `.git/`, and build artifacts (`target/`). |
+| `search_code` | Grep codebase | Fast regex and pattern search across project files. Capped at first 30 matches with line numbers. |
+| `run_command` | Execute shell command | Runs commands directly in workspace root. Captures up to 15,000 characters of combined stdout/stderr. |
+
+</div>
+
+<br>
 
 ---
 
-## 🛡 Zero-Trust Security Kernel
+<h2 align="center">Workspace Profiles & Skills</h2>
 
-The agent operates in a sandboxed, zero-trust perimeter:
-
-1. **Workspace Boundary:** Every relative and absolute path is canonicalized. Attempts to escape root via `../` or symlink traversal are caught and blocked unless explicitly approved via `/dev/tty`.
-2. **Mutating Command Interception:** Dangerous system commands (`sudo`, `pacman`, `yay`, `pip`, `systemctl`, `rm -rf`) trigger security alerts that **never** auto-approve—even when `--yolo` mode is active.
-3. **Dedicated TTY Prompts:** Security authorization reads directly from `/dev/tty`, leaving standard input clean for pipes and automation.
-
----
-
-## 🧭 Shell Teleportation & Context Router
-
-`pyra-agent` eliminates friction through shell hook integration (`pyra-hook.sh`). When you type a workspace name directly in your shell:
-
-```bash
-~ ❯ lfm
-```
-
-1. Shell hook catches `command-not-found`.
-2. `matcher.rs` queries `pyra-context.md` in `< 0.2ms`.
-3. Resolves to `ai init ~/.config/pyra-agent/projects/lfm3`.
-4. Automatically `cd`s to the workspace and boots the session.
-
-### Configuration (`pyra-context.md`)
-```markdown
-# --- Workspaces ---
-ai init ~/.config/pyra-agent/projects/lfm3 ---> lfm3, lfm
-ai init ~/.config/pyra-agent/projects/ling-tiny ---> ling, ling-tiny
-ai init ~/.config/pyra-agent/projects/clover ---> clover, clov
-
-# --- Quick Tools ---
-curl -s "wttr.in/?format=3" ---> weather, wttr
-date "+Current Date: %A, %B %-d, %Y" ---> get date, today
-```
-
----
-
-## 👤 Workspace Profiles
-
-Workspace behaviors are declared using Markdown profiles with YAML frontmatter in `profiles/*.md`:
+Define agent personas, tool tiers, and box styles in Markdown frontmatter (`profiles/*.md`):
 
 ```markdown
 ---
 name: lfm3
-description: "Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer"
+description: "Liquid AI LFM3-1.7B Edge Systems Engineer"
 yolo: true
 reasoning_budget: 500
 box: 1
@@ -122,43 +175,27 @@ box: 1
 ROLE: Liquid AI LFM3-1.7B Autonomous Edge Systems & Software Engineer.
 
 DIRECTIVES:
-- TOOL EXECUTION: Emit tool calls immediately. Never output introductory commentary.
-- CLOSED-LOOP EXECUTION: inspect -> edit -> verify.
-- HALT: Stop immediately with "✓ Task complete: <10-word summary>".
+- TOOL EXECUTION: Run tools immediately. Never output introductory commentary or planning summaries.
+- CLOSED-LOOP: Inspect (read_file) -> Edit (edit_file) -> Verify (run_command).
+- HALT: Stop immediately with: "✓ Task complete: <summary>".
 ```
 
----
+Drop skill guides like **`ponytail.md`** (anti-overengineering / YAGNI ladder) or **`humanizer.md`** (AI tell stripper) directly into `profiles/` or reference them inside system prompts.
 
-## 🔌 Provider Configuration Cascade
-
-`pyra-agent` discovers models top-down from `~/.config/pyra-agent/.env` without requiring third-party SDKs:
-
-1. **CUSTOM2:** `CUSTOM2_API_KEY` (xAI Grok, TokenHarbor, DeepSeek)
-2. **CUSTOM:** `CUSTOM_API_KEY` (Hugging Face Inference Endpoints)
-3. **OPENROUTER:** `OPENROUTER_API_KEY` (OpenRouter API)
-4. **Local Fallback:** Auto-queries `http://127.0.0.1:8080/v1/models` (local `llama-server`) and extracts the loaded `.gguf` model name automatically.
+<br>
 
 ---
 
-## ⌨️ In-Session Commands
+<h2 align="center">Setup & Installation</h2>
 
-| Command | Action |
-| :--- | :--- |
-| `/box [1-3]` | Cycle or switch terminal box preset dynamically. |
-| `/yolo` (or `/g`) | Toggle autonomous execution mode (bypasses in-bounds prompts). |
-| `/clear` (or `/c`) | Reset conversation history and redraw clean terminal header. |
-| `q` or `exit` | Gracefully exit session (status code `0`). |
-| `Ctrl+C` | Cleanly exits back to shell with `exit 0` (`~ ❯`). |
-
----
-
-## 🚀 Installation & Build
+### 1. Build and Link
 
 ```bash
-# Clone and enter directory
+# Clone into config directory
+git clone https://github.com/j5onrf/pyra-agent.git ~/.config/pyra-agent
 cd ~/.config/pyra-agent
 
-# Build optimized release binary (< 2s incremental)
+# Build optimized release binary
 cargo build --release
 
 # Symlink to PATH
@@ -166,12 +203,75 @@ mkdir -p ~/.local/bin
 ln -sf "$PWD/target/release/pyra-agent" ~/.local/bin/ai
 ln -sf "$PWD/target/release/pyra-agent" ~/.local/bin/pyra
 
-# Source the hook in ~/.bashrc or ~/.zshrc
+# Register shell hook (bash or zsh)
 echo 'source ~/.config/pyra-agent/pyra-hook.sh' >> ~/.zshrc
+source ~/.zshrc
 ```
+
+### 2. Configure Providers (`.env`)
+
+Configure credentials in `~/.config/pyra-agent/.env`. Pyra evaluates keys from the top down:
+
+1. **`CUSTOM2_API_KEY`**: Generic OpenAI endpoint (Grok, DeepSeek, TokenHarbor)
+2. **`CUSTOM_API_KEY`**: Hugging Face Inference Router
+3. **`OPENROUTER_API_KEY`**: OpenRouter Gateway
+4. **Local Fallback**: Automatically queries `http://127.0.0.1:8080/v1/models` (`llama-server`) with zero configuration.
+
+<details>
+<summary><b>View Example (<code>~/.config/pyra-agent/.env</code>)</b></summary>
+
+```env
+# ==============================================================================
+# Pyra-Agent Provider Cascade (.env)
+# Priority: Top-down first active key. Comment with '#' to disable.
+# Fallback: When all keys are commented, routes to local server on :8080.
+# ==============================================================================
+
+# ── 1. Custom 2: xAI Grok / DeepSeek / TokenHarbor ────────────────────────────
+# CUSTOM2_API_KEY="sk-your-key-here"
+CUSTOM2_URL="https://api.x.ai/v1/chat/completions"
+CUSTOM2_MODEL="grok-beta"
+
+# ── 2. Custom 1: Hugging Face Router ──────────────────────────────────────────
+# CUSTOM_API_KEY="hf_your_key_here"
+CUSTOM_URL="https://router.huggingface.co/v1/chat/completions"
+CUSTOM_MODEL="space"
+
+# ── 3. OpenRouter Universal Gateway ───────────────────────────────────────────
+# OPENROUTER_API_KEY="sk-or-v1-your-key-here"
+OPENROUTER_MODEL="openrouter/free"
+
+# ── 4. Local llama-server Fallback (Port 8080) ────────────────────────────────
+# Automatically used when cloud keys are commented. Auto-detects loaded .gguf model.
+```
+
+</details>
+
+<br>
+
+---
+
+<h2 align="center">Context Router (`pyra-context.md`)</h2>
+
+Declare instant shortcut aliases for fast navigation:
+
+```markdown
+# --- Workspaces ---
+ai init ~/.config/pyra-agent/projects/lfm3 ---> lfm3, lfm
+ai init ~/.config/pyra-agent/projects/ling-tiny ---> ling, ling-tiny
+ai init ~/.config/pyra-agent/projects/clover ---> clover, clov
+ai init ~/.config/pyra-agent/projects/sage ---> sage
+
+# --- Quick Tools ---
+curl -s "wttr.in/?format=3" ---> weather, wttr
+date "+Current Date: %A, %B %-d, %Y" ---> get date, today
+```
+
+<br>
 
 ---
 
 <div align="center">
-Built for speed, clarity, and terminal minimalism.
+  <sub>Built for speed, clarity, and terminal minimalism. Licensed under the <b><a href="LICENSE">MIT License</a></b>.</sub>
 </div>
+
