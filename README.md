@@ -2,7 +2,7 @@
 
 <div align="center">
   <img alt="rs-agent" src="logo.svg?v=2" height="130" />
-  <h1>Rs-239</h1>
+  <h1>Rs239-Agent</h1>
  
 <p>
     <a href="https://github.com/j5onrf/pyra-agent"><img src="https://shieldcn.dev/badge/version-v0.1.0.svg?variant=secondary" alt="Version"></a>
