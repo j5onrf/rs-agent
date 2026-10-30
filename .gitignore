@@ -1,0 +1,7 @@
+/target
+.env
+*.tmp*
+.active_sessions
+*.db
+*.db-wal
+*.db-shm

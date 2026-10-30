@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="121 101 270 310">
+  <defs>
+    <!-- Primary Gradient: Bright Cyan to Deep Indigo -->
+    <linearGradient id="python-grad-a" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F2FE" />
+      <stop offset="100%" stop-color="#3A7BD5" />
+    </linearGradient>
+
+    <linearGradient id="python-grad-b" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3A7BD5" />
+      <stop offset="100%" stop-color="#4FACFE" />
+    </linearGradient>
+  </defs>
+
+  <g>
+    <!-- Interlocking Python Snake Loop A (Top) -->
+    <path d="M 210 120 
+             C 140 120, 140 220, 210 220 
+             L 300 220 
+             C 370 220, 370 320, 300 320 
+             L 240 320" 
+          fill="none" 
+          stroke="url(#python-grad-a)" 
+          stroke-width="38" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" />
+
+    <!-- Interlocking Python Snake Loop B (Bottom) -->
+    <path d="M 302 392 
+             C 372 392, 372 292, 302 292 
+             L 212 292 
+             C 142 292, 142 192, 212 192 
+             L 272 192" 
+          fill="none" 
+          stroke="url(#python-grad-b)" 
+          stroke-width="38" 
+          stroke-opacity="0.85" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" />
+
+    <!-- Terminal Node Dots -->
+    <circle cx="210" cy="120" r="15" fill="#00F2FE" />
+    <circle cx="302" cy="392" r="15" fill="#3A7BD5" />
+  </g>
+</svg>
