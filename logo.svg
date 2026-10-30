@@ -1,38 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
           <defs>
-            <linearGradient id="g7-cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id="r7-border" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#00F2FE"></stop>
-              <stop offset="100%" stop-color="#4FACFE"></stop>
-            </linearGradient>
-            <linearGradient id="g7-blue" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#4FACFE"></stop>
               <stop offset="100%" stop-color="#3A7BD5"></stop>
             </linearGradient>
           </defs>
-          <!-- Primary Cog (Top-Left) -->
-          <g transform="translate(115,115)">
-            <circle cx="0" cy="0" r="50" fill="none" stroke="url(#g7-cyan)" stroke-width="14"></circle>
-            <g fill="url(#g7-cyan)">
-              <rect x="-6" y="-64" width="12" height="15" rx="2"></rect>
-              <rect x="-6" y="49" width="12" height="15" rx="2"></rect>
-              <rect x="-6" y="-64" width="12" height="15" rx="2" transform="rotate(60)"></rect>
-              <rect x="-6" y="49" width="12" height="15" rx="2" transform="rotate(60)"></rect>
-              <rect x="-6" y="-64" width="12" height="15" rx="2" transform="rotate(120)"></rect>
-              <rect x="-6" y="49" width="12" height="15" rx="2" transform="rotate(120)"></rect>
-            </g>
-            <circle cx="0" cy="0" r="14" fill="#0d1117" stroke="url(#g7-cyan)" stroke-width="5"></circle>
-          </g>
-          <!-- Secondary Cog (Bottom-Right, Intermeshed) -->
-          <g transform="translate(185,185)">
-            <circle cx="0" cy="0" r="42" fill="none" stroke="url(#g7-blue)" stroke-width="12" opacity="0.9"></circle>
-            <g fill="url(#g7-blue)" opacity="0.9">
-              <rect x="-5" y="-53" width="10" height="13" rx="2"></rect>
-              <rect x="-5" y="40" width="10" height="13" rx="2"></rect>
-              <rect x="-5" y="-53" width="10" height="13" rx="2" transform="rotate(60)"></rect>
-              <rect x="-5" y="40" width="10" height="13" rx="2" transform="rotate(60)"></rect>
-              <rect x="-5" y="-53" width="10" height="13" rx="2" transform="rotate(120)"></rect>
-              <rect x="-5" y="40" width="10" height="13" rx="2" transform="rotate(120)"></rect>
-            </g>
-            <circle cx="0" cy="0" r="11" fill="#0d1117" stroke="url(#g7-blue)" stroke-width="4"></circle>
-          </g>
+          <!-- Rounded Element Tile -->
+          <rect x="45" y="45" width="210" height="210" rx="36" fill="#161b22" stroke="url(#r7-border)" stroke-width="12"></rect>
+          <!-- Atomic Number 26 (Iron / Rust) or 239 -->
+          <text x="75" y="95" font-family="monospace" font-size="28" font-weight="bold" fill="#00F2FE">26</text>
+          <!-- Element Symbol "Rs" -->
+          <text x="150" y="180" font-family="-apple-system, monospace" font-size="78" font-weight="900" fill="#FFFFFF" text-anchor="middle">Rs</text>
+          <!-- Atomic Weight / Subtitle -->
+          <text x="150" y="222" font-family="monospace" font-size="16" letter-spacing="2" fill="#4FACFE" text-anchor="middle">&lt; 1ms • NATIVE</text>
+          <!-- Corner Glowing Node -->
+          <circle cx="225" cy="75" r="8" fill="#00F2FE"></circle>
         </svg>
