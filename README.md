@@ -4,12 +4,12 @@
   <img alt="pyra-agent" src="logo.svg" height="130" />
   <h1>Pyra</h1>
  
-  <p>
-    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://img.shields.io/badge/version-v0.1.0-blue?style=flat-square" alt="Version"></a>
-    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://img.shields.io/badge/language-Rust_2021-DEA584?style=flat-square&logo=rust&logoColor=white" alt="Rust"></a>
-    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://img.shields.io/badge/startup-%3C_1ms-success?style=flat-square" alt="Startup"></a>
-    <a href="https://github.com/j5onrf/pyra-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
-    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://img.shields.io/badge/status-active-blue?style=flat-square" alt="Status"></a>
+<p>
+    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://shieldcn.dev/badge/version-v0.1.0.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
+    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
+    <a href="https://github.com/j5onrf/pyra-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
+    <a href="https://shieldcn.dev/badge/status-beta-blue.svg"><img src="https://shieldcn.dev/badge/status-beta-blue.svg" alt="Status"></a>
   </p>
 
   <p>
