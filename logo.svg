@@ -1,26 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
           <defs>
-            <linearGradient id="b2-imp" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id="g3-grad" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#00F2FE"></stop>
               <stop offset="60%" stop-color="#4FACFE"></stop>
               <stop offset="100%" stop-color="#3A7BD5"></stop>
             </linearGradient>
           </defs>
-          <g transform="translate(150,150)">
-            <!-- Outer containment ring -->
-            <circle cx="0" cy="0" r="95" fill="none" stroke="url(#b2-imp)" stroke-width="6" opacity="0.4"></circle>
-            <!-- 8 Sweeping Turbine Blades -->
-            <g fill="url(#b2-imp)">
-              <path d="M 0 -22 C 18 -22, 55 -55, 65 -85 C 45 -85, 20 -50, 0 -35 Z"></path>
-              <path d="M 0 -22 C 18 -22, 55 -55, 65 -85 C 45 -85, 20 -50, 0 -35 Z" transform="rotate(45)"></path>
-              <path d="M 0 -22 C 18 -22, 55 -55, 65 -85 C 45 -85, 20 -50, 0 -35 Z" transform="rotate(90)"></path>
-              <path d="M 0 -22 C 18 -22, 55 -55, 65 -85 C 45 -85, 20 -50, 0 -35 Z" transform="rotate(135)"></path>
-              <path d="M 0 -22 C 18 -22, 55 -55, 65 -85 C 45 -85, 20 -50, 0 -35 Z" transform="rotate(180)"></path>
-              <path d="M 0 -22 C 18 -22, 55 -55, 65 -85 C 45 -85, 20 -50, 0 -35 Z" transform="rotate(225)"></path>
-              <path d="M 0 -22 C 18 -22, 55 -55, 65 -85 C 45 -85, 20 -50, 0 -35 Z" transform="rotate(270)"></path>
-              <path d="M 0 -22 C 18 -22, 55 -55, 65 -85 C 45 -85, 20 -50, 0 -35 Z" transform="rotate(315)"></path>
-            </g>
-            <circle cx="0" cy="0" r="22" fill="#0d1117" stroke="url(#b2-imp)" stroke-width="7"></circle>
-            <circle cx="0" cy="0" r="7" fill="#00F2FE"></circle>
+          <g transform="translate(150,155)">
+            <!-- 3-lobed Reuleaux triangular gear with teeth -->
+            <path d="M 0 -85 C 45 -85, 80 -40, 85 0 C 90 45, 60 85, 0 85 C -60 85, -90 45, -85 0 C -80 -40, -45 -85, 0 -85 Z" fill="none" stroke="url(#g3-grad)" stroke-width="24" stroke-linejoin="round"></path>
+            <!-- Corner teeth clusters -->
+            <rect x="-10" y="-105" width="20" height="20" rx="4" fill="url(#g3-grad)"></rect>
+            <rect x="-10" y="-105" width="20" height="20" rx="4" fill="url(#g3-grad)" transform="rotate(120)"></rect>
+            <rect x="-10" y="-105" width="20" height="20" rx="4" fill="url(#g3-grad)" transform="rotate(240)"></rect>
           </g>
         </svg>
