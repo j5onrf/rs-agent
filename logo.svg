@@ -1,17 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
           <defs>
-            <linearGradient id="r5-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id="b2-tach" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#00F2FE"></stop>
+              <stop offset="70%" stop-color="#4FACFE"></stop>
               <stop offset="100%" stop-color="#3A7BD5"></stop>
             </linearGradient>
           </defs>
           <g transform="translate(150,150)">
-            <!-- 3 smooth curved radiation lobes rendered with py-agent rounded stroke style -->
-            <path d="M 0 -25 C 20 -40, 50 -90, 0 -95 C -50 -90, -20 -40, 0 -25 Z" fill="url(#r5-grad)" opacity="0.95"></path>
-            <path d="M 0 -25 C 20 -40, 50 -90, 0 -95 C -50 -90, -20 -40, 0 -25 Z" fill="url(#r5-grad)" opacity="0.95" transform="rotate(120)"></path>
-            <path d="M 0 -25 C 20 -40, 50 -90, 0 -95 C -50 -90, -20 -40, 0 -25 Z" fill="url(#r5-grad)" opacity="0.95" transform="rotate(240)"></path>
-            <!-- Nuclear Center -->
-            <circle cx="0" cy="0" r="20" fill="#0d1117" stroke="#00F2FE" stroke-width="7"></circle>
-            <circle cx="0" cy="0" r="6" fill="#FFFFFF"></circle>
+            <!-- Open 270-degree arc with progressive speed ratchet teeth -->
+            <path d="M -60 60 A 85 85 0 1 1 60 60" fill="none" stroke="url(#b2-tach)" stroke-width="16" stroke-linecap="round"></path>
+            <!-- Teeth on the active arc -->
+            <g fill="url(#b2-tach)">
+              <rect x="-8" y="-102" width="16" height="18" rx="2" transform="rotate(-120)"></rect>
+              <rect x="-8" y="-102" width="16" height="18" rx="2" transform="rotate(-90)"></rect>
+              <rect x="-8" y="-102" width="16" height="18" rx="2" transform="rotate(-60)"></rect>
+              <rect x="-8" y="-102" width="16" height="18" rx="2" transform="rotate(-30)"></rect>
+              <rect x="-8" y="-102" width="16" height="18" rx="2" transform="rotate(0)"></rect>
+              <rect x="-8" y="-102" width="16" height="18" rx="2" transform="rotate(30)"></rect>
+              <rect x="-8" y="-102" width="16" height="18" rx="2" transform="rotate(60)"></rect>
+              <rect x="-8" y="-102" width="16" height="18" rx="2" transform="rotate(90)"></rect>
+              <rect x="-8" y="-102" width="16" height="18" rx="2" transform="rotate(120)"></rect>
+            </g>
+            <!-- Needle / Speed Indicator -->
+            <polygon points="-6,10 0,-70 6,10" fill="#00F2FE"></polygon>
+            <circle cx="0" cy="10" r="14" fill="#0d1117" stroke="#00F2FE" stroke-width="4"></circle>
           </g>
         </svg>
