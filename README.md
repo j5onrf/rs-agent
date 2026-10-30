@@ -2,7 +2,7 @@
 
 <div align="center">
   <img alt="pyra-agent" src="logo.svg" height="130" />
-  <h1>pyra-agent</h1>
+  <h1>Pyra</h1>
  
   <p>
     <a href="https://github.com/j5onrf/pyra-agent"><img src="https://img.shields.io/badge/version-v0.1.0-blue?style=flat-square" alt="Version"></a>
