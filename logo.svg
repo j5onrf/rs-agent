@@ -1,21 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
           <defs>
-            <linearGradient id="r1-a" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id="r4-a" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#00F2FE"></stop>
               <stop offset="100%" stop-color="#3A7BD5"></stop>
             </linearGradient>
-            <linearGradient id="r1-b" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#3A7BD5"></stop>
-              <stop offset="100%" stop-color="#4FACFE"></stop>
+            <linearGradient id="r4-b" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#4FACFE"></stop>
+              <stop offset="100%" stop-color="#00F2FE"></stop>
             </linearGradient>
           </defs>
-          <g transform="translate(10, 0)">
-            <!-- Spine and Upper Loop (Loop A) -->
-            <path d="M 95 245 L 95 65 C 95 65, 215 45, 215 130 C 215 195, 120 175, 95 175" fill="none" stroke="url(#r1-a)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"></path>
-            <!-- Sweeping Kick Leg (Loop B - Weaves out) -->
-            <path d="M 145 160 C 185 160, 215 200, 215 245" fill="none" stroke="url(#r1-b)" stroke-width="36" stroke-opacity="0.9" stroke-linecap="round"></path>
-            <!-- Terminal Node Dots -->
-            <circle cx="95" cy="245" r="14" fill="#00F2FE"></circle>
-            <circle cx="215" cy="245" r="14" fill="#3A7BD5"></circle>
+          <g transform="translate(150,150)">
+            <!-- Elliptical Orbital Ring A -->
+            <ellipse cx="0" cy="0" rx="100" ry="40" fill="none" stroke="url(#r4-a)" stroke-width="26" transform="rotate(-30)"></ellipse>
+            <!-- Elliptical Orbital Ring B (Overlapping) -->
+            <ellipse cx="0" cy="0" rx="100" ry="40" fill="none" stroke="url(#r4-b)" stroke-width="26" stroke-opacity="0.85" transform="rotate(30)"></ellipse>
+            <!-- Center Nuclear Core (Fissile Node) -->
+            <circle cx="0" cy="0" r="24" fill="#0d1117" stroke="#FFFFFF" stroke-width="6"></circle>
+            <circle cx="0" cy="0" r="10" fill="#00F2FE"></circle>
+            <!-- Orbiting Particle Dots -->
+            <circle cx="-75" cy="-42" r="12" fill="#00F2FE"></circle>
+            <circle cx="75" cy="42" r="12" fill="#3A7BD5"></circle>
           </g>
         </svg>
