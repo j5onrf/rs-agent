@@ -1,18 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
           <defs>
-            <linearGradient id="r7-border" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id="r1-a" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#00F2FE"></stop>
               <stop offset="100%" stop-color="#3A7BD5"></stop>
             </linearGradient>
+            <linearGradient id="r1-b" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#3A7BD5"></stop>
+              <stop offset="100%" stop-color="#4FACFE"></stop>
+            </linearGradient>
           </defs>
-          <!-- Rounded Element Tile -->
-          <rect x="45" y="45" width="210" height="210" rx="36" fill="#161b22" stroke="url(#r7-border)" stroke-width="12"></rect>
-          <!-- Atomic Number 26 (Iron / Rust) or 239 -->
-          <text x="75" y="95" font-family="monospace" font-size="28" font-weight="bold" fill="#00F2FE">26</text>
-          <!-- Element Symbol "Rs" -->
-          <text x="150" y="180" font-family="-apple-system, monospace" font-size="78" font-weight="900" fill="#FFFFFF" text-anchor="middle">Rs</text>
-          <!-- Atomic Weight / Subtitle -->
-          <text x="150" y="222" font-family="monospace" font-size="16" letter-spacing="2" fill="#4FACFE" text-anchor="middle">&lt; 1ms • NATIVE</text>
-          <!-- Corner Glowing Node -->
-          <circle cx="225" cy="75" r="8" fill="#00F2FE"></circle>
+          <g transform="translate(10, 0)">
+            <!-- Spine and Upper Loop (Loop A) -->
+            <path d="M 95 245 L 95 65 C 95 65, 215 45, 215 130 C 215 195, 120 175, 95 175" fill="none" stroke="url(#r1-a)" stroke-width="36" stroke-linecap="round" stroke-linejoin="round"></path>
+            <!-- Sweeping Kick Leg (Loop B - Weaves out) -->
+            <path d="M 145 160 C 185 160, 215 200, 215 245" fill="none" stroke="url(#r1-b)" stroke-width="36" stroke-opacity="0.9" stroke-linecap="round"></path>
+            <!-- Terminal Node Dots -->
+            <circle cx="95" cy="245" r="14" fill="#00F2FE"></circle>
+            <circle cx="215" cy="245" r="14" fill="#3A7BD5"></circle>
+          </g>
         </svg>
