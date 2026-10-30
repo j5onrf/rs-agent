@@ -1,12 +1,13 @@
 <br>
 
 <div align="center">
-  <img alt="pyra-agent" src="logo.svg?v=2" height="130" />
-  <h1>Pyra-Agent</h1>
+  <img alt="rs-agent" src="logo.svg?v=2" height="130" />
+  <h1>Rs-Agent</h1>
  
 <p>
     <a href="https://github.com/j5onrf/pyra-agent"><img src="https://shieldcn.dev/badge/version-v0.1.0.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/pyra-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
+    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/pyra-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
     <a href="https://shieldcn.dev/badge/status-beta-blue.svg"><img src="https://shieldcn.dev/badge/status-beta-blue.svg" alt="Status"></a>
   </p>
