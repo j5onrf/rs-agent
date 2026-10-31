@@ -17,7 +17,7 @@
   </p>
 
 <p>
-    <b>A compiled Rust AI agent built for low-latency local <code>llama-server</code> backends, small language models, and cloud endpoints.</b><br>
+    <b>A Rust AI agent built for low-latency local <code>llama-server</code> C++ backends, slm/llm gguf, and cloud endpoints.</b><br>
     <sub>Sub-millisecond boot, autonomous 6-tool execution loop, zero-trust security kernel, edge-model JSON repair, and live token stats.</sub>
   </p>
 
@@ -34,11 +34,11 @@
       </td>
       <td align="center" width="50%" valign="top">
         <h3>27B+ (LLM)</h3>
-        <p><sub>Deep reasoning, complex architecture, and multi-turn loops</sub></p>
+        <p><sub>Deep reasoning, long complex, and multi-turn loops</sub></p>
         <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br>
         <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br>
         <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br>
-        <code>Qwen3.8-Flash</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code>
+        <code>Qwen3.8-Flash</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code><br><br>
       </td>
     </tr>
   </table>
