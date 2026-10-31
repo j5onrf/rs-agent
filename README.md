@@ -160,7 +160,7 @@ Drop skill guides like **`ponytail.md`** (anti-overengineering / YAGNI ladder) o
 
 ---
 
-<h2 align="center">Setup & Installation</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Setup & Installation</h2>
 
 ### 1. 🚀 Build and Link
 
