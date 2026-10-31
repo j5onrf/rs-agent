@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>rs-agent — Tight-Cropped Code Bracket Lab</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --accent: #00F2FE;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: #e6edf3; font-family: monospace; padding: 40px 20px; }
+    header { text-align: center; margin-bottom: 36px; }
+    header h1 { font-size: 24px; margin-bottom: 8px; }
+    header p { color: #8b949e; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; max-width: 1240px; margin: 0 auto; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; text-align: center; }
+    .card:hover { border-color: var(--accent); }
+    .svg-box {
+      width: 190px;
+      height: 170px;
+      margin: 0 auto 16px;
+      background: #090d13;
+      border: 1px dashed #21262d;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .svg-box svg { width: 92%; height: 92%; }
+    h3 { font-size: 15px; margin-bottom: 6px; }
+    p.desc { font-size: 12px; color: #8b949e; height: 32px; margin-bottom: 14px; }
+    .btn { background: #21262d; color: var(--accent); border: 1px solid var(--border); padding: 6px 14px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    .btn:hover { background: #30363d; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>{ ❯ } Code-Bracket & Split-Gear Variations</h1>
+    <p>All excess padding and outer margins removed &bull; Tight viewBox for clean scaling</p>
+  </header>
+
+  <div class="grid">
+
+    <!-- 1. The Clean Split-Gear { ❯ } (Tightly Cropped) -->
+    <div class="card">
+      <div class="svg-box" id="s1">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 214 192">
+          <defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00F2FE"/><stop offset="100%" stop-color="#3A7BD5"/></linearGradient></defs>
+          <g transform="translate(107, 96)">
+            <path d="M -30 -85 A 90 90 0 0 0 -85 -30 L -85 30 A 90 90 0 0 0 -30 85" fill="none" stroke="url(#g1)" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 30 -85 A 90 90 0 0 1 85 -30 L 85 30 A 90 90 0 0 1 30 85" fill="none" stroke="url(#g1)" stroke-width="14" stroke-linecap="round"/>
+            <g fill="url(#g1)">
+              <rect x="-103" y="-10" width="18" height="20" rx="3"/>
+              <rect x="85" y="-10" width="18" height="20" rx="3"/>
+              <rect x="-95" y="-55" width="18" height="20" rx="3" transform="rotate(30 -86 -45)"/>
+              <rect x="77" y="-55" width="18" height="20" rx="3" transform="rotate(-30 86 -45)"/>
+              <rect x="-95" y="35" width="18" height="20" rx="3" transform="rotate(-30 -86 45)"/>
+              <rect x="77" y="35" width="18" height="20" rx="3" transform="rotate(30 86 45)"/>
+            </g>
+            <text x="-32" y="14" font-family="monospace" font-size="44" font-weight="bold" fill="url(#g1)">{</text>
+            <path d="M -8 -16 L 8 0 L -8 16 L -2 16 L 14 0 L -2 -16 Z" fill="#00F2FE"/>
+            <text x="16" y="14" font-family="monospace" font-size="44" font-weight="bold" fill="url(#g1)">}</text>
+          </g>
+        </svg>
+      </div>
+      <h3>1. Classic Split-Gear { ❯ }</h3>
+      <p class="desc">The exact design you liked with the outer canvas padding removed.</p>
+      <button class="btn" onclick="save(1)">Apply to logo.svg</button>
+    </div>
+
+    <!-- 2. Dual Turbo Chevron { ❯❯ } -->
+    <div class="card">
+      <div class="svg-box" id="s2">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 214 192">
+          <defs><linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00F2FE"/><stop offset="100%" stop-color="#3A7BD5"/></linearGradient></defs>
+          <g transform="translate(107, 96)">
+            <path d="M -30 -85 A 90 90 0 0 0 -85 -30 L -85 30 A 90 90 0 0 0 -30 85" fill="none" stroke="url(#g2)" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 30 -85 A 90 90 0 0 1 85 -30 L 85 30 A 90 90 0 0 1 30 85" fill="none" stroke="url(#g2)" stroke-width="14" stroke-linecap="round"/>
+            <g fill="url(#g2)">
+              <rect x="-103" y="-10" width="18" height="20" rx="3"/>
+              <rect x="85" y="-10" width="18" height="20" rx="3"/>
+              <rect x="-95" y="-55" width="18" height="20" rx="3" transform="rotate(30 -86 -45)"/>
+              <rect x="77" y="-55" width="18" height="20" rx="3" transform="rotate(-30 86 -45)"/>
+              <rect x="-95" y="35" width="18" height="20" rx="3" transform="rotate(-30 -86 45)"/>
+              <rect x="77" y="35" width="18" height="20" rx="3" transform="rotate(30 86 45)"/>
+            </g>
+            <text x="-42" y="14" font-family="monospace" font-size="44" font-weight="bold" fill="url(#g2)">{</text>
+            <path d="M -18 -16 L -4 0 L -18 16 L -12 16 L 2 0 L -12 -16 Z" fill="#00F2FE"/>
+            <path d="M 0 -16 L 14 0 L 0 16 L 6 16 L 20 0 L 6 -16 Z" fill="#4FACFE"/>
+            <text x="24" y="14" font-family="monospace" font-size="44" font-weight="bold" fill="url(#g2)">}</text>
+          </g>
+        </svg>
+      </div>
+      <h3>2. Turbo Chevron { ❯❯ }</h3>
+      <p class="desc">Dual fast-forward prompt chevrons inside the gear chassis.</p>
+      <button class="btn" onclick="save(2)">Apply to logo.svg</button>
+    </div>
+
+    <!-- 3. Square Systems Brackets [ ❯ ] -->
+    <div class="card">
+      <div class="svg-box" id="s3">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 214 192">
+          <defs><linearGradient id="g3" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00F2FE"/><stop offset="100%" stop-color="#3A7BD5"/></linearGradient></defs>
+          <g transform="translate(107, 96)">
+            <path d="M -30 -85 A 90 90 0 0 0 -85 -30 L -85 30 A 90 90 0 0 0 -30 85" fill="none" stroke="url(#g3)" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 30 -85 A 90 90 0 0 1 85 -30 L 85 30 A 90 90 0 0 1 30 85" fill="none" stroke="url(#g3)" stroke-width="14" stroke-linecap="round"/>
+            <g fill="url(#g3)">
+              <rect x="-103" y="-10" width="18" height="20" rx="3"/>
+              <rect x="85" y="-10" width="18" height="20" rx="3"/>
+              <rect x="-95" y="-55" width="18" height="20" rx="3" transform="rotate(30 -86 -45)"/>
+              <rect x="77" y="-55" width="18" height="20" rx="3" transform="rotate(-30 86 -45)"/>
+              <rect x="-95" y="35" width="18" height="20" rx="3" transform="rotate(-30 -86 45)"/>
+              <rect x="77" y="35" width="18" height="20" rx="3" transform="rotate(30 86 45)"/>
+            </g>
+            <text x="-32" y="14" font-family="monospace" font-size="44" font-weight="bold" fill="url(#g3)">[</text>
+            <path d="M -8 -16 L 8 0 L -8 16 L -2 16 L 14 0 L -2 -16 Z" fill="#00F2FE"/>
+            <text x="16" y="14" font-family="monospace" font-size="44" font-weight="bold" fill="url(#g3)">]</text>
+          </g>
+        </svg>
+      </div>
+      <h3>3. Array Brackets [ ❯ ]</h3>
+      <p class="desc">Rigid square memory-bracket notation for low-level systems.</p>
+      <button class="btn" onclick="save(3)">Apply to logo.svg</button>
+    </div>
+
+    <!-- 4. Terminal Command Slash { / } -->
+    <div class="card">
+      <div class="svg-box" id="s4">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 214 192">
+          <defs><linearGradient id="g4" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00F2FE"/><stop offset="100%" stop-color="#3A7BD5"/></linearGradient></defs>
+          <g transform="translate(107, 96)">
+            <path d="M -30 -85 A 90 90 0 0 0 -85 -30 L -85 30 A 90 90 0 0 0 -30 85" fill="none" stroke="url(#g4)" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 30 -85 A 90 90 0 0 1 85 -30 L 85 30 A 90 90 0 0 1 30 85" fill="none" stroke="url(#g4)" stroke-width="14" stroke-linecap="round"/>
+            <g fill="url(#g4)">
+              <rect x="-103" y="-10" width="18" height="20" rx="3"/>
+              <rect x="85" y="-10" width="18" height="20" rx="3"/>
+              <rect x="-95" y="-55" width="18" height="20" rx="3" transform="rotate(30 -86 -45)"/>
+              <rect x="77" y="-55" width="18" height="20" rx="3" transform="rotate(-30 86 -45)"/>
+              <rect x="-95" y="35" width="18" height="20" rx="3" transform="rotate(-30 -86 45)"/>
+              <rect x="77" y="35" width="18" height="20" rx="3" transform="rotate(30 86 45)"/>
+            </g>
+            <text x="-32" y="14" font-family="monospace" font-size="44" font-weight="bold" fill="url(#g4)">{</text>
+            <text x="-7" y="14" font-family="monospace" font-size="44" font-weight="bold" fill="#00F2FE">/</text>
+            <text x="16" y="14" font-family="monospace" font-size="44" font-weight="bold" fill="url(#g4)">}</text>
+          </g>
+        </svg>
+      </div>
+      <h3>4. CLI Slash { / }</h3>
+      <p class="desc">References your in-session slash commands (/box, /yolo, /clear).</p>
+      <button class="btn" onclick="save(4)">Apply to logo.svg</button>
+    </div>
+
+    <!-- 5. Node Dot Accents on Gear Flanks -->
+    <div class="card">
+      <div class="svg-box" id="s5">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 214 192">
+          <defs><linearGradient id="g5" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00F2FE"/><stop offset="100%" stop-color="#3A7BD5"/></linearGradient></defs>
+          <g transform="translate(107, 96)">
+            <path d="M -30 -85 A 90 90 0 0 0 -85 -30 L -85 30 A 90 90 0 0 0 -30 85" fill="none" stroke="url(#g5)" stroke-width="14" stroke-linecap="round"/>
+            <path d="M 30 -85 A 90 90 0 0 1 85 -30 L 85 30 A 90 90 0 0 1 30 85" fill="none" stroke="url(#g5)" stroke-width="14" stroke-linecap="round"/>
+            <g fill="url(#g5)">
+              <rect x="-103" y="-10" width="18" height="20" rx="3"/>
+              <rect x="85" y="-10" width="18" height="20" rx="3"/>
+              <rect x="-95" y="-55" width="18" height="20" rx="3" transform="rotate(30 -86 -45)"/>
+              <rect x="77" y="-55" width="18" height="20" rx="3" transform="rotate(-30 86 -45)"/>
+              <rect x="-95" y="35" width="18" height="20" rx="3" transform="rotate(-30 -86 45)"/>
+              <rect x="77" y="35" width="18" height="20" rx="3" transform="rotate(30 86 45)"/>
+            </g>
+            <circle cx="-30" cy="-85" r="9" fill="#00F2FE"/>
+            <circle cx="30" cy="-85" r="9" fill="#4FACFE"/>
+            <circle cx="-30" cy="85" r="9" fill="#4FACFE"/>
+            <circle cx="30" cy="85" r="9" fill="#3A7BD5"/>
+            <text x="-32" y="14" font-family="monospace" font-size="44" font-weight="bold" fill="url(#g5)">{</text>
+            <path d="M -8 -16 L 8 0 L -8 16 L -2 16 L 14 0 L -2 -16 Z" fill="#00F2FE"/>
+            <text x="16" y="14" font-family="monospace" font-size="44" font-weight="bold" fill="url(#g5)">}</text>
+          </g>
+        </svg>
+      </div>
+      <h3>5. Node-Capped Flanks</h3>
+      <p class="desc">Adds glowing cyan/indigo node dots onto the four open arc endpoints.</p>
+      <button class="btn" onclick="save(5)">Apply to logo.svg</button>
+    </div>
+
+    <!-- 6. Heavy 20px Solid Split Core -->
+    <div class="card">
+      <div class="svg-box" id="s6">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 214 192">
+          <defs><linearGradient id="g6" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#00F2FE"/><stop offset="100%" stop-color="#3A7BD5"/></linearGradient></defs>
+          <g transform="translate(107, 96)">
+            <path d="M -25 -82 A 88 88 0 0 0 -85 -25 L -85 25 A 88 88 0 0 0 -25 82" fill="none" stroke="url(#g6)" stroke-width="20" stroke-linecap="round"/>
+            <path d="M 25 -82 A 88 88 0 0 1 85 -25 L 85 25 A 88 88 0 0 1 25 82" fill="none" stroke="url(#g6)" stroke-width="20" stroke-linecap="round"/>
+            <text x="-34" y="15" font-family="monospace" font-size="48" font-weight="bold" fill="url(#g6)">{</text>
+            <path d="M -9 -18 L 9 0 L -9 18 L -2 18 L 16 0 L -2 -18 Z" fill="#00F2FE"/>
+            <text x="18" y="15" font-family="monospace" font-size="48" font-weight="bold" fill="url(#g6)">}</text>
+          </g>
+        </svg>
+      </div>
+      <h3>6. Bold Minimal Arc (Toothless)</h3>
+      <p class="desc">Pure 20px thick rounded bracket arcs without gear teeth—super clean.</p>
+      <button class="btn" onclick="save(6)">Apply to logo.svg</button>
+    </div>
+
+  </div>
+
+  <script>
+    function save(id) {
+      const svg = document.getElementById('s' + id).innerHTML.trim();
+      navigator.clipboard.writeText(svg).then(() => {
+        alert('Variation ' + id + ' copied to clipboard!\n\nTo apply it, paste into logo.svg or run:\nwl-paste > ~/.config/rs-agent/logo.svg');
+      });
+    }
+  </script>
+
+</body>
+</html>

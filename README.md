@@ -117,29 +117,6 @@
 
 ---
 
-<h2 align="center">Engine Benchmarks</h2>
-
-<p align="center">
-  Performance comparison between native Rust <code>rs-agent</code> and the Python predecessor (<code>py-agent</code>):
-</p>
-
-<div align="center">
-
-| Metric | rs-agent (Rust) | py-agent (Python) | Difference |
-| :--- | :---: | :---: | :--- |
-| **Cold Startup Latency** | **< 1 ms** | ~450 ms | **450x faster** (zero interpreter overhead) |
-| **Idle Memory Footprint** | **~3.2 MB** | ~42 MB | **92% reduction** |
-| **Shell Teleport Lookup** | **0.18 ms** | ~12 ms | **Instant shell interception** |
-| **Runtime Dependencies** | **0** (single static binary) | Python, rich, requests | **Zero package drift** |
-| **Tool Turn Speed (AG-03)** | **4.0s** (3 turns) | ~6.5s (3 turns) | **Fast local streaming** |
-| **KV Cache Hit Rate** | **85%+** | ~74% | **Consistent prompt caching** |
-
-</div>
-
-<br>
-
----
-
 <h2 align="center">Smol 6-Tool Suite</h2>
 
 <div align="center">
@@ -161,7 +138,7 @@
 
 <h2 align="center">Workspace Profiles & Skills</h2>
 
-Define agent personas, tool tiers, and box styles in Markdown frontmatter (`profiles/*.md`):
+Define agent profiles, tool tiers in Markdown frontmatter (`profiles/*.md`):
 
 ```markdown
 ---
@@ -169,7 +146,6 @@ name: lfm3
 description: "Liquid AI LFM3-1.7B Edge Systems Engineer"
 yolo: true
 reasoning_budget: 500
-box: 1
 ---
 ROLE: Liquid AI LFM3-1.7B Autonomous Edge Systems & Software Engineer.
 
