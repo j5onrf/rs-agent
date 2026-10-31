@@ -38,7 +38,9 @@
         <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br>
         <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br>
         <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br>
-        <code>Qwen3.8-Flash</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code><br><br>
+        <code>Qwen3.8-27B</code> &nbsp;•&nbsp; <code>Qwen4.0-27B</code><br>
+        <code>Qwen3.8-Flash</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code><br>
+        <br>
       </td>
     </tr>
   </table>
@@ -176,7 +178,6 @@ cargo build --release
 # Symlink to PATH
 mkdir -p ~/.local/bin
 ln -sf "$PWD/target/release/rs-agent" ~/.local/bin/ai
-ln -sf "$PWD/target/release/rs-agent" ~/.local/bin/rs
 
 # Register shell hook (bash or zsh)
 echo 'source ~/.config/rs-agent/rs-hook.sh' >> ~/.zshrc
