@@ -1,17 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
           <defs>
-            <linearGradient id="g3-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id="r6-a" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#00F2FE"></stop>
-              <stop offset="60%" stop-color="#4FACFE"></stop>
+              <stop offset="100%" stop-color="#4FACFE"></stop>
+            </linearGradient>
+            <linearGradient id="r6-b" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#4FACFE"></stop>
               <stop offset="100%" stop-color="#3A7BD5"></stop>
             </linearGradient>
           </defs>
-          <g transform="translate(150,155)">
-            <!-- 3-lobed Reuleaux triangular gear with teeth -->
-            <path d="M 0 -85 C 45 -85, 80 -40, 85 0 C 90 45, 60 85, 0 85 C -60 85, -90 45, -85 0 C -80 -40, -45 -85, 0 -85 Z" fill="none" stroke="url(#g3-grad)" stroke-width="24" stroke-linejoin="round"></path>
-            <!-- Corner teeth clusters -->
-            <rect x="-10" y="-105" width="20" height="20" rx="4" fill="url(#g3-grad)"></rect>
-            <rect x="-10" y="-105" width="20" height="20" rx="4" fill="url(#g3-grad)" transform="rotate(120)"></rect>
-            <rect x="-10" y="-105" width="20" height="20" rx="4" fill="url(#g3-grad)" transform="rotate(240)"></rect>
+          <g>
+            <!-- Triangle Left Flank & Base (Delta silhouette) -->
+            <path d="M 150 55 L 75 235 L 180 235" fill="none" stroke="url(#r6-a)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"></path>
+            <!-- 'R' Kick-Leg Sweeping outward -->
+            <path d="M 150 55 C 210 115, 225 180, 225 235" fill="none" stroke="url(#r6-b)" stroke-width="34" stroke-linecap="round" stroke-opacity="0.9"></path>
+            <!-- Glowing Nodes -->
+            <circle cx="150" cy="55" r="14" fill="#FFFFFF"></circle>
+            <circle cx="75" cy="235" r="13" fill="#00F2FE"></circle>
+            <circle cx="225" cy="235" r="13" fill="#3A7BD5"></circle>
           </g>
         </svg>
