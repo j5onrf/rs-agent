@@ -1,4 +1,4 @@
-# Production Pyra-Agent Shell Hook (Sub-Millisecond Startup)
+# Rs-Agent Shell Hook (Sub-Millisecond Startup)
 _pyra_bin="$HOME/.config/rs-agent/target/release/rs-agent"
 
 # Primary 'ai' command wrapper
@@ -22,7 +22,7 @@ pyra_handle_missing() {
     local rc=$?
 
     if [[ $rc -eq 0 && -n "$matched" ]]; then
-        # If the matched command starts with "ai init <dir>" or "pyra init <dir>", auto-cd into it
+        # If the matched command starts with "ai init <dir>" or "ai init <dir>", auto-cd into it
         if [[ "$matched" =~ ^(ai|pyra)[[:space:]]+init[[:space:]]+(.*)$ ]]; then
             local target_dir="${BASH_REMATCH[2]}"
             target_dir="${target_dir/#\~/$HOME}"
