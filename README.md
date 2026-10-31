@@ -18,7 +18,7 @@
 
 <p>
     <b>A compiled Rust AI agent built for low-latency local <code>llama-server</code> backends, small language models, and cloud endpoints.</b><br>
-    <sub>Sub-millisecond cold boot, autonomous 6-tool execution loop, zero-trust security kernel, edge-model JSON repair, and live token stats.</sub>
+    <sub>Sub-millisecond boot, autonomous 6-tool execution loop, zero-trust security kernel, edge-model JSON repair, and live token stats.</sub>
   </p>
 
   <br>
