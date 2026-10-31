@@ -98,7 +98,7 @@
 </div>
 
 <p align="center">
-  <sub><code>/box [1-3]</code> style &nbsp;•&nbsp; <code>/p</code> (or <code>/profile</code>) profile select &nbsp;•&nbsp; <code>/r</code> reset session &nbsp;•&nbsp; <code>/s/code> or <code>/skill</code> skills</sub>
+  <sub><code>/box [1-3]</code> style &nbsp;•&nbsp; <code>/p</code> (or <code>/profile</code>) profile select &nbsp;•&nbsp; <code>/r</code> reset session &nbsp;•&nbsp; <code>/s/<code> or <code>/skill</code> skills</sub>
 </p>
 
 <br>
