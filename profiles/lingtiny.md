@@ -1,9 +1,6 @@
 ---
 description: "Ling-3.0-tiny Autonomous Systems Engineer (Native 6-Tool)"
 yolo: true
-map: false
-memory: false
-ipython: false
 adapters: true
 reasoning_budget: 500
 ---

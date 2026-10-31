@@ -98,7 +98,7 @@
 </div>
 
 <p align="center">
-  <sub><code>/box [1-3]</code> style &nbsp;•&nbsp; <code>/p</code> (or <code>/profile</code>) profile select &nbsp;•&nbsp; <code>/r</code> reset session &nbsp;•&nbsp; <code>/s</code> or <code>/skill</code> skills</sub>
+  <sub><code>/p</code> (or <code>/profile</code>) profile select &nbsp;•&nbsp; <code>/r</code> reset session &nbsp;•&nbsp; <code>/s</code> or <code>/skill</code> skills</sub>
 </p>
 
 <br>
@@ -146,9 +146,9 @@ Define agent profiles, tool tiers in Markdown frontmatter (`profiles/*.md`):
 name: lfm3
 description: "Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer (Native 6-Tool)"
 yolo: true
-adapters: true
 reasoning_budget: 500
-purebash: false
+adapters: true     # SLM tool argument repair (strips markdown fences, heals newlines)
+purebash: false    # false = 6 tools (~700t schema), true = single bash tool (~95t schema)
 ---
 ```
 
