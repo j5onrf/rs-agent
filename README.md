@@ -16,9 +16,9 @@
     <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>grok</code> &nbsp;•&nbsp; <code>openrouter</code>
   </p>
 
-   <p>
-    <b>A single-binary Rust AI agent built for local <code>llama-server</code> backends and cloud endpoints.</b><br>
-    <sub>Sub-millisecond startup, autonomous 6-tool execution loop, zero-trust security kernel, and live token stats.</sub>
+<p>
+    <b>A compiled Rust AI agent built for low-latency local <code>llama-server</code> backends, small language models, and cloud endpoints.</b><br>
+    <sub>Sub-millisecond cold boot, autonomous 6-tool execution loop, zero-trust security kernel, edge-model JSON repair, and live token stats.</sub>
   </p>
 
   <br>
@@ -38,7 +38,7 @@
         <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br>
         <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br>
         <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br>
-        <code>xAI Grok-Beta</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code>
+        <code>Qwen3.8-Flash</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code>
       </td>
     </tr>
   </table>
@@ -48,7 +48,7 @@
   </p>
 
   <p>
-    <sub><b>Cloud Endpoints:</b> <a href="https://tokenharbor.ai">TokenHarbor</a>, <a href="https://api.x.ai">xAI Grok</a>, <a href="https://openrouter.ai">OpenRouter</a>, and <a href="https://huggingface.co/spaces">Hugging Face</a><br>
+    <sub><b>Cloud Endpoints:</b> <a href="https://tokenharbor.ai">TokenHarbor</a>, <a href="https://openrouter.ai">OpenRouter</a>, and <a href="https://huggingface.co/spaces">Hugging Face</a><br>
     <b>Free Endpoints:</b> <a href="https://tokenharbor.ai"><code>deepseek-v4.1-flash:free</code></a> (TokenHarbor) &nbsp;•&nbsp; <a href="https://openrouter.ai/models?variant=free"><code>openrouter/free</code></a> (OpenRouter)</sub>
   </p>
 </div>
