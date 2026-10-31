@@ -13,7 +13,7 @@
   </p>
 
   <p>
-    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>grok</code> &nbsp;•&nbsp; <code>openrouter</code>
+    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>plugins</code> &nbsp;•&nbsp; <code>openrouter</code>
   </p>
 
 <p>
