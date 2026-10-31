@@ -35,11 +35,17 @@ impl Default for WorkspaceConfig {
 
 impl WorkspaceConfig {
     pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self {
-        let cfg_path = workspace.as_ref().join(".pyra").join("config.json");
-        if cfg_path.exists() {
-            if let Ok(content) = fs::read_to_string(cfg_path) {
-                if let Ok(cfg) = serde_json::from_str::<WorkspaceConfig>(&content) {
-                    return cfg;
+        let candidates = [
+            workspace.as_ref().join(".rs").join("config.json"),
+            workspace.as_ref().join(".rs-agent").join("config.json"),
+            workspace.as_ref().join(".pyra").join("config.json"),
+        ];
+        for cfg_path in &candidates {
+            if cfg_path.exists() {
+                if let Ok(content) = fs::read_to_string(cfg_path) {
+                    if let Ok(cfg) = serde_json::from_str::<WorkspaceConfig>(&content) {
+                        return cfg;
+                    }
                 }
             }
         }
@@ -47,7 +53,7 @@ impl WorkspaceConfig {
     }
 
     pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()> {
-        let dir = workspace.as_ref().join(".pyra");
+        let dir = workspace.as_ref().join(".rs");
         fs::create_dir_all(&dir)?;
         let content = serde_json::to_string_pretty(self)?;
         fs::write(dir.join("config.json"), content)?;
@@ -85,10 +91,16 @@ async fn query_local_model_name() -> Option<String> {
 
 impl ProviderConfig {
     pub async fn load() -> Self {
-        let env_path = dirs::home_dir()
-            .map(|h| h.join(".config/pyra-agent/.env"))
-            .filter(|p| p.exists())
-            .or_else(|| dirs::home_dir().map(|h| h.join(".config/py-agent/.env")))
+        let env_candidates = [
+            dirs::home_dir().map(|h| h.join(".config/rs-agent/.env")),
+            dirs::home_dir().map(|h| h.join(".config/pyra-agent/.env")),
+            dirs::home_dir().map(|h| h.join(".config/py-agent/.env")),
+        ];
+
+        let env_path = env_candidates
+            .into_iter()
+            .flatten()
+            .find(|p| p.exists())
             .unwrap_or_else(|| PathBuf::from(".env"));
 
         let mut lines = Vec::new();
@@ -127,7 +139,6 @@ impl ProviderConfig {
             std::env::var(var_name).ok()
         };
 
-        // 1. Check CUSTOM2 (xAI Grok / TokenHarbor / DeepSeek)
         if let Some(key) = get_active_key("CUSTOM2_API_KEY") {
             return Self {
                 base_url: get_var("CUSTOM2_URL").unwrap_or_else(|| "https://api.x.ai/v1/chat/completions".into()),
@@ -136,7 +147,6 @@ impl ProviderConfig {
             };
         }
 
-        // 2. Check CUSTOM (Hugging Face) ONLY if CUSTOM_API_KEY is active
         if let Some(key) = get_active_key("CUSTOM_API_KEY") {
             return Self {
                 base_url: get_var("CUSTOM_URL").unwrap_or_else(|| "https://router.huggingface.co/v1/chat/completions".into()),
@@ -145,7 +155,6 @@ impl ProviderConfig {
             };
         }
 
-        // 3. Check OPENROUTER
         if let Some(key) = get_active_key("OPENROUTER_API_KEY") {
             return Self {
                 base_url: "https://openrouter.ai/api/v1/chat/completions".into(),
@@ -154,7 +163,6 @@ impl ProviderConfig {
             };
         }
 
-        // 4. Fallback: Local llama-server (:8080)
         let local_model = query_local_model_name().await.unwrap_or_else(|| "LFM3-1.7B".into());
         Self {
             base_url: "http://127.0.0.1:8080/v1/chat/completions".into(),

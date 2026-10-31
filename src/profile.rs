@@ -80,7 +80,7 @@ impl Profile {
 
     pub fn load(profile_name: &str) -> Option<Self> {
         let base_dirs = [
-            dirs::home_dir().map(|h| h.join(".config/pyra-agent/profiles")),
+            dirs::home_dir().map(|h| h.join(".config/rs-agent/profiles")),
             dirs::home_dir().map(|h| h.join(".config/py-agent/skills/profiles")),
         ];
 
@@ -113,7 +113,7 @@ impl Profile {
 
     pub fn list_available() -> Vec<String> {
         let mut list = Vec::new();
-        if let Some(dir) = dirs::home_dir().map(|h| h.join(".config/pyra-agent/profiles")) {
+        if let Some(dir) = dirs::home_dir().map(|h| h.join(".config/rs-agent/profiles")) {
             if let Ok(entries) = fs::read_dir(dir) {
                 for entry in entries.flatten() {
                     let path = entry.path();
@@ -140,7 +140,7 @@ impl Profile {
             .and_then(|n| n.to_str())
             .unwrap_or("workspace");
 
-        println!("\n\x1b[1;36m[pyra init]\x1b[0m Select Agent Profile for workspace \x1b[1;33m{}\x1b[0m:\n", ws_name);
+        println!("\n\x1b[1;36m[rs init]\x1b[0m Select Agent Profile for workspace \x1b[1;33m{}\x1b[0m:\n", ws_name);
 
         let mut sel_idx = 0;
         let num_opts = options.len();

@@ -15,7 +15,7 @@ impl Default for AppState {
 
 fn state_path() -> PathBuf {
     dirs::home_dir()
-        .map(|h| h.join(".config/pyra-agent/state.json"))
+        .map(|h| h.join(".config/rs-agent/state.json"))
         .unwrap_or_else(|| PathBuf::from("state.json"))
 }
 

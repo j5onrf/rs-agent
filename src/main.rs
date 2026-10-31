@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 #[derive(Parser, Debug)]
-#[command(name = "pyra", about = "Blazing-fast minimal Rust AI Agent")]
+#[command(name = "rs-agent", about = "Blazing-fast minimal Rust AI Agent")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -67,7 +67,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
     let mut cfg = if is_agent_init {
         let mut c = WorkspaceConfig::load_or_default(target_dir);
-        if !target_dir.join(".pyra/config.json").exists() {
+        if !target_dir.join(".rs/config.json").exists() {
             c.is_agent = true;
 
             let dir_name = target_dir
@@ -124,7 +124,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         if let Some(prof) = &active_profile {
             format!("{}\n\nWorkspace Path: {}", prof.system_prompt, target_dir.display())
         } else {
-            format!("You are Pyra, an autonomous agent working in workspace: {}.", target_dir.display())
+            format!("You are Rs, an autonomous agent working in workspace: {}.", target_dir.display())
         }
     } else {
         if let Some(prof) = &active_profile {
@@ -307,7 +307,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     if cli.bridge {
-        println!("[pyra] Starting Bridge Mode (JSON-RPC on stdin)...");
+        println!("[rs-agent] Starting Bridge Mode (JSON-RPC on stdin)...");
         return Ok(());
     }
 

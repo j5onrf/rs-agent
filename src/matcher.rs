@@ -32,10 +32,10 @@ pub struct ContextRouter {
 impl ContextRouter {
     pub fn load() -> Self {
         let path = dirs::home_dir()
-            .map(|h| h.join(".config/pyra-agent/pyra-context.md"))
+            .map(|h| h.join(".config/rs-agent/rs-context.md"))
             .filter(|p| p.exists())
             .or_else(|| dirs::home_dir().map(|h| h.join(".config/py-agent/ai-context.md")))
-            .unwrap_or_else(|| PathBuf::from("pyra-context.md"));
+            .unwrap_or_else(|| PathBuf::from("rs-context.md"));
 
         let mut entries = Vec::new();
         if let Ok(content) = fs::read_to_string(path) {
