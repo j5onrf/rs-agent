@@ -9,5 +9,7 @@ ai init ~/.config/rs-agent/projects/flint ---> flint, flin
 ai init ~/.config/rs-agent/projects/qwen38d ---> qwen38d, qwen
 
 # --- Quick Tools ---
+ai new ---> newp, new-project
+~/.config/rs-agent/tools/test-agent ---> test-agent, ta
 curl -s "wttr.in/?format=3" ---> weather, wttr
 date "+Current Date: %A, %B %-d, %Y" ---> get date, today

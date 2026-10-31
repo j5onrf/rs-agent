@@ -5,5 +5,7 @@
 *.db
 *.db-wal
 *.db-shm
-state.json
 .rs/
+
+system_instructions.md
+state.json

@@ -18,6 +18,8 @@ pub struct WorkspaceConfig {
     pub is_agent: bool,
     pub tier: ToolTier,
     pub yolo: bool,
+    #[serde(default)]
+    pub adapters: bool,
     pub thinking_budget: u32,
 }
 
@@ -28,6 +30,7 @@ impl Default for WorkspaceConfig {
             is_agent: false,
             tier: ToolTier::Smol,
             yolo: false,
+            adapters: false,
             thinking_budget: 500,
         }
     }
@@ -94,7 +97,6 @@ impl ProviderConfig {
         let env_candidates = [
             dirs::home_dir().map(|h| h.join(".config/rs-agent/.env")),
             dirs::home_dir().map(|h| h.join(".config/pyra-agent/.env")),
-            dirs::home_dir().map(|h| h.join(".config/py-agent/.env")),
         ];
 
         let env_path = env_candidates
@@ -170,4 +172,32 @@ impl ProviderConfig {
             model: local_model,
         }
     }
+}
+
+/// Loads active (uncommented) rules from system_instructions.md
+
+/// Loads active (uncommented) rules from system_instructions.md
+pub fn load_global_instructions() -> Option<String> {
+    use std::fs;
+    let candidates = [
+        dirs::home_dir().map(|h| h.join(".config/rs-agent/system_instructions.md")),
+        dirs::home_dir().map(|h| h.join(".config/rs-agent/skills/system_instructions.md")),
+    ];
+
+    for path in candidates.into_iter().flatten() {
+        if path.is_file() {
+            if let Ok(content) = fs::read_to_string(&path) {
+                let active_lines: Vec<&str> = content
+                    .lines()
+                    .map(|l| l.trim())
+                    .filter(|l| !l.is_empty() && !l.starts_with('#'))
+                    .collect();
+
+                if !active_lines.is_empty() {
+                    return Some(active_lines.join("\n"));
+                }
+            }
+        }
+    }
+    None
 }

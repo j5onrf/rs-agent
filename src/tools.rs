@@ -4,7 +4,15 @@ use crate::security::SecurityBoundary;
 use serde_json::{json, Value};
 use std::fs;
 use std::path::Path;
-use std::process::Command;
+use std::time::Duration;
+use tokio::time::timeout;
+
+// Direct POSIX binding for process-group killing (Zero extra crates needed)
+extern "C" {
+    fn kill(pid: i32, sig: i32) -> i32;
+}
+const SIGTERM: i32 = 15;
+const SIGKILL: i32 = 9;
 
 pub fn get_tools_schema(tier: &ToolTier) -> Value {
     match tier {
@@ -105,7 +113,7 @@ pub fn get_tools_schema(tier: &ToolTier) -> Value {
                 "type": "function",
                 "function": {
                     "name": "run_command",
-                    "description": "Run a shell command inside the workspace directory.",
+                    "description": "Run a shell command inside the workspace directory (auto-killed after 30s timeout).",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -119,7 +127,7 @@ pub fn get_tools_schema(tier: &ToolTier) -> Value {
     }
 }
 
-pub fn execute_tool(
+pub async fn execute_tool(
     name: &str,
     raw_args: &str,
     workspace: &Path,
@@ -191,7 +199,6 @@ pub fn execute_tool(
 
             let original = fs::read_to_string(&safe_path).map_err(|e| e.to_string())?;
 
-            // Stage 1: Exact substring replacement
             if original.contains(old_str) {
                 if original.matches(old_str).count() > 1 {
                     return Err("Target 'old_str' matched multiple times. Include more surrounding lines to make it unique.".into());
@@ -201,7 +208,6 @@ pub fn execute_tool(
                 return Ok(format!("Successfully edited {} (replaced {} chars with {} chars).", path_str, old_str.len(), new_str.len()));
             }
 
-            // Stage 2: Whitespace-tolerant replacement
             let clean_orig = original.replace("\r\n", "\n");
             let clean_old = old_str.replace("\r\n", "\n");
             let clean_new = new_str.replace("\r\n", "\n");
@@ -354,22 +360,47 @@ pub fn execute_tool(
         "run_command" => {
             let cmd = args["command"].as_str().ok_or("Missing 'command' parameter")?;
 
-            // 1. Mutating package manager / dangerous command gate (ALWAYS PROMPTS EVEN IN YOLO)
             if let Some(forbidden) = boundary.check_command(cmd) {
                 if !boundary.authorize(&format!("MUTATING SYSTEM COMMAND: '{}' ({})", cmd, forbidden), true, false) {
                     return Err(format!("[denied] Execution of forbidden command '{}' cancelled by user.", forbidden));
                 }
             } else if !boundary.authorize(&format!("execute: $ {}", cmd), false, yolo) {
-                // 2. Normal in-bounds command (Auto-approves in YOLO, prompts in strict)
                 return Err("[denied] Action cancelled by user.".into());
             }
 
-            let output = Command::new("sh")
+            // Spawn command in its own process group with 30s async timeout
+            let child = tokio::process::Command::new("sh")
                 .arg("-c")
                 .arg(cmd)
                 .current_dir(workspace)
-                .output()
-                .map_err(|e| format!("Command execution failed: {}", e))?;
+                .process_group(0) // New process group (pgid = child pid)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .spawn()
+                .map_err(|e| format!("Command spawn failed: {}", e))?;
+
+            let pid = child.id().unwrap_or(0) as i32;
+
+            // Wait with 30s timeout
+            let run_res = timeout(Duration::from_secs(30), child.wait_with_output()).await;
+
+            let output = match run_res {
+                Ok(Ok(out)) => out,
+                Ok(Err(e)) => return Err(format!("Command execution failed: {}", e)),
+                Err(_) => {
+                    // Timeout hit: reap entire process group (-pid)
+                    if pid > 0 {
+                        unsafe {
+                            kill(-pid, SIGTERM);
+                        }
+                        tokio::time::sleep(Duration::from_millis(150)).await;
+                        unsafe {
+                            kill(-pid, SIGKILL);
+                        }
+                    }
+                    return Err(format!("Command timed out after 30 seconds: '{}'. Process group terminated.", cmd));
+                }
+            };
 
             let stdout = String::from_utf8_lossy(&output.stdout);
             let stderr = String::from_utf8_lossy(&output.stderr);
