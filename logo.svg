@@ -1,22 +1,24 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
           <defs>
-            <linearGradient id="r6-a" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id="b2-hex" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#00F2FE"></stop>
-              <stop offset="100%" stop-color="#4FACFE"></stop>
-            </linearGradient>
-            <linearGradient id="r6-b" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#4FACFE"></stop>
+              <stop offset="50%" stop-color="#4FACFE"></stop>
               <stop offset="100%" stop-color="#3A7BD5"></stop>
             </linearGradient>
           </defs>
-          <g>
-            <!-- Triangle Left Flank & Base (Delta silhouette) -->
-            <path d="M 150 55 L 75 235 L 180 235" fill="none" stroke="url(#r6-a)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"></path>
-            <!-- 'R' Kick-Leg Sweeping outward -->
-            <path d="M 150 55 C 210 115, 225 180, 225 235" fill="none" stroke="url(#r6-b)" stroke-width="34" stroke-linecap="round" stroke-opacity="0.9"></path>
-            <!-- Glowing Nodes -->
-            <circle cx="150" cy="55" r="14" fill="#FFFFFF"></circle>
-            <circle cx="75" cy="235" r="13" fill="#00F2FE"></circle>
-            <circle cx="225" cy="235" r="13" fill="#3A7BD5"></circle>
+          <g transform="translate(150,150)">
+            <!-- Outer Hexagon chassis with corner gear teeth -->
+            <polygon points="0,-95 82,-48 82,48 0,95 -82,48 -82,-48" fill="none" stroke="url(#b2-hex)" stroke-width="16" stroke-linejoin="round"></polygon>
+            <!-- 6 Corner Teeth -->
+            <rect x="-8" y="-110" width="16" height="18" rx="3" fill="url(#b2-hex)"></rect>
+            <rect x="-8" y="-110" width="16" height="18" rx="3" fill="url(#b2-hex)" transform="rotate(60)"></rect>
+            <rect x="-8" y="-110" width="16" height="18" rx="3" fill="url(#b2-hex)" transform="rotate(120)"></rect>
+            <rect x="-8" y="-110" width="16" height="18" rx="3" fill="url(#b2-hex)" transform="rotate(180)"></rect>
+            <rect x="-8" y="-110" width="16" height="18" rx="3" fill="url(#b2-hex)" transform="rotate(240)"></rect>
+            <rect x="-8" y="-110" width="16" height="18" rx="3" fill="url(#b2-hex)" transform="rotate(300)"></rect>
+            <!-- Inner Hex Core (Cargo Crate) -->
+            <polygon points="0,-48 42,-24 42,24 0,48 -42,24 -42,-24" fill="url(#b2-hex)" opacity="0.8"></polygon>
+            <circle cx="0" cy="0" r="14" fill="#0d1117"></circle>
+            <circle cx="0" cy="0" r="5" fill="#00F2FE"></circle>
           </g>
         </svg>
