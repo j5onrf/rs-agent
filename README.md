@@ -85,7 +85,7 @@
 
 ---
 
-<h2 align="center">⚡ Execution Surfaces</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Execution Surfaces</h2>
 
 <div align="center">
 
