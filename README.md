@@ -5,7 +5,7 @@
   <h1>rs-agent</h1>
  
 <p>
-    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://shieldcn.dev/badge/version-v0.1.0.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/pyra-agent"><img src="https://shieldcn.dev/badge/version-v0.2.4.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/pyra-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/pyra-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/pyra-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -16,8 +16,8 @@
     <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>grok</code> &nbsp;•&nbsp; <code>openrouter</code>
   </p>
 
-<p>
-    <b>A standalone Rust AI agent built for local <code>llama-server</code> backends and cloud endpoints.</b><br>
+   <p>
+    <b>A single-binary Rust AI agent built for local <code>llama-server</code> backends and cloud endpoints.</b><br>
     <sub>Sub-millisecond startup, autonomous 6-tool execution loop, zero-trust security kernel, and live token stats.</sub>
   </p>
 
