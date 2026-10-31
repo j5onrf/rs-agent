@@ -78,7 +78,7 @@
 ```
 
 <div align="center">
-  <p><sub>Switch terminal styles with <code>/box [1-3]</code> or pin in profile frontmatter. Progressive 350ms wake-on-key reveal.</sub></p>
+  <p><sub>Switch terminal styles with <code>/box [1-3]</code> Progressive 350ms wake-on-key reveal.</sub></p>
 </div>
 
 <br>
@@ -92,13 +92,13 @@
 | Invocation | Interface | Description |
 | :--- | :---: | :--- |
 | `[shortcut]` | **Shell Teleport** | Sub-millisecond context router (`matcher.rs`) via `rs-context.md` (e.g., `lfm`, `ling`) |
-| `ai` | **Interactive REPL** | Conversational chat session with thinking and token stats |
+| `ai` | **Interactive Chat** | Conversational chat session with thinking and token stats |
 | `ai init [path]` | **Workspace Agent** | Autonomous project workspace with full Smol 6-tools |
 
 </div>
 
 <p align="center">
-  <sub><code>/box [1-3]</code> style &nbsp;•&nbsp; <code>/yolo</code> (or <code>/g</code>) autonomy gate &nbsp;•&nbsp; <code>/clear</code> (or <code>/c</code>) reset &nbsp;•&nbsp; <code>q</code> or <code>exit</code> quit</sub>
+  <sub><code>/box [1-3]</code> style &nbsp;•&nbsp; <code>/p</code> (or <code>/profile</code>) profile select &nbsp;•&nbsp; <code>/r</code> reset session &nbsp;•&nbsp; <code>/s/code> or <code>/skill</code> skills</sub>
 </p>
 
 <br>
@@ -113,7 +113,6 @@
 * **Autonomous 6-Tool Suite (`tools.rs`):** Minimal tool surface built for refactoring without AST bloat: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant matcher), `write_file`, `list_dir`, `search_code`, and `run_command`.
 * **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and repairs broken JSON frames on the fly.
 * **Zero-Trust Security Boundary (`security.rs`):** Canonicalizes all paths inside workspace root. Traversal attempts (`../`) and mutating system calls (`sudo`, `pacman`, `pip`, `systemctl`, destructive `rm`) fail closed and require explicit interactive approval via `/dev/tty`.
-* **Live Thinking Gutter & Telemetry (`stream.rs`):** Streams model `<think>` reasoning into a dimmed `│ ` vertical gutter with word-wrapping, followed by compact live telemetry (`↑ ↓ R CH% · %/8.2k · s @ t/s`).
 
 <br>
 
@@ -145,19 +144,17 @@ Define agent profiles, tool tiers in Markdown frontmatter (`profiles/*.md`):
 ```markdown
 ---
 name: lfm3
-description: "Liquid AI LFM3-1.7B Edge Systems Engineer"
+description: "Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer (Native 6-Tool)"
 yolo: true
+adapters: true
 reasoning_budget: 500
+purebash: false
 ---
-ROLE: Liquid AI LFM3-1.7B Autonomous Edge Systems & Software Engineer.
-
-DIRECTIVES:
-- TOOL EXECUTION: Run tools immediately. Never output introductory commentary or planning summaries.
-- CLOSED-LOOP: Inspect (read_file) -> Edit (edit_file) -> Verify (run_command).
-- HALT: Stop immediately with: "✓ Task complete: <summary>".
 ```
 
-Drop skill guides like **`ponytail.md`** (anti-overengineering / YAGNI ladder) or **`humanizer.md`** (AI tell stripper) directly into `profiles/` or reference them inside system prompts.
+Drop profiles for models like **`lfm3.md`** (Liquid AI LFM3-1.7B) or **`lingtiny.md`** (Ling-3.0-tiny) directly into `profiles/` or type `newp` in terminal to create them.
+
+Drop skill guides like **`ponytail.md`** (anti-overengineering / YAGNI ladder) or **`humanizer.md`** (AI tell stripper) directly into `skills/` or reference them inside system prompts.
 
 <br>
 
@@ -180,8 +177,8 @@ mkdir -p ~/.local/bin
 ln -sf "$PWD/target/release/rs-agent" ~/.local/bin/ai
 
 # Register shell hook (bash or zsh)
-echo 'source ~/.config/rs-agent/rs-hook.sh' >> ~/.zshrc
-source ~/.zshrc
+echo 'source ~/.config/rs-agent/rs-hook.sh' >> ~/.bashrc
+source ~/.bashrc
 ```
 
 ### 2. Configure Providers (`.env`)
