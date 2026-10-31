@@ -85,7 +85,7 @@
 
 ---
 
-<h2 align="center">Execution Surfaces</h2>
+<h2 align="center">⚡ Execution Surfaces</h2>
 
 <div align="center">
 
@@ -105,7 +105,7 @@
 
 ---
 
-<h2 align="center">Runtime Architecture</h2>
+<h2 align="center">🛡 Runtime Architecture</h2>
 
 `rs-agent` discards heavy agent frameworks in favor of simple, predictable primitives:
 
@@ -118,7 +118,7 @@
 
 ---
 
-<h2 align="center">Smol 6-Tool Suite</h2>
+<h2 align="center">🛠 Smol 6-Tool Suite</h2>
 
 <div align="center">
 
@@ -137,7 +137,7 @@
 
 ---
 
-<h2 align="center">Workspace Profiles & Skills</h2>
+<h2 align="center">👤 Workspace Profiles & Skills</h2>
 
 Define agent profiles, tool tiers in Markdown frontmatter (`profiles/*.md`):
 
@@ -154,7 +154,7 @@ purebash: false    # false = 6 tools (~700t schema), true = single bash tool (~9
 
 Drop profiles for models like **`lfm3.md`** (Liquid AI LFM3-1.7B) or **`lingtiny.md`** (Ling-3.0-tiny) directly into `profiles/` or type `newp` in terminal to create them.
 
-Drop skill guides like **`ponytail.md`** (anti-overengineering / YAGNI ladder) or **`humanizer.md`** (AI tell stripper) directly into `skills/` or reference them inside system prompts.
+Drop skill guides like **`ponytail.md`** (anti-overengineering / YAGNI ladder) or **`humanizer.md`** (AI tell stripper) directly into `skills/`.
 
 <br>
 
@@ -162,7 +162,7 @@ Drop skill guides like **`ponytail.md`** (anti-overengineering / YAGNI ladder) o
 
 <h2 align="center">Setup & Installation</h2>
 
-### 1. Build and Link
+### 1. 🚀 Build and Link
 
 ```bash
 # Clone into config directory
@@ -181,14 +181,7 @@ echo 'source ~/.config/rs-agent/rs-hook.sh' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### 2. Configure Providers (`.env`)
-
-Configure credentials in `~/.config/rs-agent/.env`. Rs-Agent evaluates keys from the top down:
-
-1. **`CUSTOM2_API_KEY`**: Generic OpenAI endpoint (Grok, DeepSeek, TokenHarbor)
-2. **`CUSTOM_API_KEY`**: Hugging Face Inference Router
-3. **`OPENROUTER_API_KEY`**: OpenRouter Gateway
-4. **Local Fallback**: Automatically queries `http://127.0.0.1:8080/v1/models` (`llama-server`) with zero configuration.
+### 2. 🔌 Configure Providers (`.env`)
 
 <details>
 <summary><b>View Example (<code>~/.config/rs-agent/.env</code>)</b></summary>
@@ -224,7 +217,7 @@ OPENROUTER_MODEL="openrouter/free"
 
 ---
 
-<h2 align="center">Context Router (`rs-context.md`)</h2>
+<h2 align="center">🧭 Context Router (`rs-context.md`)</h2>
 
 Declare instant shortcut aliases for fast navigation:
 
