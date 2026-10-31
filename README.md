@@ -16,9 +16,9 @@
     <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>grok</code> &nbsp;•&nbsp; <code>openrouter</code>
   </p>
 
-  <p>
-    <b>A zero-dependency Rust AI agent engine driving local <code>llama-server</code> backends and cloud endpoints.</b><br>
-    <sub>Sub-millisecond startup, autonomous 6-tool refactoring suite, zero-trust security kernel, and streaming thinking telemetry.</sub>
+<p>
+    <b>A standalone Rust AI agent built for local <code>llama-server</code> backends and cloud endpoints.</b><br>
+    <sub>Sub-millisecond startup, autonomous 6-tool execution loop, zero-trust security kernel, and live token stats.</sub>
   </p>
 
   <br>
