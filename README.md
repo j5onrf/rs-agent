@@ -105,7 +105,7 @@
 
 ---
 
-<h2 align="center">🛡 Runtime Architecture</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Runtime Architecture</h2>
 
 `rs-agent` discards heavy agent frameworks in favor of simple, predictable primitives:
 
@@ -118,7 +118,7 @@
 
 ---
 
-<h2 align="center">🛠 Smol 6-Tool Suite</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Smol 6-Tool Suite</h2>
 
 <div align="center">
 
@@ -137,7 +137,7 @@
 
 ---
 
-<h2 align="center">👤 Workspace Profiles & Skills</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Workspace Profiles & Skills</h2>
 
 Define agent profiles, tool tiers in Markdown frontmatter (`profiles/*.md`):
 
@@ -217,7 +217,7 @@ OPENROUTER_MODEL="openrouter/free"
 
 ---
 
-<h2 align="center">🧭 Context Router (`rs-context.md`)</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Context Router (`rs-context.md`)</h2>
 
 Declare instant shortcut aliases for fast navigation:
 
