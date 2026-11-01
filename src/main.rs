@@ -105,10 +105,6 @@ fn handle_new_project(name: &str, intents_arg: Option<&str>) -> anyhow::Result<(
     Ok(())
 }
 
-fn get_styled_shell_prompt() -> String {
-    "\x1b[33m~\x1b[0m \x1b[1;33m❯\x1b[0m ".to_string()
-}
-
 fn build_system_prompt(
     is_agent: bool,
     target_dir: &Path,
@@ -228,6 +224,28 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             print!("\x1b[1A\r\x1b[2K");
             let _ = io::stdout().flush();
 
+            if !cfg.is_agent {
+                println!("  \x1b[1;33m[info]\x1b[0m /p is only available in workspace agents (ai init <path>).");
+                println!("         Chat mode is locked to the pure conversation profile.\n");
+                continue;
+            }
+
+            // Only guard with [y/N] if an active conversation exists
+            let has_conversation = history.iter().any(|m| m.role == "user");
+            if has_conversation {
+                print!("  \x1b[1;33m[warn]\x1b[0m Switching profile will erase active conversation. Proceed? [y/N] ");
+                let _ = io::stdout().flush();
+                let mut conf = String::new();
+                if io::stdin().read_line(&mut conf).is_err() || !matches!(conf.trim().to_lowercase().as_str(), "y" | "yes") {
+                    print!("\x1b[1A\r\x1b[2K");
+                    let _ = io::stdout().flush();
+                    println!("  \x1b[2mProfile switch cancelled.\x1b[0m\n");
+                    continue;
+                }
+                print!("\x1b[1A\r\x1b[2K");
+                let _ = io::stdout().flush();
+            }
+
             if let Some(new_prof) = Profile::select_interactive(target_dir, &cfg.profile_name) {
                 cfg.profile_name = new_prof;
                 active_profile = Profile::load(&cfg.profile_name);
@@ -250,10 +268,10 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     None
                 };
 
-                // Clean screen reset to ~ ❯ <new_profile>
+                // Clean screen reset with status line touching the box directly
                 print!("\x1b[H\x1b[2J");
-                let prompt = get_styled_shell_prompt();
-                println!("{}{}", prompt, cfg.profile_name);
+                println!(); // Row 1: Blank margin matching shell
+                println!("\x1b[1;32m✓\x1b[0m \x1b[2mProfile set to:\x1b[0m \x1b[1;36m{}\x1b[0m", cfg.profile_name);
                 ui::draw_box(&provider.model, &cfg.profile_name, current_box_style, false);
                 let _ = io::stdout().flush();
             }
@@ -336,22 +354,78 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             state::set_box_style(current_box_style);
 
             print!("\x1b[H\x1b[2J");
-            let prompt = get_styled_shell_prompt();
-            let cmd = if cfg.is_agent { &cfg.profile_name } else { "ai" };
-            println!("{}{}", prompt, cmd);
+            println!(); // Row 1
+            println!("\x1b[1;32m✓\x1b[0m \x1b[2mTheme set to box style\x1b[0m \x1b[1;36m{}\x1b[0m", current_box_style);
             let second_line = if cfg.is_agent { &cfg.profile_name } else { "chat" };
             ui::draw_box(&provider.model, second_line, current_box_style, false);
+            let _ = io::stdout().flush();
             continue;
         }
 
-        if input == "/clear" || input == "/c" {
-            history.truncate(1);
+        // Live /r or /reset Session Reset: wipes memory & resets screen
+        if input == "/r" || input == "/reset" {
+            print!("\x1b[1A\r\x1b[2K");
+            let _ = io::stdout().flush();
+
+            history.clear();
+            system_prompt = build_system_prompt(cfg.is_agent, target_dir, &active_profile, &active_skills);
+            history.push(ChatMessage::system(&system_prompt));
+
             print!("\x1b[H\x1b[2J");
-            let prompt = get_styled_shell_prompt();
-            let cmd = if cfg.is_agent { &cfg.profile_name } else { "ai" };
-            println!("{}{}", prompt, cmd);
+            println!(); // Row 1
+            println!("\x1b[1;32m✓\x1b[0m \x1b[2mSession reset\x1b[0m");
             let second_line = if cfg.is_agent { &cfg.profile_name } else { "chat" };
             ui::draw_box(&provider.model, second_line, current_box_style, false);
+            let _ = io::stdout().flush();
+            continue;
+        }
+
+        // Live /c or /clear Screen Wipe: clears screen, keeps conversation memory
+        if input == "/clear" || input == "/c" {
+            print!("\x1b[H\x1b[2J");
+            println!(); // Row 1
+            println!("\x1b[1;32m✓\x1b[0m \x1b[2mSession reset\x1b[0m");
+            let second_line = if cfg.is_agent { &cfg.profile_name } else { "chat" };
+            let second_line = if cfg.is_agent { &cfg.profile_name } else { "chat" };
+            ui::draw_box(&provider.model, second_line, current_box_style, false);
+            let _ = io::stdout().flush();
+            continue;
+        }
+
+        // Intercept Quick Tools from rs-context.md
+        let router = matcher::ContextRouter::load();
+        if let Some(entry) = router.resolve_entry(input) {
+            let cmd = entry.command;
+
+            // Enforce confirmation if marked with [gate] or if security kernel flags mutating command
+            let is_destructive = cmd.contains("rm ") || cmd.contains("sudo ") || cmd.contains("reset --hard");
+            if entry.gated || is_destructive {
+                print!("  \x1b[1;33m[gate]\x1b[0m Execute '\x1b[1;36m{}\x1b[0m'? [y/N] ", cmd);
+                let _ = io::stdout().flush();
+                let mut conf = String::new();
+                if io::stdin().read_line(&mut conf).is_err() || !matches!(conf.trim().to_lowercase().as_str(), "y" | "yes") {
+                    println!("  \x1b[2mCancelled.\x1b[0m\n");
+                    continue;
+                }
+                println!();
+            }
+            if cmd.starts_with("ai init ") {
+                println!("  \x1b[1;33m[info]\x1b[0m Workspace teleports ('{}') are used from your terminal shell.\n", input);
+                continue;
+            }
+
+            let expanded_cmd = if let Ok(home) = std::env::var("HOME") {
+                cmd.replace("~/", &format!("{}/", home))
+            } else {
+                cmd
+            };
+
+            let _ = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(&expanded_cmd)
+                .status();
+
+            println!();
             continue;
         }
 

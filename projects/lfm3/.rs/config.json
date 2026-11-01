@@ -3,5 +3,6 @@
   "is_agent": true,
   "tier": "Smol",
   "yolo": true,
+  "adapters": true,
   "thinking_budget": 500
 }

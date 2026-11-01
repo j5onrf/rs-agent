@@ -331,15 +331,19 @@ impl Profile {
                         let _ = disable_raw_mode();
                         return Some(options[sel_idx].clone());
                     }
-                    KeyCode::Esc
-                    | KeyCode::Char('q')
-                    | KeyCode::Char('c')
+                    KeyCode::Esc | KeyCode::Char('q') => {
+                        print!("\x1b[{}A\r\x1b[J\x1b[?25h", lines_to_ascend);
+                        let _ = stdout.flush();
+                        let _ = disable_raw_mode();
+                        return None;
+                    }
+                    KeyCode::Char('c')
                         if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
                     {
                         print!("\x1b[{}A\r\x1b[J\x1b[?25h", lines_to_ascend);
                         let _ = stdout.flush();
                         let _ = disable_raw_mode();
-                        return Some(options[default_idx.min(options.len() - 1)].clone());
+                        return None;
                     }
                     _ => {}
                 }

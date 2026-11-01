@@ -1,44 +1,59 @@
 use std::fs;
 use std::path::PathBuf;
 
+#[derive(Clone, Debug)]
 pub struct ContextEntry {
     pub command: String,
     pub aliases: Vec<String>,
+    pub gated: bool,
 }
 
 impl ContextEntry {
     pub fn parse(line: &str) -> Option<Self> {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') || !line.contains("--->") {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
             return None;
         }
 
-        let parts: Vec<&str> = line.splitn(2, "--->").collect();
-        let command = parts[0].trim().to_string();
-        let aliases = parts[1]
+        let parts: Vec<&str> = trimmed.split("--->").collect();
+        if parts.len() != 2 {
+            return None;
+        }
+
+        let mut raw_cmd = parts[0].trim();
+        let gated = if raw_cmd.starts_with("[gate]") {
+            raw_cmd = raw_cmd["[gate]".len()..].trim();
+            true
+        } else {
+            false
+        };
+        let command = raw_cmd.to_string();
+
+        let aliases: Vec<String> = parts[1]
             .split(',')
-            .map(|a| a.trim().to_lowercase())
-            .filter(|a| !a.is_empty())
+            .map(|s| s.trim().to_lowercase())
+            .filter(|s| !s.is_empty())
             .collect();
 
-        Some(Self { command, aliases })
+        if aliases.is_empty() {
+            return None;
+        }
+
+        Some(Self { command, aliases, gated })
     }
 }
 
 pub struct ContextRouter {
-    entries: Vec<ContextEntry>,
+    pub entries: Vec<ContextEntry>,
 }
 
 impl ContextRouter {
     pub fn load() -> Self {
-        let path = dirs::home_dir()
-            .map(|h| h.join(".config/rs-agent/rs-context.md"))
-            .filter(|p| p.exists())
-            .or_else(|| dirs::home_dir().map(|h| h.join(".config/py-agent/ai-context.md")))
-            .unwrap_or_else(|| PathBuf::from("rs-context.md"));
-
+        let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+        let ctx_path = PathBuf::from(home).join(".config/rs-agent/rs-context.md");
         let mut entries = Vec::new();
-        if let Ok(content) = fs::read_to_string(path) {
+
+        if let Ok(content) = fs::read_to_string(ctx_path) {
             for line in content.lines() {
                 if let Some(entry) = ContextEntry::parse(line) {
                     entries.push(entry);
@@ -50,25 +65,16 @@ impl ContextRouter {
     }
 
     pub fn resolve(&self, query: &str) -> Option<String> {
-        let q = query.trim().to_lowercase();
-        if q.is_empty() {
-            return None;
-        }
+        self.resolve_entry(query).map(|e| e.command)
+    }
 
-        // Pass 1: Exact alias match
+    pub fn resolve_entry(&self, query: &str) -> Option<ContextEntry> {
+        let q = query.trim().to_lowercase();
         for entry in &self.entries {
             if entry.aliases.iter().any(|a| a == &q) {
-                return Some(entry.command.clone());
+                return Some(entry.clone());
             }
         }
-
-        // Pass 2: Prefix / Substring match
-        for entry in &self.entries {
-            if entry.aliases.iter().any(|a| a.starts_with(&q) || q.starts_with(a)) {
-                return Some(entry.command.clone());
-            }
-        }
-
         None
     }
 }
