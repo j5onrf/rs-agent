@@ -1,0 +1,11 @@
+# CODEBASE ARCHITECTURE MAP
+# Root: /home/j5/.config/rs-agent
+# Target: /home/j5/.config/rs-agent/tools/rs-index
+# Purpose: A Rust AI agent built for low-latency local llama-server C++ backends, slm/llm gguf, and cloud endpoints.
+# Dependencies: tokio, reqwest, futures-util, eventsource-stream, serde, serde_json, crossterm, clap, anyhow, regex, dirs
+# --------------------------------------------------
+
+# Active Architecture Tree:
+# --------------------------------------------------
+
+## Rust API Skeleton:

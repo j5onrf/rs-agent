@@ -4,20 +4,19 @@
   <img alt="rs-agent" src="logo.svg?v=2" height="130" />
   <h1>Rs-Agent</h1>
  
-<p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.2.1.svg?variant=secondary" alt="Version"></a>
+  <p>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.3.1.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Cargo.svg?variant=outline&logo=rust" alt="Cargo"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
     <a href="https://shieldcn.dev/badge/status-beta-blue.svg"><img src="https://shieldcn.dev/badge/status-beta-blue.svg" alt="Status"></a>
   </p>
 
   <p>
-    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>plugins</code> &nbsp;•&nbsp; <code>router</code>
+    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>router</code> &nbsp;•&nbsp; <code>local-first</code>
   </p>
 
-<p>
+  <p>
     <b>A Rust AI agent built for low-latency local <code>llama-server</code> C++ backends, slm/llm gguf, and cloud endpoints.</b><br>
     <sub>Sub-millisecond boot, autonomous 6-tool execution loop, zero-trust security kernel, edge-model JSON repair, and live token stats.</sub>
   </p>
@@ -35,7 +34,7 @@
       </td>
       <td align="center" width="50%" valign="top">
         <h3>27B+ (LLM)</h3>
-        <p><sub>Deep reasoning, long complex, and multi-turn loops</sub></p>
+        <p><sub>Deep reasoning, complex logic, and multi-turn loops</sub></p>
         <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br>
         <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br>
         <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br>
@@ -79,7 +78,7 @@
 ```
 
 <div align="center">
-  <p><sub>Switch terminal styles with <code>/box [1-3]</code> Progressive 350ms wake-on-key reveal.</sub></p>
+  <p><sub>Switch terminal styles with <code>/box [1-3]</code> · Progressive 350ms wake-on-key reveal</sub></p>
 </div>
 
 <br>
@@ -92,14 +91,17 @@
 
 | Invocation | Interface | Description |
 | :--- | :---: | :--- |
-| `[shortcut]` | **Shell Teleport** | Sub-millisecond context router (`matcher.rs`) via `rs-context.md` (e.g., `lfm`, `ling`) |
-| `ai` | **Interactive Chat** | Conversational chat session with thinking and token stats |
-| `ai init [path]` | **Workspace Agent** | Autonomous project workspace with full Smol 6-tools |
+| `[shortcut]` | **Shell Teleport** | Sub-millisecond context router via `rs-context.md` (e.g., `lfm`, `ling`) |
+| `ai` | **Interactive Chat** | Conversational chat session with thinking gutters and live token stats |
+| `ai init [path]` | **Workspace Agent** | Autonomous project workspace with full Smol 6-tool suite |
+| `newp` | **Project Creator** | Interactive wizard to scaffold projects and auto-link router aliases |
+| `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) |
+| `ta` | **System Diagnostics** | 10-pass native verification suite testing binary integrity and safety |
 
 </div>
 
 <p align="center">
-  <sub><code>/p</code> (or <code>/profile</code>) profile select &nbsp;•&nbsp; <code>/r</code> reset session &nbsp;•&nbsp; <code>/s</code> or <code>/skill</code> skills</sub>
+  <sub><code>/p</code> profile select &nbsp;•&nbsp; <code>/r</code> reset session &nbsp;•&nbsp; <code>/s</code> toggle skills</sub>
 </p>
 
 <br>
@@ -110,10 +112,10 @@
 
 `rs-agent` discards heavy agent frameworks in favor of simple, predictable primitives:
 
-* **Sub-Millisecond Shell Intercept (`matcher.rs`):** `rs-hook.sh` catches missing commands and routes through `rs-context.md` in `< 0.2ms`. Typing `lfm` jumps into the directory and launches the agent instantly.
-* **Autonomous 6-Tool Suite (`tools.rs`):** Minimal tool surface built for refactoring without AST bloat: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant matcher), `write_file`, `list_dir`, `search_code`, and `run_command`.
-* **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and repairs broken JSON frames on the fly.
-* **Zero-Trust Security Boundary (`security.rs`):** Canonicalizes all paths inside workspace root. Traversal attempts (`../`) and mutating system calls (`sudo`, `pacman`, `pip`, `systemctl`, destructive `rm`) fail closed and require explicit interactive approval via `/dev/tty`.
+* **Sub-Millisecond Shell Intercept (`matcher.rs`):** `rs-hook.sh` intercepts terminal input and matches against `rs-context.md` in `< 0.2ms`. Typing `lfm` jumps into the target directory and launches the workspace instantly.
+* **Autonomous 6-Tool Suite (`tools.rs`):** Minimal tool surface built for refactoring without AST bloat: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
+* **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and heals broken JSON frames on the fly.
+* **Zero-Trust Security Boundary (`security.rs`):** Canonicalizes all paths inside workspace root. Traversal attempts (`../`) and mutating system calls (`sudo`, `pacman`, `pip`, `systemctl`, destructive `rm`) fail closed and require explicit approval via `/dev/tty`.
 
 <br>
 
@@ -138,9 +140,26 @@
 
 ---
 
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Efficiency & Token Footprint</h2>
+
+<div align="center">
+
+| Operational Tier | Token Budget | Runtime Footprint | Target Workload |
+| :--- | :---: | :---: | :--- |
+| **Pure Chat** (`ai`) | **~180 tokens** | < 1ms startup · 0 MB idle | Conversational queries and fast reasoning |
+| **Pure Bash** (`purebash: true`) | **~95 tokens** | Single-tool dispatch loop | Low-parameter SLMs (1.7B–3B) via shell commands |
+| **Smol 6-Tool** (`purebash: false`) | **~700 tokens** | Full AST-free surgical suite | Code refactoring, test execution, and file search |
+| **Context Router** (`matcher.rs`) | **0 tokens** | < 0.2ms shell lookup | Instant shortcut teleportation via `rs-context.md` |
+
+</div>
+
+<br>
+
+---
+
 <h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Workspace Profiles & Skills</h2>
 
-Define agent profiles, tool tiers in Markdown frontmatter (`profiles/*.md`):
+Define agent profiles and runtime behavior in Markdown frontmatter (`profiles/*.md`):
 
 ```markdown
 ---
@@ -153,9 +172,9 @@ purebash: false    # false = 6 tools (~700t schema), true = single bash tool (~9
 ---
 ```
 
-Drop profiles for models like **`lfm3.md`** (Liquid AI LFM3-1.7B) or **`lingtiny.md`** (Ling-3.0-tiny) directly into `profiles/` or type `newp` in terminal to create them.
-
-Drop skill guides like **`ponytail.md`** (anti-overengineering / YAGNI ladder) or **`humanizer.md`** (AI tell stripper) directly into `skills/`.
+* **Profiles (`profiles/`):** Model configurations and system personas (e.g. `lfm3.md`, `lingtiny.md`, `chat.md`). Run `newp` to scaffold new workspaces with interactive profile selection.
+* **Skills (`skills/`):** Modular runtime directives toggled via `/s` (e.g. `ponytail.md` for YAGNI minimalism, `humanizer.md` for clean output).
+* **Global Rules (`system_instructions.md`):** Universal directives loaded across every profile and workspace.
 
 <br>
 
@@ -163,7 +182,7 @@ Drop skill guides like **`ponytail.md`** (anti-overengineering / YAGNI ladder) o
 
 <h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Setup & Installation</h2>
 
-### 1. 🚀 Build and Link
+### 1. 👤 Build and Link
 
 ```bash
 # Clone into config directory
@@ -213,26 +232,6 @@ OPENROUTER_MODEL="openrouter/free"
 ```
 
 </details>
-
-<br>
-
----
-
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Context Router (`rs-context.md`)</h2>
-
-Declare instant shortcut aliases for fast navigation:
-
-```markdown
-# --- Workspaces ---
-ai init ~/.config/rs-agent/projects/lfm3 ---> lfm3, lfm
-ai init ~/.config/rs-agent/projects/ling-tiny ---> ling, ling-tiny
-ai init ~/.config/rs-agent/projects/clover ---> clover, clov
-ai init ~/.config/rs-agent/projects/sage ---> sage
-
-# --- Quick Tools ---
-curl -s "wttr.in/?format=3" ---> weather, wttr
-date "+Current Date: %A, %B %-d, %Y" ---> get date, today
-```
 
 <br>
 

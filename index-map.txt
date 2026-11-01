@@ -1,0 +1,207 @@
+# CODEBASE ARCHITECTURE MAP
+# Root: /home/j5/.config/rs-agent
+# Target: /home/j5/.config/rs-agent
+# Purpose: A Rust AI agent built for low-latency local llama-server C++ backends, slm/llm gguf, and cloud endpoints.
+# Dependencies: tokio, reqwest, futures-util, eventsource-stream, serde, serde_json, crossterm, clap, anyhow, regex, dirs
+# --------------------------------------------------
+
+# Active Architecture Tree:
+#   ├── Cargo.toml                       - name = "rs-agent"
+#   ├── README.md                        - A Rust AI agent built for low-latency local llama-server C++ backends, slm/llm g
+#   ├── profiles/chat.md                 - Versatile, articulate, and high-signal conversational partner
+#   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer (Native 6-Tool)
+#   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer (Native 6-Tool)
+#   ├── profiles/photocraft-gem.md       - PhotoCraft Visual Engine & Automation Specialist (Gemini Flash Lite)
+#   ├── profiles/photocraft-loc.md       - Ling-3.0-tiny PhotoCraft Automation Engineer (Native 6-Tool)
+#   ├── profiles/purebash-lfm.md         - Pure Bash LFM2.5 Minimalist Shell Agent
+#   ├── profiles/purebash-ling.md        - Pure Bash Minimalist Shell-Centric Agent (Single-Tool SLM)
+#   ├── profiles/sage.md                 - InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent
+#   ├── rs-context.md                    - Agent Context Router
+#   ├── rs-hook.sh                       - rs-agent Shell Hook (Sub-Millisecond Startup)
+#   ├── skills/humanizer.md              - Anti-AI Slop Humanizer Directive
+#   ├── skills/ponytail.md               - Ponytail Architecture Directive for Rust
+#   ├── src/adapter.rs                   - fn: heal_json_args, repair_tool_args
+#   ├── src/client.rs                    - types: ChatMessage, LlmClient
+#   ├── src/config.rs                    - types: ToolTier, WorkspaceConfig, ProviderConfig
+#   ├── src/main.rs                      - CLI Entrypoint & Runtime Loop
+#   ├── src/matcher.rs                   - types: ContextEntry, ContextRouter
+#   ├── src/profile.rs                   - types: Profile
+#   ├── src/security.rs                  - types: SecurityBoundary
+#   ├── src/skill.rs                     - types: Skill, SkillAction
+#   ├── src/spinner.rs                   - types: InlineSpinner
+#   ├── src/state.rs                     - types: AppState
+#   ├── src/stream.rs                    - types: UsageStats, StreamRenderer
+#   ├── src/tools.rs                     - fn: get_tools_schema, execute_tool
+#   ├── src/ui.rs                        - fn: render_frame, draw_box
+#   ├── tools/new-project/Cargo.toml     - name = "new-project"
+#   ├── tools/new-project/new-project
+#   ├── tools/new-project/src/main.rs    - CLI Entrypoint & Runtime Loop
+#   └── tools/test-agent/test-agent
+# --------------------------------------------------
+
+## Rust API Skeleton:
+
+### `src/main.rs`
+```rust
+  L003: mod adapter;
+  L004: mod client;
+  L005: mod config;
+  L006: mod matcher;
+  L007: mod profile;
+  L008: mod security;
+  L009: mod skill;
+  L010: mod spinner;
+  L011: mod state;
+  L012: mod stream;
+  L013: mod tools;
+  L014: mod ui;
+  L031: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
+  L041: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff }
+  L458: async fn main() -> anyhow :: Result<()>;
+```
+
+### `tools/new-project/src/main.rs`
+```rust
+  L032: fn main();
+```
+
+### `src/adapter.rs`
+```rust
+  L005: pub fn heal_json_args(raw_args: &str) -> Value; // Parses and heals JSON arguments into a serde_json::Value (used by tools.rs)
+  L027: pub fn repair_tool_args(fn_name: &str, raw_args: &str) -> String; // Repairs common SLM JSON formatting defects (unescaped newlines, markdown fences, trailing commas)
+```
+
+### `src/client.rs`
+```rust
+  L014: pub struct ChatMessage { pub role: String, pub content: String, pub tool_calls: Option<Value>, pub tool_call_id: Option<String> }
+  L024: impl ChatMessage {
+    L025: pub fn system(content: impl Into<String>) -> Self;
+    L034: pub fn user(content: impl Into<String>) -> Self;
+    L043: pub fn assistant(content: impl Into<String>) -> Self;
+    L052: pub fn tool_response(tool_call_id: String, content: String) -> Self;
+  }
+  L062: pub struct LlmClient
+  L067: impl LlmClient {
+    L068: pub fn new(config: ProviderConfig) -> Self;
+    L075: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<Vec<Value>>, UsageStats)>;
+  }
+```
+
+### `src/config.rs`
+```rust
+  L009: pub enum ToolTier { PureBash, Smol }
+  L015: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, ... (6 fields) }
+  L026: impl Default for WorkspaceConfig {
+    L027: fn default() -> Self;
+  }
+  L039: impl WorkspaceConfig {
+    L040: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
+    L058: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
+  }
+  L067: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String }
+  L095: impl ProviderConfig {
+    L096: pub async fn load() -> Self;
+  }
+  L177: pub fn load_global_instructions() -> Option<String>; // Loads active (uncommented) rules from system_instructions.md
+```
+
+### `src/matcher.rs`
+```rust
+  L004: pub struct ContextEntry { pub command: String, pub aliases: Vec<String> }
+  L009: impl ContextEntry {
+    L010: pub fn parse(line: &str) -> Option<Self>;
+  }
+  L028: pub struct ContextRouter
+  L032: impl ContextRouter {
+    L033: pub fn load() -> Self;
+    L052: pub fn resolve(&self, query: &str) -> Option<String>;
+  }
+```
+
+### `src/profile.rs`
+```rust
+  L010: pub struct Profile { pub name: String, pub tier: ToolTier, pub yolo: bool, ... (6 fields) }
+  L020: impl Profile {
+    L021: pub fn parse(name: &str, raw_content: &str) -> Self;
+    L079: pub fn profile_dirs() -> Vec<PathBuf>;
+    L093: pub fn load(profile_name: &str) -> Option<Self>;
+    L121: pub fn list_available() -> Vec<String>;
+    L154: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
+    L177: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
+    L219: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
+    L262: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
+  }
+```
+
+### `src/security.rs`
+```rust
+  L014: pub struct SecurityBoundary { pub root: PathBuf }
+  L018: impl SecurityBoundary {
+    L019: pub fn new<P: AsRef<Path>>(workspace: P) -> Self;
+    L024: pub fn resolve_path(&self, target: &str) -> PathBuf; // Resolves target path expanding ~ and relative components
+    L036: pub fn is_outside(&self, path: &Path) -> bool; // Returns true if the target path breaks outside the workspace root
+    L050: pub fn check_command(&self, cmd: &str) -> Option<&'static str>; // Flags system mutating package managers or destructive shell calls
+    L065: pub fn authorize(&self, action: &str, is_security_event: bool, yolo: bool) -> bool; // Invariant gate: Never bypass security events even in YOLO; auto-approve safe in-bounds actions in YOLO
+  }
+```
+
+### `src/skill.rs`
+```rust
+  L009: pub struct Skill { pub name: String, pub description: String, pub content: String }
+  L016: pub enum SkillAction { Attach(String), Detach(String), DetachAll }
+  L023: impl Skill {
+    L024: pub fn parse(name: &str, raw_content: &str) -> Self;
+    L056: pub fn skill_dirs() -> Vec<PathBuf>;
+    L068: pub fn list_available() -> Vec<String>;
+    L093: pub fn load(skill_name: &str) -> Option<Self>;
+    L105: pub fn select_interactive(active_skills: &[String]) -> Option<SkillAction>; // Interactive selector with live search, toggle, and Detach All
+  }
+```
+
+### `src/spinner.rs`
+```rust
+  L007: pub struct InlineSpinner
+  L014: impl InlineSpinner {
+    L015: pub fn new() -> Self;
+    L024: pub fn start(&mut self, msg: &str);
+    L063: pub fn update(&self, msg: &str);
+    L069: pub fn stop(&mut self);
+  }
+  L081: impl Drop for InlineSpinner {
+    L082: fn drop(&mut self);
+  }
+```
+
+### `src/state.rs`
+```rust
+  L005: pub struct AppState { pub box_style: usize }
+  L010: impl Default for AppState {
+    L011: fn default() -> Self;
+  }
+  L022: pub fn get_box_style() -> usize;
+  L034: pub fn set_box_style(style: usize);
+```
+
+### `src/stream.rs`
+```rust
+  L004: pub struct UsageStats { pub prompt_tokens: usize, pub completion_tokens: usize, pub reasoning_tokens: usize, pub cached_tokens: usize }
+  L012: pub struct StreamRenderer { pub thinking_started: bool, pub answer_started: bool, pub at_line_start: bool, ... (9 fields) }
+  L024: impl StreamRenderer {
+    L025: pub fn new() -> Self;
+    L068: pub fn close_thinking(&mut self); // Cleanly closes thinking gutter with proper blank line spacing
+    L083: pub fn on_chunk(&mut self, chunk: &str, is_thinking: bool);
+    L141: pub fn finish(&mut self, stats: &UsageStats, prompt_chars: usize);
+  }
+```
+
+### `src/tools.rs`
+```rust
+  L017: pub fn get_tools_schema(tier: &ToolTier) -> Value;
+  L130: pub async fn execute_tool(name: &str, raw_args: &str, workspace: &Path, boundary: &SecurityBoundary, yolo: bool ,) -> Result<String, String>;
+```
+
+### `src/ui.rs`
+```rust
+  L026: pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) ->(Vec<String>, usize);
+  L195: pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Option<char>;
+```
