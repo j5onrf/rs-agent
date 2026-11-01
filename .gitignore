@@ -6,7 +6,5 @@
 *.db-wal
 *.db-shm
 .rs/
-
-system_instructions.md
 state.json
 target/

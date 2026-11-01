@@ -1,13 +1,13 @@
 # CODEBASE ARCHITECTURE MAP
 # Root: /home/j5/.config/rs-agent
 # Target: /home/j5/.config/rs-agent
-# Purpose: A Rust AI agent built for low-latency local llama-server C++ backends, slm/llm gguf, and cloud endpoints.
+# Purpose: gguf llama.cpp router local-first
 # Dependencies: tokio, reqwest, futures-util, eventsource-stream, serde, serde_json, crossterm, clap, anyhow, regex, dirs
 # --------------------------------------------------
 
 # Active Architecture Tree:
 #   ├── Cargo.toml                       - name = "rs-agent"
-#   ├── README.md                        - A Rust AI agent built for low-latency local llama-server C++ backends, slm/llm g
+#   ├── README.md                        - gguf llama.cpp router local-first
 #   ├── profiles/chat.md                 - Versatile, articulate, and high-signal conversational partner
 #   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer (Native 6-Tool)
 #   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer (Native 6-Tool)
