@@ -16,8 +16,8 @@
 #   ├── profiles/purebash-lfm.md         - Pure Bash LFM2.5 Minimalist Shell Agent
 #   ├── profiles/purebash-ling.md        - Pure Bash Minimalist Shell-Centric Agent (Single-Tool SLM)
 #   ├── profiles/sage.md                 - InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent
-#   ├── rs-context.md                    - Agent Context Router
-#   ├── rs-hook.sh                       - rs-agent Shell Hook (Sub-Millisecond Startup)
+#   ├── rs-context.md                    - Rs-Agent Context Router
+#   ├── rs-hook.sh                       - Rs-Agent Shell Hook (Sub-Millisecond Startup)
 #   ├── skills/humanizer.md              - Anti-AI Slop Humanizer Directive
 #   ├── skills/ponytail.md               - Ponytail Architecture Directive for Rust
 #   ├── src/adapter.rs                   - fn: heal_json_args, repair_tool_args
@@ -33,6 +33,7 @@
 #   ├── src/stream.rs                    - types: UsageStats, StreamRenderer
 #   ├── src/tools.rs                     - fn: get_tools_schema, execute_tool
 #   ├── src/ui.rs                        - fn: render_frame, draw_box
+#   ├── system_instructions.md           - Global System Instructions (identical to .cursorrules or CLAUDE.md):
 #   ├── tools/new-project/Cargo.toml     - name = "new-project"
 #   ├── tools/new-project/new-project
 #   ├── tools/new-project/src/main.rs    - CLI Entrypoint & Runtime Loop
@@ -57,7 +58,7 @@
   L014: mod ui;
   L031: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
   L041: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff }
-  L458: async fn main() -> anyhow :: Result<()>;
+  L532: async fn main() -> anyhow :: Result<()>;
 ```
 
 ### `tools/new-project/src/main.rs`
@@ -107,14 +108,15 @@
 
 ### `src/matcher.rs`
 ```rust
-  L004: pub struct ContextEntry { pub command: String, pub aliases: Vec<String> }
-  L009: impl ContextEntry {
-    L010: pub fn parse(line: &str) -> Option<Self>;
+  L004: pub struct ContextEntry { pub command: String, pub aliases: Vec<String>, pub gated: bool }
+  L011: impl ContextEntry {
+    L012: pub fn parse(line: &str) -> Option<Self>;
   }
-  L028: pub struct ContextRouter
-  L032: impl ContextRouter {
-    L033: pub fn load() -> Self;
-    L052: pub fn resolve(&self, query: &str) -> Option<String>;
+  L046: pub struct ContextRouter { pub entries: Vec<ContextEntry> }
+  L050: impl ContextRouter {
+    L051: pub fn load() -> Self;
+    L067: pub fn resolve(&self, query: &str) -> Option<String>;
+    L071: pub fn resolve_entry(&self, query: &str) -> Option<ContextEntry>;
   }
 ```
 

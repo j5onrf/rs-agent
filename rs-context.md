@@ -1,5 +1,6 @@
 # Rs-Agent Context Router
 
+```properties
 # --- Workspaces ---
 ai init ~/.config/rs-agent/projects/lfm3 ---> lfm3, lfm
 ai init ~/.config/rs-agent/projects/ling-tiny ---> ling, ling-tiny, lingtiny
@@ -16,5 +17,6 @@ ai init ~/.config/rs-agent/projects/qwen38d ---> qwen38d, qwen
 curl -s "wttr.in/?format=3" ---> get weather, wttr
 date "+Current Date: %A, %B %-d, %Y" ---> get date
 
-# Example Gated Tool:
+# --- Gated Tools ---
 [gate] date "+Current Date: %A, %B %-d, %Y" ---> test gate
+```
