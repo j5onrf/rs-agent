@@ -55,7 +55,6 @@
   </p>
 </div>
 
-<br>
 
 ---
 
@@ -81,7 +80,7 @@
   <p><sub>Switch terminal styles with <code>/box [1-3]</code> · Progressive 350ms wake-on-key reveal</sub></p>
 </div>
 
-<br>
+
 
 ---
 
@@ -104,7 +103,7 @@
   <sub><code>/p</code> profile select &nbsp;•&nbsp; <code>/r</code> reset session &nbsp;•&nbsp; <code>/s</code> toggle skills</sub>
 </p>
 
-<br>
+
 
 ---
 
@@ -117,7 +116,7 @@
 * **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and heals broken JSON frames on the fly.
 * **Zero-Trust Security Boundary (`security.rs`):** Canonicalizes all paths inside workspace root. Traversal attempts (`../`) and mutating system calls (`sudo`, `pacman`, `pip`, `systemctl`, destructive `rm`) fail closed and require explicit approval via `/dev/tty`.
 
-<br>
+
 
 ---
 
@@ -136,7 +135,7 @@
 
 </div>
 
-<br>
+
 
 ---
 
@@ -153,7 +152,7 @@
 
 </div>
 
-<br>
+
 
 ---
 
@@ -176,7 +175,7 @@ purebash: false    # false = 6 tools (~700t schema), true = single bash tool (~9
 * **Skills (`skills/`):** Modular runtime directives toggled via `/s` (e.g. `ponytail.md` for YAGNI minimalism, `humanizer.md` for clean output).
 * **Global Rules (`system_instructions.md`):** Universal directives loaded across every profile and workspace.
 
-<br>
+
 
 ---
 
@@ -233,11 +232,12 @@ OPENROUTER_MODEL="openrouter/free"
 
 </details>
 
-<br>
+
 
 ---
 
 <div align="center">
   <sub>Built for speed, clarity, and terminal minimalism. Licensed under the <b><a href="LICENSE">MIT License</a></b>.</sub>
 </div>
+
 
