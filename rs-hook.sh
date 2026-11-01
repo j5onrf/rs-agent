@@ -1,4 +1,4 @@
-# rs-agent Shell Hook (Sub-Millisecond Startup)
+# Rs-Agent Shell Hook (Sub-Millisecond Startup)
 _ai_bin="$HOME/.local/bin/ai"
 [[ ! -x "$_ai_bin" ]] && _ai_bin="$HOME/.config/rs-agent/target/release/rs-agent"
 

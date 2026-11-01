@@ -181,7 +181,7 @@ purebash: false    # false = 6 tools (~700t schema), true = single bash tool (~9
 
 <h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Setup & Installation</h2>
 
-### 1. 👤 Build and Link
+### 1. 🛠 Build and Link
 
 ```bash
 # Clone into config directory

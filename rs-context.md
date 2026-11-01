@@ -1,4 +1,4 @@
-# Agent Context Router
+# Rs-Agent Context Router
 
 # --- Workspaces ---
 ai init ~/.config/rs-agent/projects/lfm3 ---> lfm3, lfm
