@@ -2,7 +2,8 @@
 set -eo pipefail
 
 PLUGIN_DIR="$HOME/.config/rs-agent/plugins/t3code"
-BRIDGE_BIN="$PLUGIN_DIR/t3code-bridge"
+BRIDGE_BIN="$HOME/.config/rs-agent/target/release/t3code-bridge"
+[[ -f "$BRIDGE_BIN" ]] || BRIDGE_BIN="$PLUGIN_DIR/t3code-bridge"
 
 T3_BIN="$(command -v t3code || command -v t3 || true)"
 T3_CLI="$HOME/.t3/bin/t3"

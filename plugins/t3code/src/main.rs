@@ -9,16 +9,23 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::sync::Mutex;
+use tokio::sync::{oneshot, Mutex};
 
 struct SessionState {
     workspace: PathBuf,
     history: Vec<ChatMessage>,
     active_tools: Option<Value>,
     cancel_flag: Arc<AtomicBool>,
+}
+
+fn send_raw_rpc(payload: &Value) {
+    let serialized = serde_json::to_string(payload).unwrap_or_default();
+    let mut stdout = std::io::stdout().lock();
+    let _ = writeln!(stdout, "{}", serialized);
+    let _ = stdout.flush();
 }
 
 fn send_rpc(id: Option<&Value>, result: Option<Value>, error: Option<Value>) {
@@ -31,10 +38,7 @@ fn send_rpc(id: Option<&Value>, result: Option<Value>, error: Option<Value>) {
     } else {
         payload["result"] = result.unwrap_or_else(|| json!({}));
     }
-    let serialized = serde_json::to_string(&payload).unwrap_or_default();
-    let mut stdout = std::io::stdout().lock();
-    let _ = writeln!(stdout, "{}", serialized);
-    let _ = stdout.flush();
+    send_raw_rpc(&payload);
 }
 
 fn send_acp_chunk(session_id: &str, text: &str, is_thought: bool) {
@@ -56,10 +60,7 @@ fn send_acp_chunk(session_id: &str, text: &str, is_thought: bool) {
             }
         }
     });
-    let serialized = serde_json::to_string(&payload).unwrap_or_default();
-    let mut stdout = std::io::stdout().lock();
-    let _ = writeln!(stdout, "{}", serialized);
-    let _ = stdout.flush();
+    send_raw_rpc(&payload);
 }
 
 fn strip_xml_block(text: &str, tag: &str) -> String {
@@ -94,6 +95,40 @@ fn sanitize_t3_prompt(raw: &str) -> String {
     cleaned.trim().to_string()
 }
 
+fn get_config_options(current_val: &str) -> Value {
+    json!([
+        {
+            "id": "reasoning_budget",
+            "name": "Reasoning Effort",
+            "category": "thought_level",
+            "type": "select",
+            "currentValue": current_val,
+            "options": [
+                { "id": "0", "value": "0", "name": "Off (0 tokens)" },
+                { "id": "250", "value": "250", "name": "Low (250 tokens)" },
+                { "id": "500", "value": "500", "name": "Medium (500 tokens)" },
+                { "id": "1000", "value": "1000", "name": "High (1000 tokens)" },
+                { "id": "-1", "value": "-1", "name": "Unrestricted" }
+            ]
+        }
+    ])
+}
+
+fn is_permission_approved(res: &Value) -> bool {
+    if let Some(result) = res.get("result") {
+        if let Some(outcome) = result.get("outcome") {
+            let outcome_type = outcome.get("outcome").and_then(|v| v.as_str()).unwrap_or("");
+            if outcome_type == "selected" {
+                let opt = outcome.get("optionId").and_then(|v| v.as_str()).unwrap_or("");
+                return opt != "deny" && opt != "reject" && opt != "reject_once" && opt != "reject_always";
+            }
+            return false;
+        }
+        return result.as_bool().unwrap_or(true);
+    }
+    false
+}
+
 fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>) {
     let cfg = WorkspaceConfig::load_or_default(workspace);
     let inherited_profile = std::env::var("AI_ACTIVE_PROFILE").unwrap_or_else(|_| cfg.profile_name.clone());
@@ -121,7 +156,6 @@ fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>) {
         }
     }
 
-    // Dynamic skills only (opt-in via AI_ACTIVE_SKILLS)
     if let Ok(extra) = std::env::var("AI_ACTIVE_SKILLS") {
         for sk_name in extra.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
             if let Some(sk) = Skill::load(sk_name) {
@@ -137,6 +171,9 @@ fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>) {
 #[tokio::main]
 async fn main() -> Result<()> {
     let sessions: Arc<Mutex<HashMap<String, SessionState>>> = Arc::new(Mutex::new(HashMap::new()));
+    let pending_permissions: Arc<Mutex<HashMap<u64, oneshot::Sender<Value>>>> = Arc::new(Mutex::new(HashMap::new()));
+    let next_rpc_id = Arc::new(AtomicU64::new(1000));
+
     let provider = ProviderConfig::load().await;
     let client = Arc::new(LlmClient::new(provider));
 
@@ -157,6 +194,17 @@ async fn main() -> Result<()> {
             Err(_) => continue,
         };
 
+        // Handle incoming responses to our outbound RPC requests (e.g. session/request_permission)
+        if req.get("method").is_none() {
+            if let Some(id_num) = req.get("id").and_then(|v| v.as_u64()) {
+                let mut pending = pending_permissions.lock().await;
+                if let Some(tx) = pending.remove(&id_num) {
+                    let _ = tx.send(req);
+                    continue;
+                }
+            }
+        }
+
         let req_id = req.get("id");
         let method = req.get("method").and_then(|v| v.as_str()).unwrap_or("");
         let params = req.get("params").cloned().unwrap_or_else(|| json!({}));
@@ -171,12 +219,13 @@ async fn main() -> Result<()> {
                             "sessionCapabilities": {
                                 "list": {},
                                 "load": {},
-                                "resume": {}
+                                "resume": {},
+                                "configOptions": {}
                             }
                         },
                         "agentInfo": {
                             "name": "rs-agent",
-                            "version": "0.4.0"
+                            "version": "0.4.4"
                         }
                     })),
                     None,
@@ -202,13 +251,50 @@ async fn main() -> Result<()> {
                 let history = vec![ChatMessage::system(sys_prompt)];
 
                 sessions.lock().await.insert(sid.clone(), SessionState {
-                    workspace: cwd,
+                    workspace: cwd.clone(),
                     history,
                     active_tools,
                     cancel_flag: Arc::new(AtomicBool::new(false)),
                 });
 
-                send_rpc(req_id, Some(json!({ "sessionId": sid })), None);
+                let cfg = WorkspaceConfig::load_or_default(&cwd);
+                let prof = Profile::load(&cfg.profile_name);
+                let initial_val = prof.as_ref()
+                    .and_then(|p| p.reasoning_budget)
+                    .map(|b| b.to_string())
+                    .unwrap_or_else(|| "-1".to_string());
+
+                client.set_reasoning_budget(prof.as_ref().and_then(|p| p.reasoning_budget));
+
+                send_rpc(req_id, Some(json!({
+                    "sessionId": sid,
+                    "configOptions": get_config_options(&initial_val)
+                })), None);
+            }
+            "session/set_config_option" => {
+                let config_id = params.get("configId").and_then(|v| v.as_str()).unwrap_or("");
+                let value_str = params.get("value")
+                    .and_then(|v| {
+                        if let Some(s) = v.as_str() {
+                            Some(s.to_string())
+                        } else if let Some(val_str) = v.get("value").and_then(|v2| v2.as_str()) {
+                            Some(val_str.to_string())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_else(|| "0".to_string());
+
+                if config_id == "reasoning_budget" || config_id == "thought_level" {
+                    if let Ok(b) = value_str.parse::<i64>() {
+                        let budget = if b < 0 { None } else { Some(b as usize) };
+                        client.set_reasoning_budget(budget);
+                    }
+                }
+
+                send_rpc(req_id, Some(json!({
+                    "configOptions": get_config_options(&value_str)
+                })), None);
             }
             "session/list" | "listSessions" => {
                 let sess_lock = sessions.lock().await;
@@ -243,6 +329,8 @@ async fn main() -> Result<()> {
                 let client_ref = client.clone();
                 let sessions_ref = sessions.clone();
                 let req_id_owned = req_id.cloned();
+                let pending_perms = pending_permissions.clone();
+                let rpc_id_gen = next_rpc_id.clone();
 
                 tokio::spawn(async move {
                     let (workspace, mut history, tools_schema, cancel_flag) = {
@@ -292,6 +380,60 @@ async fn main() -> Result<()> {
                                             let call_id = call["id"].as_str().unwrap_or("call_0").to_string();
                                             let fn_name = call["function"]["name"].as_str().unwrap_or("tool");
                                             let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
+
+                                            let is_mutating = fn_name == "write_file" || fn_name == "edit_file" || fn_name == "run_command";
+                                            if is_mutating {
+                                                let kind = match fn_name {
+                                                    "write_file" | "edit_file" => "edit",
+                                                    "run_command" => "execute",
+                                                    _ => "other",
+                                                };
+
+                                                let raw_input: Value = serde_json::from_str(fn_args).unwrap_or_else(|_| json!({}));
+                                                let brief = raw_input.get("path")
+                                                    .or_else(|| raw_input.get("command"))
+                                                    .or_else(|| raw_input.get("pattern"))
+                                                    .and_then(|v| v.as_str())
+                                                    .unwrap_or("");
+
+                                                let title = if brief.is_empty() {
+                                                    fn_name.to_string()
+                                                } else {
+                                                    format!("{} {}", fn_name, brief)
+                                                };
+
+                                                let req_id = rpc_id_gen.fetch_add(1, Ordering::SeqCst);
+                                                let (tx, rx) = oneshot::channel();
+                                                pending_perms.lock().await.insert(req_id, tx);
+
+                                                let perm_req = json!({
+                                                    "jsonrpc": "2.0",
+                                                    "id": req_id,
+                                                    "method": "session/request_permission",
+                                                    "params": {
+                                                        "sessionId": sid,
+                                                        "toolCall": {
+                                                            "toolCallId": call_id,
+                                                            "title": title,
+                                                            "kind": kind,
+                                                            "rawInput": raw_input
+                                                        },
+                                                        "options": [
+                                                            { "optionId": "allow", "name": "Allow", "kind": "allow_once" },
+                                                            { "optionId": "deny", "name": "Deny", "kind": "reject_once" }
+                                                        ]
+                                                    }
+                                                });
+                                                send_raw_rpc(&perm_req);
+
+                                                // Wait for T3 Code decision based on active security mode
+                                                let perm_res = rx.await.unwrap_or_else(|_| json!({}));
+                                                if !is_permission_approved(&perm_res) {
+                                                    send_acp_chunk(&sid, &format!("\n\n*Action `{}` was declined by user.*\n", fn_name), false);
+                                                    history.push(ChatMessage::tool_response(call_id, "User declined permission for this tool action.".to_string()));
+                                                    continue;
+                                                }
+                                            }
 
                                             send_acp_chunk(&sid, &format!("\n\n*Running `{}`...*\n", fn_name), false);
 

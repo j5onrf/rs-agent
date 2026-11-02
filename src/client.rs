@@ -58,13 +58,20 @@ impl ChatMessage {
 }
 
 pub struct LlmClient {
+    pub reasoning_budget: std::sync::atomic::AtomicI64,
     http: Client,
     config: ProviderConfig,
 }
 
 impl LlmClient {
+    pub fn set_reasoning_budget(&self, budget: Option<usize>) {
+        let val = budget.map(|b| b as i64).unwrap_or(-1);
+        self.reasoning_budget.store(val, std::sync::atomic::Ordering::Relaxed);
+    }
+
     pub fn new(config: ProviderConfig) -> Self {
         Self {
+            reasoning_budget: std::sync::atomic::AtomicI64::new(-1),
             http: Client::builder().build().unwrap_or_default(),
             config,
         }
@@ -88,6 +95,18 @@ impl LlmClient {
 
         if let Some(tool_specs) = tools {
             body["tools"] = tool_specs;
+        }
+
+        let rb = self.reasoning_budget.load(std::sync::atomic::Ordering::Relaxed);
+        if rb >= 0 {
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert("reasoning_budget".to_string(), serde_json::json!(rb));
+                obj.insert("reasoning_budget_tokens".to_string(), serde_json::json!(rb));
+                obj.insert("thinking_budget_tokens".to_string(), serde_json::json!(rb));
+                if rb == 0 {
+                    obj.insert("chat_template_kwargs".to_string(), serde_json::json!({ "enable_thinking": false }));
+                }
+            }
         }
 
         let mut req = self.http.post(&self.config.base_url)
@@ -245,6 +264,18 @@ impl LlmClient {
 
         if let Some(tool_specs) = tools {
             body["tools"] = tool_specs;
+        }
+
+        let rb = self.reasoning_budget.load(std::sync::atomic::Ordering::Relaxed);
+        if rb >= 0 {
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert("reasoning_budget".to_string(), serde_json::json!(rb));
+                obj.insert("reasoning_budget_tokens".to_string(), serde_json::json!(rb));
+                obj.insert("thinking_budget_tokens".to_string(), serde_json::json!(rb));
+                if rb == 0 {
+                    obj.insert("chat_template_kwargs".to_string(), serde_json::json!({ "enable_thinking": false }));
+                }
+            }
         }
 
         let mut req = self.http.post(&self.config.base_url)

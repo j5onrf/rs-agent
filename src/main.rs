@@ -362,6 +362,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     } else {
         Profile::load("chat")
     };
+    client.set_reasoning_budget(active_profile.as_ref().and_then(|p| p.reasoning_budget));
 
     let mut active_skills: Vec<String> = Vec::new();
     let second_line = if cfg.is_agent { cfg.profile_name.clone() } else { "chat".to_string() };
@@ -498,6 +499,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             if let Some(new_prof) = Profile::select_interactive(target_dir, &cfg.profile_name) {
                 cfg.profile_name = new_prof;
                 active_profile = Profile::load(&cfg.profile_name);
+                client.set_reasoning_budget(active_profile.as_ref().and_then(|p| p.reasoning_budget));
 
                 if let Some(p) = &active_profile {
                     cfg.tier = p.tier.clone();

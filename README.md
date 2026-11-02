@@ -5,7 +5,7 @@
   <h1>rs-agent</h1>
  
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.3.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.5.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -13,7 +13,7 @@
   </p>
 
   <p>
-    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>router</code> &nbsp;•&nbsp; <code>local-first</code>
+    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>t3code</code> &nbsp;•&nbsp; <code>local-first</code>
   </p>
 
   <p>
@@ -81,6 +81,47 @@
 
 ---
 
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Official Client Surface</h2>
+
+<p align="center">
+  <b><a href="https://t3.codes">T3 Code</a> is the official graphical surface for rs-agent.</b><br>
+  <sub>A zero-overhead pairing connecting rs-agent's native Rust execution kernel directly to T3 Code via stdio ACP (Agent Client Protocol).</sub>
+</p>
+
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="220" valign="top">
+        <br>
+        <h3>Seamless Handover</h3>
+        <p><code>/t3</code> · <code>/t3 web</code></p>
+        <sub>Instant desktop or browser launch with workspace context, profiles, and active skills passed automatically.</sub>
+        <br><br>
+      </td>
+      <td align="center" width="220" valign="top">
+        <br>
+        <h3>Interactive Security Gates</h3>
+        <p><code>session/request_permission</code></p>
+        <sub>Full support for T3's 4-tier security controls (<i>Supervised</i>, <i>Auto-accept edits</i>, <i>Auto</i>, <i>Full access</i>) with live diff review.</sub>
+        <br><br>
+      </td>
+      <td align="center" width="220" valign="top">
+        <br>
+        <h3>Dynamic Reasoning Dials</h3>
+        <p><code>thought_level</code></p>
+        <sub>Composer dropdown to dynamically clamp or disable reasoning tokens (Off, 250t, 500t, 1000t, Unrestricted).</sub>
+        <br><br>
+      </td>
+    </tr>
+  </table>
+
+  <p>
+    <sub><b>Decoupled Plugin Architecture:</b> Drop any launcher in <code>~/.config/rs-agent/plugins/&lt;name&gt;/launch.sh</code> for automatic <code>/&lt;name&gt;</code> dispatch without modifying core engine code.</sub>
+  </p>
+</div>
+
+---
+
 <h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Execution Modes</h2>
 
 <div align="center">
@@ -91,7 +132,7 @@
 | `ai` | **Interactive Chat** | Conversational REPL with thinking gutters and live token stats |
 | `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security kernel |
 | `/task [goal]` | **Task Loop** | Autonomous goal loop; auto-discovers `TASK.md` when prompt is omitted |
-| `/t3` / `/t3 web` | **T3 Code IDE** | Handover active workspace and profile to T3 Code desktop or browser |
+| `/t3` / `/t3 web` | **T3 Code IDE** | Handover active workspace to official T3 Code GUI with diffs & security gates |
 | `ai --bridge` | **Headless ACP** | Stdio JSON-RPC 2.0 interface for IDEs and desktop surfaces |
 
 </div>
@@ -125,9 +166,10 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 * **Sub-Millisecond Shell Intercept (`matcher.rs`):** `rs-hook.sh` intercepts terminal input and matches against `rs-context.md` in `< 0.2ms`. Typing `lfm` jumps into the target directory and launches the workspace instantly.
 * **Native 6-Tool Suite (`tools.rs`):** Minimal tool surface built for refactoring without AST bloat: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
+* **Official ACP Bridge (`plugins/t3code`):** High-performance stdio JSON-RPC 2.0 bridge for T3 Code. Strips foreign client prefill, implements native 4-tier security approval gates, and exposes reasoning effort controls.
 * **Autonomous Task Loop (`/task`):** Multi-step goal loop with failure decomposition (reminds models to inspect lines after tool errors) and anti-hallucination verification.
 * **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and heals broken JSON frames on the fly.
-* **Zero-Trust Security Boundary (`security.rs`):** Canonicalizes all paths inside workspace root. Traversal attempts (`../`) and mutating system calls (`sudo`, `pacman`, `pip`, `systemctl`, destructive `rm`) fail closed and require explicit approval via `/dev/tty`.
+* **Zero-Trust Security Boundary (`security.rs`):** Canonicalizes all paths inside workspace root. Traversal attempts (`../`) and mutating system calls (`sudo`, `pacman`, `pip`, `systemctl`, destructive `rm`) fail closed and require explicit approval.
 
 ---
 
@@ -170,40 +212,48 @@ Define agent profiles and runtime behavior in Markdown frontmatter (`profiles/*.
 ```markdown
 ---
 description: "Edge Systems Engineer (Native 6-Tool)"
-adapters: true     # Tool argument repair (strips markdown fences, heals newlines)
-memory: false      # Opt-in: injects workspace rules from .rs/memory.md if present
-purebash: false    # Optional: single bash tool (~95t schema). Omit for Native 6-tool suite (~700t)
+adapters: true          # Tool argument repair (strips markdown fences, heals newlines)
+reasoning_budget: 500   # Thinking tokens clamp: 0 (off), 500 (medium), or omit for unrestricted
+memory: false           # Opt-in: injects workspace rules from .rs/memory.md if present
+purebash: false         # Optional: single bash tool (~95t schema). Omit for Native 6-tool suite (~700t)
 ---
 ```
 
 * **Profiles (`profiles/`):** Model configurations and system personas (e.g. `lfm3.md`, `lingtiny.md`, `chat.md`). Run `newp` to scaffold new workspaces with interactive profile selection.
 * **Workspace Memory (`.rs/memory.md`):** Optional, project-isolated rules loaded into context when `memory: true` is set in the profile frontmatter.
-* **Skills (`skills/`):** Modular runtime directives toggled via `/s` (e.g. `ponytail.md` for YAGNI minimalism, `humanizer.md` for clean output).
+* **Skills (`skills/`):** Modular runtime directives toggled via `/s` (e.g. `ponytail.md` for YAGNI minimalism, `humanizer.md` for clean output, `ub-mode.md` for clean craftsmanship).
 * **Global Rules (`system_instructions.md`):** Universal directives loaded across every profile and workspace.
 
 ---
 
 <h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Setup & Installation</h2>
 
-### 1. 👤 Build and Link
+### 1. 👤 Quick Start (Linux x86_64)
+
+Pre-built native binaries are included. No Rust installation or build tools required:
 
 ```bash
-# Clone into config directory
+# 1. Clone into config directory
 git clone https://github.com/j5onrf/rs-agent.git ~/.config/rs-agent
-cd ~/.config/rs-agent
 
-# Build optimized release binary
-cargo build --release
-
-# Symlink to PATH
-mkdir -p ~/.local/bin
-ln -sf "$PWD/target/release/rs-agent" ~/.local/bin/ai
-ln -sf "$PWD/plugins/t3code/t3code-bridge" ~/.local/bin/t3code-bridge
-
-# Register shell hook (bash or zsh)
+# 2. Register shell hook
 echo 'source ~/.config/rs-agent/rs-hook.sh' >> ~/.bashrc
-source ~/.bashrc
+source ~/.config/rs-agent/rs-hook.sh
 ```
+
+<details>
+<summary><b>macOS / Build from Source</b></summary>
+
+For macOS (Apple Silicon / Intel), ARM64, or custom modifications:
+
+```bash
+cd ~/.config/rs-agent
+cargo build --release
+echo 'source ~/.config/rs-agent/rs-hook.sh' >> ~/.zshrc
+source ~/.config/rs-agent/rs-hook.sh
+```
+
+</details>
 
 ### 2. 👤 Configure Providers (`.env`)
 

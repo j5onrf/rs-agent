@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct Profile {
+    pub reasoning_budget: Option<usize>,
     pub tier: ToolTier,
     pub adapters: bool,
     pub memory: bool,
@@ -18,6 +19,7 @@ impl Profile {
         let mut tier = ToolTier::Smol;
         let mut adapters = false;
         let mut memory = false;
+        let mut reasoning_budget = None;
         let mut body = raw_content.to_string();
 
         let trimmed = raw_content.trim_start();
@@ -49,6 +51,9 @@ impl Profile {
                             "memory" | "mem" => {
                                 memory = val == "true" || val == "1" || val == "yes";
                             }
+                            "reasoning_budget" | "reasoning-budget" | "reasoning" | "thinking_budget" => {
+                                reasoning_budget = clean_v.trim_matches('"').trim_matches('\'').parse::<usize>().ok();
+                            }
                             _ => {}
                         }
                     }
@@ -57,6 +62,7 @@ impl Profile {
         }
 
         Self {
+            reasoning_budget,
             tier,
             adapters,
             memory,

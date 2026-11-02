@@ -16,6 +16,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "rs-agent"
 path = "src/main.rs"
+[[bin]]
+name = "ai"
+path = "src/main.rs"
+
 
 [dependencies]
 anyhow = "1.0"
