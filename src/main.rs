@@ -415,6 +415,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 }
                 cmd.arg(target_dir);
                 cmd.env("AI_ACTIVE_PROFILE", &cfg.profile_name);
+                cmd.env("AI_IS_AGENT", if cfg.is_agent { "1" } else { "0" });
+                cmd.env("AI_ACTIVE_SKILLS", active_skills.join(","));
                 cmd.env("AI_WORKSPACE_PATH", target_dir);
 
                 println!("  \x1b[1;36m[t3code]\x1b[0m Handing over workspace to T3 Code...");
@@ -576,7 +578,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
                 system_prompt = build_system_prompt(cfg.is_agent, target_dir, &active_profile, &active_skills);
                 if let Some(first) = history.first_mut() {
-                    first.content = system_prompt.clone();
+                    first.content = serde_json::Value::String(system_prompt.clone());
                 }
                 let _ = io::stdout().flush();
             }
@@ -670,7 +672,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
         let max_rounds = get_max_rounds();
         for round in 0..max_rounds {
-            let prompt_chars: usize = history.iter().map(|m| m.content.len()).sum();
+            let prompt_chars: usize = history.iter().map(|m| m.content_as_str().len()).sum();
             let mut renderer = StreamRenderer::new();
 
             if round == 0 && history.len() <= 2 {
@@ -707,6 +709,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             assistant_msg.tool_calls = Some(serde_json::Value::Array(calls.clone()));
             history.push(assistant_msg);
 
+            println!();
             for call in calls {
                 let call_id = call["id"].as_str().unwrap_or("call_0").to_string();
                 let fn_name = call["function"]["name"].as_str().unwrap_or("tool");
@@ -805,8 +808,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     if cli.bridge {
-        println!("[rs-agent] Starting Bridge Mode (JSON-RPC on stdin)...");
-        return Ok(());
+        return rs_agent::bridge::run_bridge().await;
     }
 
     match cli.command {
@@ -816,7 +818,11 @@ async fn main() -> anyhow::Result<()> {
         }
         Some(Commands::Match { .. }) | Some(Commands::New { .. }) | Some(Commands::Handoff) => unreachable!(),
         None => {
-            run_session(&current_dir, false).await?;
+            let chat_dir = dirs::home_dir()
+                .map(|h| h.join(".config/rs-agent/projects/chat"))
+                .unwrap_or_else(|| PathBuf::from("projects/chat"));
+            fs::create_dir_all(&chat_dir).ok();
+            run_session(&chat_dir, false).await?;
         }
     }
 

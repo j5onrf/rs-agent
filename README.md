@@ -5,7 +5,7 @@
   <h1>rs-agent</h1>
  
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.5.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.6.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -18,7 +18,7 @@
 
   <p>
     <b>A Rust AI harness built for low-latency local <code>llama-server</code> C++ backends, slm/llm gguf, and cloud endpoints.</b><br>
-    <sub>Sub-millisecond boot, autonomous 6-tool execution loop, zero-trust security kernel, edge-model JSON repair.</sub>
+    <sub>Sub-millisecond boot, autonomous 6-tool execution loop, zero-trust security kernel, and edge-model JSON repair.</sub>
   </p>
 
   <br>
@@ -50,8 +50,8 @@
   </p>
 
   <p>
-    <sub><b>Cloud Endpoints:</b> <a href="https://tokenharbor.ai">TokenHarbor</a>, <a href="https://openrouter.ai">OpenRouter</a>, and <a href="https://huggingface.co/spaces">Hugging Face</a><br>
-    <b>Free Endpoints:</b> <a href="https://tokenharbor.ai"><code>deepseek-v4.1-flash:free</code></a> (TokenHarbor) &nbsp;•&nbsp; <a href="https://openrouter.ai/models?variant=free"><code>openrouter/free</code></a> (OpenRouter)</sub>
+    <sub><b>Cloud Endpoints:</b> <a href="https://ai.google.dev">Google Gemini</a>, <a href="https://openrouter.ai">OpenRouter</a>, and <a href="https://tokenharbor.ai">TokenHarbor</a><br>
+    <b>Free Endpoints:</b> <a href="https://ai.google.dev"><code>gemini-2.5-flash-lite</code></a> (Google AI Studio) &nbsp;•&nbsp; <a href="https://openrouter.ai/models?variant=free"><code>openrouter/free</code></a> (OpenRouter) &nbsp;•&nbsp; <a href="https://tokenharbor.ai"><code>deepseek-v4.1-flash:free</code></a> (TokenHarbor)</sub>
   </p>
 </div>
 
@@ -95,28 +95,28 @@
         <br>
         <h3>Seamless Handover</h3>
         <p><code>/t3</code> · <code>/t3 web</code></p>
-        <sub>Instant desktop or browser launch with workspace context, profiles, and active skills passed automatically.</sub>
+        <sub>Instant desktop or browser launch. Conversational chat isolates to <code>projects/chat</code>; agent sessions inherit workspace root.</sub>
         <br><br>
       </td>
       <td align="center" width="220" valign="top">
         <br>
-        <h3>Interactive Security Gates</h3>
+        <h3>Interactive Diff Review</h3>
         <p><code>session/request_permission</code></p>
-        <sub>Full support for T3's 4-tier security controls (<i>Supervised</i>, <i>Auto-accept edits</i>, <i>Auto</i>, <i>Full access</i>) with live diff review.</sub>
+        <sub>Full support for T3's 4-tier security controls (<i>Supervised</i>, <i>Auto-accept edits</i>, <i>Auto</i>, <i>Full access</i>) with live split/unified diff previews.</sub>
         <br><br>
       </td>
       <td align="center" width="220" valign="top">
         <br>
-        <h3>Dynamic Reasoning Dials</h3>
-        <p><code>thought_level</code></p>
-        <sub>Composer dropdown to dynamically clamp or disable reasoning tokens (Off, 250t, 500t, 1000t, Unrestricted).</sub>
+        <h3>Dynamic Controls</h3>
+        <p><code>$skills</code> · <code>/commands</code> · <code>thought_level</code></p>
+        <sub>Autocomplete <code>$</code> skill pills with side-panel instruction viewer, <code>/task</code> goal loop, reasoning budget dials, and multimodal vision.</sub>
         <br><br>
       </td>
     </tr>
   </table>
 
   <p>
-    <sub><b>Decoupled Plugin Architecture:</b> Drop any launcher in <code>~/.config/rs-agent/plugins/&lt;name&gt;/launch.sh</code> for automatic <code>/&lt;name&gt;</code> dispatch without modifying core engine code.</sub>
+    <sub><b>Unified Binary Bridge:</b> Embedded JSON-RPC 2.0 ACP server runs natively from <code>ai --bridge</code> without duplicate compilation units or binary drift.</sub>
   </p>
 </div>
 
@@ -133,12 +133,12 @@
 | `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security kernel |
 | `/task [goal]` | **Task Loop** | Autonomous goal loop; auto-discovers `TASK.md` when prompt is omitted |
 | `/t3` / `/t3 web` | **T3 Code IDE** | Handover active workspace to official T3 Code GUI with diffs & security gates |
-| `ai --bridge` | **Headless ACP** | Stdio JSON-RPC 2.0 interface for IDEs and desktop surfaces |
+| `ai --bridge` | **Headless ACP** | Embedded stdio JSON-RPC 2.0 interface for IDEs and desktop surfaces |
 
 </div>
 
 <p align="center">
-  <sub><code>/p</code> profile select &nbsp;•&nbsp; <code>/task</code> goal loop &nbsp;•&nbsp; <code>/t3</code> launch IDE &nbsp;•&nbsp; <code>/s</code> toggle skills</sub>
+  <sub><code>/p</code> profile select &nbsp;•&nbsp; <code>/task</code> goal loop &nbsp;•&nbsp; <code>/t3</code> launch IDE &nbsp;•&nbsp; <code>/s</code> toggle skills &nbsp;•&nbsp; <code>/box</code> themes &nbsp;•&nbsp; <code>/r</code> reset</sub>
 </p>
 
 ---
@@ -151,7 +151,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 | Binary | Tool | Purpose |
 | :--- | :---: | :--- |
-| `ms` | **Model Selector** | Native TUI for switching models, endpoints, and loop budgets |
+| `ms` | **Model Selector** | Dynamic TUI for toggling universal providers, context budget, and loop limit |
 | `newp` | **Project Creator** | Scaffolds workspace, `.rs/config.json`, and auto-links router aliases |
 | `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) via `syn` |
 | `ta` | **System Diagnostics** | 10-pass native verification suite testing binary integrity, safety, and UI |
@@ -166,27 +166,10 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 * **Sub-Millisecond Shell Intercept (`matcher.rs`):** `rs-hook.sh` intercepts terminal input and matches against `rs-context.md` in `< 0.2ms`. Typing `lfm` jumps into the target directory and launches the workspace instantly.
 * **Native 6-Tool Suite (`tools.rs`):** Minimal tool surface built for refactoring without AST bloat: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
-* **Official ACP Bridge (`plugins/t3code`):** High-performance stdio JSON-RPC 2.0 bridge for T3 Code. Strips foreign client prefill, implements native 4-tier security approval gates, and exposes reasoning effort controls.
+* **Embedded ACP Bridge (`bridge.rs`):** Stdio JSON-RPC 2.0 server inside the core binary. Dispatches live file diffs for T3 Code review, handles multimodal image attachments, and streams token cancellation mid-turn.
 * **Autonomous Task Loop (`/task`):** Multi-step goal loop with failure decomposition (reminds models to inspect lines after tool errors) and anti-hallucination verification.
 * **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and heals broken JSON frames on the fly.
 * **Zero-Trust Security Boundary (`security.rs`):** Canonicalizes all paths inside workspace root. Traversal attempts (`../`) and mutating system calls (`sudo`, `pacman`, `pip`, `systemctl`, destructive `rm`) fail closed and require explicit approval.
-
----
-
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Native 6-Tool Suite</h2>
-
-<div align="center">
-
-| Tool | Action | Rules |
-| :--- | :--- | :--- |
-| `read_file` | Read source file | Relative workspace path. Supports `line_start` and `line_end`. Truncates files over 250 lines to conserve context. |
-| `edit_file` | Surgical patch | Two-stage replacer: (1) exact unique string match, (2) whitespace-tolerant line block match. Fails if target is ambiguous. |
-| `write_file` | Write / Create file | Creates missing parent directories automatically. Requires `overwrite: true` when overwriting existing files. |
-| `list_dir` | Workspace exploration | Recursively lists clean file tree. Auto-ignores hidden files, `.git/`, and build artifacts (`target/`). |
-| `search_code` | Grep codebase | Fast regex and pattern search across project files. Capped at first 30 matches with line numbers. |
-| `run_command` | Execute shell command | Runs commands directly in workspace root. Captures up to 15,000 characters of combined stdout/stderr. |
-
-</div>
 
 ---
 
@@ -221,7 +204,7 @@ purebash: false         # Optional: single bash tool (~95t schema). Omit for Nat
 
 * **Profiles (`profiles/`):** Model configurations and system personas (e.g. `lfm3.md`, `lingtiny.md`, `chat.md`). Run `newp` to scaffold new workspaces with interactive profile selection.
 * **Workspace Memory (`.rs/memory.md`):** Optional, project-isolated rules loaded into context when `memory: true` is set in the profile frontmatter.
-* **Skills (`skills/`):** Modular runtime directives toggled via `/s` (e.g. `ponytail.md` for YAGNI minimalism, `humanizer.md` for clean output, `ub-mode.md` for clean craftsmanship).
+* **Skills (`skills/`):** Modular runtime directives toggled via `/s` or T3 Code's `$` picker (e.g. `ponytail.md` for YAGNI minimalism, `humanizer.md` for clean output, `ub-mode.md` for clean craftsmanship).
 * **Global Rules (`system_instructions.md`):** Universal directives loaded across every profile and workspace.
 
 ---
@@ -249,6 +232,15 @@ For macOS (Apple Silicon / Intel), ARM64, or custom modifications:
 ```bash
 cd ~/.config/rs-agent
 cargo build --release
+mkdir -p bin ~/.local/bin
+cp target/release/ai bin/ai
+cp target/release/ai bin/rs-agent
+
+# Build model selector (ms) and create global symlink
+cargo build --release --package model-select
+cp target/release/model-select bin/ms
+ln -sf ~/.config/rs-agent/bin/ms ~/.local/bin/ms
+
 echo 'source ~/.config/rs-agent/rs-hook.sh' >> ~/.zshrc
 source ~/.config/rs-agent/rs-hook.sh
 ```
@@ -261,33 +253,38 @@ source ~/.config/rs-agent/rs-hook.sh
 <summary><b>View Example (<code>~/.config/rs-agent/.env</code>)</b></summary>
 
 ```env
-# ==============================================================================
-# Rs-Agent Provider Cascade (.env)
-# Priority: Top-down first active key. Comment with '#' to disable.
-# Fallback: When all keys are commented, routes to local server on :8080.
-# Configure interactively with: models
-# ==============================================================================
+# Rs-Agent Provider Cascade (.env) — Priority: First active key | Switch with: ms
+# Fallback: Local llama-server (:8080) when all cloud keys are commented with '#'.
 
-# ── 1. Custom 2: xAI Grok / DeepSeek / TokenHarbor ────────────────────────────
-# CUSTOM2_API_KEY="sk-your-key-here"
-CUSTOM2_URL="https://api.x.ai/v1/chat/completions"
-CUSTOM2_MODEL="grok-beta"
+# ── 1. Google Gemini ──────────────────────────────────────────────────────────
+CUSTOM1_NAME="Google Gemini"
+CUSTOM1_API_KEY="AIzaSyYourGeminiApiKeyHere"
+CUSTOM1_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+CUSTOM1_MODEL="gemini-2.5-flash-lite"
 
-# ── 2. Custom 1: Hugging Face Router ──────────────────────────────────────────
-# CUSTOM_API_KEY="hf_your_key_here"
-CUSTOM_URL="https://router.huggingface.co/v1/chat/completions"
-CUSTOM_MODEL="space"
+# ── 2. OpenRouter ─────────────────────────────────────────────────────────────
+# CUSTOM2_NAME="OpenRouter"
+# CUSTOM2_API_KEY="sk-or-v1-your-key-here"
+CUSTOM2_URL="https://openrouter.ai/api/v1/chat/completions"
+CUSTOM2_MODEL="openrouter/free"
 
-# ── 3. OpenRouter Universal Gateway ───────────────────────────────────────────
-# OPENROUTER_API_KEY="sk-or-v1-your-key-here"
-OPENROUTER_MODEL="openrouter/free"
+# ── 3. Custom Direct Endpoint ─────────────────────────────────────────────────
+# Quick Reference URLs & Models:
+#   • DeepSeek: https://api.deepseek.com/chat/completions        (deepseek-chat / deepseek-reasoner)
+#   • xAI:      https://api.x.ai/v1/chat/completions             (grok-2-latest)
+#   • OpenAI:   https://api.openai.com/v1/chat/completions       (gpt-4o / o3-mini)
+#   • Groq:     https://api.groq.com/openai/v1/chat/completions  (llama-3.3-70b-versatile)
+# CUSTOM3_NAME="Custom Provider"
+# CUSTOM3_API_KEY="sk-your-key-here"
+CUSTOM3_URL="https://api.deepseek.com/chat/completions"
+CUSTOM3_MODEL="deepseek-chat"
 
-# ── 4. Local llama-server Fallback (Port 8080) ────────────────────────────────
-# Automatically used when cloud keys are commented. Auto-detects loaded .gguf model.
+# ── Local llama-server Fallback (Port 8080) ───────────────────────────────────
+# Automatically used when all keys above are commented. Auto-detects loaded .gguf model.
 
-# ── 5. Runtime Governors ──────────────────────────────────────────────────────
+# ── Runtime Governors ─────────────────────────────────────────────────────────
 AI_MAX_TOKENS="8192"
-AI_MAX_AGENT_ROUNDS="15"
+AI_MAX_AGENT_ROUNDS="10"
 ```
 
 </details>

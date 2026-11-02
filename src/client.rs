@@ -4,6 +4,8 @@ use futures_util::StreamExt;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use crate::config::ProviderConfig;
 use crate::spinner::InlineSpinner;
@@ -12,7 +14,7 @@ use crate::stream::{StreamRenderer, UsageStats};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     pub role: String,
-    pub content: String,
+    pub content: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -23,7 +25,7 @@ impl ChatMessage {
     pub fn system(content: impl Into<String>) -> Self {
         Self {
             role: "system".into(),
-            content: content.into(),
+            content: Value::String(content.into()),
             tool_calls: None,
             tool_call_id: None,
         }
@@ -32,7 +34,7 @@ impl ChatMessage {
     pub fn user(content: impl Into<String>) -> Self {
         Self {
             role: "user".into(),
-            content: content.into(),
+            content: Value::String(content.into()),
             tool_calls: None,
             tool_call_id: None,
         }
@@ -41,7 +43,7 @@ impl ChatMessage {
     pub fn assistant(content: impl Into<String>) -> Self {
         Self {
             role: "assistant".into(),
-            content: content.into(),
+            content: Value::String(content.into()),
             tool_calls: None,
             tool_call_id: None,
         }
@@ -50,10 +52,14 @@ impl ChatMessage {
     pub fn tool_response(tool_call_id: String, content: String) -> Self {
         Self {
             role: "tool".into(),
-            content,
+            content: Value::String(content),
             tool_calls: None,
             tool_call_id: Some(tool_call_id),
         }
+    }
+
+    pub fn content_as_str(&self) -> &str {
+        self.content.as_str().unwrap_or("")
     }
 }
 
@@ -66,7 +72,7 @@ pub struct LlmClient {
 impl LlmClient {
     pub fn set_reasoning_budget(&self, budget: Option<usize>) {
         let val = budget.map(|b| b as i64).unwrap_or(-1);
-        self.reasoning_budget.store(val, std::sync::atomic::Ordering::Relaxed);
+        self.reasoning_budget.store(val, Ordering::Relaxed);
     }
 
     pub fn new(config: ProviderConfig) -> Self {
@@ -81,6 +87,7 @@ impl LlmClient {
         &self,
         messages: &[ChatMessage],
         tools: Option<Value>,
+        cancel_flag: Option<Arc<AtomicBool>>,
         mut on_chunk: F,
     ) -> Result<(String, Option<Vec<Value>>, UsageStats)>
     where
@@ -97,7 +104,7 @@ impl LlmClient {
             body["tools"] = tool_specs;
         }
 
-        let rb = self.reasoning_budget.load(std::sync::atomic::Ordering::Relaxed);
+        let rb = self.reasoning_budget.load(Ordering::Relaxed);
         if rb >= 0 {
             if let Some(obj) = body.as_object_mut() {
                 obj.insert("reasoning_budget".to_string(), serde_json::json!(rb));
@@ -132,6 +139,12 @@ impl LlmClient {
         let mut tool_calls_map: std::collections::BTreeMap<usize, (String, String, String)> = std::collections::BTreeMap::new();
 
         while let Some(event_res) = stream.next().await {
+            if let Some(ref flag) = cancel_flag {
+                if flag.load(Ordering::SeqCst) {
+                    break;
+                }
+            }
+
             let event = event_res.context("Error reading SSE event")?;
             if event.data == "[DONE]" {
                 break;
@@ -266,7 +279,7 @@ impl LlmClient {
             body["tools"] = tool_specs;
         }
 
-        let rb = self.reasoning_budget.load(std::sync::atomic::Ordering::Relaxed);
+        let rb = self.reasoning_budget.load(Ordering::Relaxed);
         if rb >= 0 {
             if let Some(obj) = body.as_object_mut() {
                 obj.insert("reasoning_budget".to_string(), serde_json::json!(rb));

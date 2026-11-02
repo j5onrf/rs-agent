@@ -8,3 +8,4 @@
 .rs/
 state.json
 target/
+projects/chat/
