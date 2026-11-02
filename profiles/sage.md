@@ -1,9 +1,5 @@
 ---
 description: "InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent"
-yolo: true
-map: false
-memory: false
-ipython: true
 adapters: true
 reasoning_budget: 500
 ---

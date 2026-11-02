@@ -1,10 +1,5 @@
 ---
 description: "Ling-3.0-tiny PhotoCraft Automation Engineer (Native 6-Tool)"
-category: "Local"
-yolo: true
-map: false
-memory: false
-ipython: false
 adapters: true
 reasoning_budget: 500
 ---

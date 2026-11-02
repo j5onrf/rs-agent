@@ -1,7 +1,0 @@
-{
-  "profile_name": "agent",
-  "is_agent": true,
-  "tier": "Smol",
-  "yolo": false,
-  "thinking_budget": 500
-}

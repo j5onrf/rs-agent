@@ -2,7 +2,6 @@ use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 
-// Dangerous binaries that alter system state or packages
 const MUTATING_COMMANDS: &[&str] = &[
     "sudo", "doas", "su", "pkexec",
     "pip", "pip3", "pipx",
@@ -21,7 +20,6 @@ impl SecurityBoundary {
         Self { root }
     }
 
-    /// Resolves target path expanding ~ and relative components
     pub fn resolve_path(&self, target: &str) -> PathBuf {
         let clean = target.trim().trim_matches(|c| c == '\'' || c == '"' || c == '`');
         if let Some(stripped) = clean.strip_prefix("~/") {
@@ -33,7 +31,6 @@ impl SecurityBoundary {
         }
     }
 
-    /// Returns true if the target path breaks outside the workspace root
     pub fn is_outside(&self, path: &Path) -> bool {
         if path.exists() {
             if let Ok(canon) = path.canonicalize() {
@@ -47,7 +44,6 @@ impl SecurityBoundary {
         true
     }
 
-    /// Flags system mutating package managers or destructive shell calls
     pub fn check_command(&self, cmd: &str) -> Option<&'static str> {
         let lower = cmd.to_lowercase();
         for &mutating in MUTATING_COMMANDS {
@@ -62,20 +58,11 @@ impl SecurityBoundary {
         None
     }
 
-    /// Invariant gate: Never bypass security events even in YOLO; auto-approve safe in-bounds actions in YOLO
-    pub fn authorize(&self, action: &str, is_security_event: bool, yolo: bool) -> bool {
-        // Safe in-bounds action with YOLO active: 100% Autonomous (0 Prompts)
-        if !is_security_event && yolo {
-            return true;
-        }
-
-        let prompt_color = if is_security_event { "\x1b[1;31m" } else { "\x1b[1;33m" };
-        let tag = if is_security_event { "[SECURITY-ALERT]" } else { "[gate]" };
-
-        print!("\n{}{} Authorize: {}? [y/N]: \x1b[0m", prompt_color, tag, action);
+    /// Hard security gate: prompts only on boundary violations or mutating binaries
+    pub fn authorize(&self, violation: &str) -> bool {
+        print!("\n\x1b[1;31m[SECURITY-ALERT] Authorize: {}? [y/N]: \x1b[0m", violation);
         let _ = io::stdout().flush();
 
-        // Read directly from /dev/tty so stdin remains clean
         if let Ok(tty) = fs::File::open("/dev/tty") {
             let mut reader = io::BufReader::new(tty);
             let mut line = String::new();

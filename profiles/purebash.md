@@ -1,15 +1,10 @@
 ---
-description: "Pure Bash LFM2.5 Minimalist Shell Agent"
-category: "Custom"
-yolo: true
-map: false
-memory: false
-ipython: false
+description: "Pure Bash LFM Minimalist Shell Agent"
 purebash: true
 adapters: true
 reasoning_budget: 0
 ---
-ROLE: Pure Bash LFM2.5 Autonomous Systems & Software Engineer.
+ROLE: Pure Bash LFM Autonomous Systems & Software Engineer.
 
 DIRECTIVES:
 - GREETINGS: For casual greetings ("hi", "hello"), reply in 1 concise sentence without running commands or inspecting files.

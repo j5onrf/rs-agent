@@ -11,11 +11,11 @@
 #   ├── profiles/chat.md                 - Versatile, articulate, and high-signal conversational partner
 #   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer (Native 6-Tool)
 #   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer (Native 6-Tool)
-#   ├── profiles/photocraft-gem.md       - PhotoCraft Visual Engine & Automation Specialist (Gemini Flash Lite)
-#   ├── profiles/photocraft-loc.md       - Ling-3.0-tiny PhotoCraft Automation Engineer (Native 6-Tool)
-#   ├── profiles/purebash-lfm.md         - Pure Bash LFM2.5 Minimalist Shell Agent
-#   ├── profiles/purebash-ling.md        - Pure Bash Minimalist Shell-Centric Agent (Single-Tool SLM)
+#   ├── profiles/photocraft-c.md         - PhotoCraft Visual Engine & Automation Specialist (Gemini Flash Lite)
+#   ├── profiles/photocraft-l.md         - Ling-3.0-tiny PhotoCraft Automation Engineer (Native 6-Tool)
+#   ├── profiles/purebash.md             - Pure Bash LFM Minimalist Shell Agent
 #   ├── profiles/sage.md                 - InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent
+#   ├── projects/lfm3/test_calc.py       - def add(a, b):
 #   ├── rs-context.md                    - Rs-Agent Context Router
 #   ├── rs-hook.sh                       - Rs-Agent Shell Hook (Sub-Millisecond Startup)
 #   ├── skills/humanizer.md              - Anti-AI Slop Humanizer Directive
@@ -37,6 +37,8 @@
 #   ├── tools/new-project/Cargo.toml     - name = "new-project"
 #   ├── tools/new-project/new-project
 #   ├── tools/new-project/src/main.rs    - CLI Entrypoint & Runtime Loop
+#   ├── tools/test-agent/Cargo.toml      - name = "test-agent"
+#   ├── tools/test-agent/src/main.rs     - CLI Entrypoint & Runtime Loop
 #   └── tools/test-agent/test-agent
 # --------------------------------------------------
 
@@ -44,21 +46,21 @@
 
 ### `src/main.rs`
 ```rust
-  L003: mod adapter;
-  L004: mod client;
-  L005: mod config;
-  L006: mod matcher;
-  L007: mod profile;
-  L008: mod security;
-  L009: mod skill;
-  L010: mod spinner;
-  L011: mod state;
-  L012: mod stream;
-  L013: mod tools;
-  L014: mod ui;
-  L031: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
-  L041: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff }
-  L532: async fn main() -> anyhow :: Result<()>;
+  L001: mod adapter;
+  L002: mod client;
+  L003: mod config;
+  L004: mod matcher;
+  L005: mod profile;
+  L006: mod security;
+  L007: mod skill;
+  L008: mod spinner;
+  L009: mod state;
+  L010: mod stream;
+  L011: mod tools;
+  L012: mod ui;
+  L029: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
+  L039: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff }
+  L515: async fn main() -> anyhow :: Result<()>;
 ```
 
 ### `tools/new-project/src/main.rs`
@@ -66,44 +68,49 @@
   L032: fn main();
 ```
 
+### `tools/test-agent/src/main.rs`
+```rust
+  L214: fn main();
+```
+
 ### `src/adapter.rs`
 ```rust
-  L005: pub fn heal_json_args(raw_args: &str) -> Value; // Parses and heals JSON arguments into a serde_json::Value (used by tools.rs)
-  L027: pub fn repair_tool_args(fn_name: &str, raw_args: &str) -> String; // Repairs common SLM JSON formatting defects (unescaped newlines, markdown fences, trailing commas)
+  L003: pub fn heal_json_args(raw_args: &str) -> Value; // Parses and heals JSON arguments into a serde_json::Value (used by tools.rs)
+  L025: pub fn repair_tool_args(fn_name: &str, raw_args: &str) -> String; // Repairs common SLM JSON formatting defects (unescaped newlines, markdown fences, trailing commas)
 ```
 
 ### `src/client.rs`
 ```rust
-  L014: pub struct ChatMessage { pub role: String, pub content: String, pub tool_calls: Option<Value>, pub tool_call_id: Option<String> }
-  L024: impl ChatMessage {
-    L025: pub fn system(content: impl Into<String>) -> Self;
-    L034: pub fn user(content: impl Into<String>) -> Self;
-    L043: pub fn assistant(content: impl Into<String>) -> Self;
-    L052: pub fn tool_response(tool_call_id: String, content: String) -> Self;
+  L012: pub struct ChatMessage { pub role: String, pub content: String, pub tool_calls: Option<Value>, pub tool_call_id: Option<String> }
+  L022: impl ChatMessage {
+    L023: pub fn system(content: impl Into<String>) -> Self;
+    L032: pub fn user(content: impl Into<String>) -> Self;
+    L041: pub fn assistant(content: impl Into<String>) -> Self;
+    L050: pub fn tool_response(tool_call_id: String, content: String) -> Self;
   }
-  L062: pub struct LlmClient
-  L067: impl LlmClient {
-    L068: pub fn new(config: ProviderConfig) -> Self;
-    L075: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<Vec<Value>>, UsageStats)>;
+  L060: pub struct LlmClient
+  L065: impl LlmClient {
+    L066: pub fn new(config: ProviderConfig) -> Self;
+    L073: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<Vec<Value>>, UsageStats)>;
   }
 ```
 
 ### `src/config.rs`
 ```rust
-  L009: pub enum ToolTier { PureBash, Smol }
-  L015: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, ... (6 fields) }
-  L026: impl Default for WorkspaceConfig {
-    L027: fn default() -> Self;
+  L007: pub enum ToolTier { PureBash, Smol }
+  L013: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, ... (5 fields) }
+  L023: impl Default for WorkspaceConfig {
+    L024: fn default() -> Self;
   }
-  L039: impl WorkspaceConfig {
-    L040: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
-    L058: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
+  L035: impl WorkspaceConfig {
+    L036: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
+    L054: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
   }
-  L067: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String }
-  L095: impl ProviderConfig {
-    L096: pub async fn load() -> Self;
+  L063: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String }
+  L091: impl ProviderConfig {
+    L092: pub async fn load() -> Self;
   }
-  L177: pub fn load_global_instructions() -> Option<String>; // Loads active (uncommented) rules from system_instructions.md
+  L173: pub fn load_global_instructions() -> Option<String>; // Loads active (uncommented) rules from system_instructions.md
 ```
 
 ### `src/matcher.rs`
@@ -122,16 +129,16 @@
 
 ### `src/profile.rs`
 ```rust
-  L010: pub struct Profile { pub name: String, pub tier: ToolTier, pub yolo: bool, ... (6 fields) }
-  L020: impl Profile {
-    L021: pub fn parse(name: &str, raw_content: &str) -> Self;
-    L079: pub fn profile_dirs() -> Vec<PathBuf>;
-    L093: pub fn load(profile_name: &str) -> Option<Self>;
-    L121: pub fn list_available() -> Vec<String>;
-    L154: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
-    L177: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
-    L219: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
-    L262: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
+  L008: pub struct Profile { pub tier: ToolTier, pub adapters: bool, pub system_prompt: String }
+  L015: impl Profile {
+    L016: pub fn parse(raw_content: &str) -> Self;
+    L061: pub fn profile_dirs() -> Vec<PathBuf>;
+    L070: pub fn load(profile_name: &str) -> Option<Self>;
+    L098: pub fn list_available() -> Vec<String>;
+    L131: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
+    L154: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
+    L196: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
+    L239: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
   }
 ```
 
@@ -149,14 +156,14 @@
 
 ### `src/skill.rs`
 ```rust
-  L009: pub struct Skill { pub name: String, pub description: String, pub content: String }
-  L016: pub enum SkillAction { Attach(String), Detach(String), DetachAll }
-  L023: impl Skill {
-    L024: pub fn parse(name: &str, raw_content: &str) -> Self;
-    L056: pub fn skill_dirs() -> Vec<PathBuf>;
-    L068: pub fn list_available() -> Vec<String>;
-    L093: pub fn load(skill_name: &str) -> Option<Self>;
-    L105: pub fn select_interactive(active_skills: &[String]) -> Option<SkillAction>; // Interactive selector with live search, toggle, and Detach All
+  L007: pub struct Skill { pub name: String, pub content: String }
+  L013: pub enum SkillAction { Attach(String), Detach(String), DetachAll }
+  L020: impl Skill {
+    L021: pub fn parse(name: &str, raw_content: &str) -> Self;
+    L038: pub fn skill_dirs() -> Vec<PathBuf>;
+    L047: pub fn list_available() -> Vec<String>;
+    L072: pub fn load(skill_name: &str) -> Option<Self>;
+    L084: pub fn select_interactive(active_skills: &[String]) -> Option<SkillAction>;
   }
 ```
 

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -17,10 +15,8 @@ pub struct WorkspaceConfig {
     pub profile_name: String,
     pub is_agent: bool,
     pub tier: ToolTier,
-    pub yolo: bool,
     #[serde(default)]
     pub adapters: bool,
-    pub thinking_budget: u32,
 }
 
 impl Default for WorkspaceConfig {
@@ -29,9 +25,7 @@ impl Default for WorkspaceConfig {
             profile_name: "chat".into(),
             is_agent: false,
             tier: ToolTier::Smol,
-            yolo: false,
             adapters: false,
-            thinking_budget: 500,
         }
     }
 }
@@ -175,10 +169,7 @@ impl ProviderConfig {
 }
 
 /// Loads active (uncommented) rules from system_instructions.md
-
-/// Loads active (uncommented) rules from system_instructions.md
 pub fn load_global_instructions() -> Option<String> {
-    use std::fs;
     let candidates = [
         dirs::home_dir().map(|h| h.join(".config/rs-agent/system_instructions.md")),
         dirs::home_dir().map(|h| h.join(".config/rs-agent/skills/system_instructions.md")),

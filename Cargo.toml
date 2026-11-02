@@ -1,24 +1,31 @@
 [package]
 name = "rs-agent"
-version = "0.1.0"
+version = "0.4.0"
 edition = "2021"
 
-[dependencies]
-# Async Runtime & Networking
-tokio = { version = "1.38", features = ["full"] }
-reqwest = { version = "0.12", features = ["json", "stream"] }
-futures-util = "0.3"
-eventsource-stream = "0.2"
+[workspace]
+members = [
+    ".",
+    "plugins/t3code"
+]
 
-# Serialization & JSON Schema
+[lib]
+name = "rs_agent"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rs-agent"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "4.4", features = ["derive"] }
+crossterm = "0.27"
+dirs = "5.0"
+eventsource-stream = "0.2"
+futures-util = "0.3"
+regex = "1.10"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-# CLI & Terminal Handling
-crossterm = "0.28"
-clap = { version = "4.5", features = ["derive"] }
-
-# Utilities & Error Handling
-anyhow = "1.0"
-regex = "1.10"
-dirs = "5.0"
+tokio = { version = "1", features = ["full"] }

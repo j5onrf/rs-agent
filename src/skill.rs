@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use std::fs;
@@ -9,7 +7,6 @@ use std::path::PathBuf;
 #[derive(Debug, Clone)]
 pub struct Skill {
     pub name: String,
-    pub description: String,
     pub content: String,
 }
 
@@ -22,44 +19,26 @@ pub enum SkillAction {
 
 impl Skill {
     pub fn parse(name: &str, raw_content: &str) -> Self {
-        let mut description = String::new();
         let mut body = raw_content.to_string();
 
         let trimmed = raw_content.trim_start();
         if trimmed.starts_with("---") {
             let parts: Vec<&str> = trimmed.splitn(3, "---").collect();
             if parts.len() >= 3 {
-                let fm = parts[1];
                 body = parts[2].trim().to_string();
-
-                for line in fm.lines() {
-                    let line = line.trim();
-                    if line.is_empty() || line.starts_with('#') {
-                        continue;
-                    }
-                    if let Some((k, v)) = line.split_once(':') {
-                        if k.trim().to_lowercase() == "description" {
-                            description = v.trim().trim_matches('"').trim_matches('\'').to_string();
-                        }
-                    }
-                }
             }
         }
 
         Self {
             name: name.to_string(),
-            description,
             content: body,
         }
     }
 
     pub fn skill_dirs() -> Vec<PathBuf> {
-        let home = match dirs::home_dir() {
-            Some(h) => h,
-            None => return Vec::new(),
-        };
-
-        [home.join(".config/rs-agent/skills")]
+        dirs::home_dir()
+            .map(|h| vec![h.join(".config/rs-agent/skills")])
+            .unwrap_or_default()
             .into_iter()
             .filter(|p| p.is_dir())
             .collect()
@@ -70,7 +49,7 @@ impl Skill {
         let mut list = Vec::new();
 
         for dir in Self::skill_dirs() {
-            if let Ok(entries) = fs::read_dir(&dir) {
+            if let Ok(entries) = fs::read_dir(dir) {
                 for entry in entries.flatten() {
                     let path = entry.path();
                     if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("md") {
@@ -102,7 +81,6 @@ impl Skill {
         None
     }
 
-    /// Interactive selector with live search, toggle, and Detach All
     pub fn select_interactive(active_skills: &[String]) -> Option<SkillAction> {
         let all_skills = Self::list_available();
         if all_skills.is_empty() {

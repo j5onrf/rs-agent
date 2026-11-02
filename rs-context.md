@@ -10,13 +10,17 @@ ai init ~/.config/rs-agent/projects/flint ---> flint, flin
 ai init ~/.config/rs-agent/projects/qwen38d ---> qwen38d, qwen
 
 # --- Quick Tools ---
+~/.config/rs-agent/tools/model-select/model-select ---> model select, ms
 ~/.config/rs-agent/tools/new-project/new-project ---> newp, new project
 ~/.config/rs-agent/tools/test-agent/test-agent ---> test agent, ta
 ~/.config/rs-agent/tools/rs-index/rs-index ---> idx, index
 
-curl -s "wttr.in/?format=3" ---> get weather, wttr
+# --- Custom Tools ---
+curl -s "wttr.in/?format=3" ---> get weather
 date "+Current Date: %A, %B %-d, %Y" ---> get date
 
 # --- Gated Tools ---
 [gate] date "+Current Date: %A, %B %-d, %Y" ---> test gate
 ```
+
+

@@ -7,7 +7,6 @@ use std::path::Path;
 use std::time::Duration;
 use tokio::time::timeout;
 
-// Direct POSIX binding for process-group killing (Zero extra crates needed)
 extern "C" {
     fn kill(pid: i32, sig: i32) -> i32;
 }
@@ -132,7 +131,6 @@ pub async fn execute_tool(
     raw_args: &str,
     workspace: &Path,
     boundary: &SecurityBoundary,
-    yolo: bool,
 ) -> Result<String, String> {
     let args = heal_json_args(raw_args);
 
@@ -140,14 +138,10 @@ pub async fn execute_tool(
         "read_file" => {
             let path_str = args["path"].as_str().ok_or("Missing 'path' parameter")?;
             let safe_path = boundary.resolve_path(path_str);
-            let is_outside = boundary.is_outside(&safe_path);
-
-            if is_outside {
-                if !boundary.authorize(&format!("OUT-OF-BOUNDS READ: '{}' (outside workspace)", path_str), true, false) {
+            if boundary.is_outside(&safe_path) {
+                if !boundary.authorize(&format!("OUT-OF-BOUNDS READ: '{}'", path_str)) {
                     return Err("[denied] Out-of-bounds read cancelled by user.".into());
                 }
-            } else if !boundary.authorize(&format!("read file {}", path_str), false, yolo) {
-                return Err("[denied] Action cancelled by user.".into());
             }
 
             if !safe_path.is_file() {
@@ -183,14 +177,10 @@ pub async fn execute_tool(
             let new_str = args["new_str"].as_str().ok_or("Missing 'new_str' parameter")?;
 
             let safe_path = boundary.resolve_path(path_str);
-            let is_outside = boundary.is_outside(&safe_path);
-
-            if is_outside {
-                if !boundary.authorize(&format!("OUT-OF-BOUNDS EDIT: '{}' (outside workspace)", path_str), true, false) {
+            if boundary.is_outside(&safe_path) {
+                if !boundary.authorize(&format!("OUT-OF-BOUNDS EDIT: '{}'", path_str)) {
                     return Err("[denied] Out-of-bounds edit cancelled by user.".into());
                 }
-            } else if !boundary.authorize(&format!("surgically edit {}", path_str), false, yolo) {
-                return Err("[denied] Action cancelled by user.".into());
             }
 
             if !safe_path.is_file() {
@@ -244,16 +234,9 @@ pub async fn execute_tool(
             let overwrite = args.get("overwrite").and_then(|v| v.as_bool()).unwrap_or(false);
 
             let safe_path = boundary.resolve_path(path_str);
-            let is_outside = boundary.is_outside(&safe_path);
-
-            if is_outside {
-                if !boundary.authorize(&format!("OUT-OF-BOUNDS WRITE: '{}' (outside workspace)", path_str), true, false) {
+            if boundary.is_outside(&safe_path) {
+                if !boundary.authorize(&format!("OUT-OF-BOUNDS WRITE: '{}'", path_str)) {
                     return Err("[denied] Out-of-bounds write cancelled by user.".into());
-                }
-            } else {
-                let action_desc = if safe_path.exists() { format!("overwrite {}", path_str) } else { format!("create {}", path_str) };
-                if !boundary.authorize(&action_desc, false, yolo) {
-                    return Err("[denied] Action cancelled by user.".into());
                 }
             }
 
@@ -272,14 +255,10 @@ pub async fn execute_tool(
         "list_dir" => {
             let sub = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
             let safe_path = boundary.resolve_path(sub);
-            let is_outside = boundary.is_outside(&safe_path);
-
-            if is_outside {
-                if !boundary.authorize(&format!("OUT-OF-BOUNDS LIST DIR: '{}' (outside workspace)", sub), true, false) {
+            if boundary.is_outside(&safe_path) {
+                if !boundary.authorize(&format!("OUT-OF-BOUNDS LIST DIR: '{}'", sub)) {
                     return Err("[denied] Out-of-bounds list_dir cancelled by user.".into());
                 }
-            } else if !boundary.authorize(&format!("list directory {}", sub), false, yolo) {
-                return Err("[denied] Action cancelled by user.".into());
             }
 
             if !safe_path.is_dir() {
@@ -305,10 +284,8 @@ pub async fn execute_tool(
             let pattern = args["pattern"].as_str().ok_or("Missing 'pattern' parameter")?;
             let sub = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
             let safe_path = boundary.resolve_path(sub);
-            let is_outside = boundary.is_outside(&safe_path);
-
-            if is_outside {
-                if !boundary.authorize(&format!("OUT-OF-BOUNDS SEARCH: '{}' (outside workspace)", sub), true, false) {
+            if boundary.is_outside(&safe_path) {
+                if !boundary.authorize(&format!("OUT-OF-BOUNDS SEARCH: '{}'", sub)) {
                     return Err("[denied] Out-of-bounds search cancelled by user.".into());
                 }
             }
@@ -361,19 +338,16 @@ pub async fn execute_tool(
             let cmd = args["command"].as_str().ok_or("Missing 'command' parameter")?;
 
             if let Some(forbidden) = boundary.check_command(cmd) {
-                if !boundary.authorize(&format!("MUTATING SYSTEM COMMAND: '{}' ({})", cmd, forbidden), true, false) {
+                if !boundary.authorize(&format!("MUTATING SYSTEM COMMAND: '{}' ({})", cmd, forbidden)) {
                     return Err(format!("[denied] Execution of forbidden command '{}' cancelled by user.", forbidden));
                 }
-            } else if !boundary.authorize(&format!("execute: $ {}", cmd), false, yolo) {
-                return Err("[denied] Action cancelled by user.".into());
             }
 
-            // Spawn command in its own process group with 30s async timeout
             let child = tokio::process::Command::new("sh")
                 .arg("-c")
                 .arg(cmd)
                 .current_dir(workspace)
-                .process_group(0) // New process group (pgid = child pid)
+                .process_group(0)
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
                 .spawn()
@@ -381,14 +355,12 @@ pub async fn execute_tool(
 
             let pid = child.id().unwrap_or(0) as i32;
 
-            // Wait with 30s timeout
             let run_res = timeout(Duration::from_secs(30), child.wait_with_output()).await;
 
             let output = match run_res {
                 Ok(Ok(out)) => out,
                 Ok(Err(e)) => return Err(format!("Command execution failed: {}", e)),
                 Err(_) => {
-                    // Timeout hit: reap entire process group (-pid)
                     if pid > 0 {
                         unsafe {
                             kill(-pid, SIGTERM);

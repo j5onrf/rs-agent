@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use serde_json::Value;
 
 /// Parses and heals JSON arguments into a serde_json::Value (used by tools.rs)

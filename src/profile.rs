@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::config::ToolTier;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
@@ -9,20 +7,17 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone)]
 pub struct Profile {
-    pub name: String,
     pub tier: ToolTier,
-    pub yolo: bool,
     pub adapters: bool,
-    pub thinking_budget: u32,
+    pub memory: bool,
     pub system_prompt: String,
 }
 
 impl Profile {
-    pub fn parse(name: &str, raw_content: &str) -> Self {
+    pub fn parse(raw_content: &str) -> Self {
         let mut tier = ToolTier::Smol;
-        let mut yolo = false;
         let mut adapters = false;
-        let mut thinking_budget = 500;
+        let mut memory = false;
         let mut body = raw_content.to_string();
 
         let trimmed = raw_content.trim_start();
@@ -48,16 +43,11 @@ impl Profile {
                                     tier = ToolTier::PureBash;
                                 }
                             }
-                            "yolo" => {
-                                yolo = val == "true" || val == "1" || val == "yes";
-                            }
                             "adapters" | "adapter" => {
                                 adapters = val == "true" || val == "1" || val == "yes";
                             }
-                            "reasoning_budget" | "thinking_budget" | "budget" => {
-                                if let Ok(b) = val.parse::<u32>() {
-                                    thinking_budget = b;
-                                }
+                            "memory" | "mem" => {
+                                memory = val == "true" || val == "1" || val == "yes";
                             }
                             _ => {}
                         }
@@ -67,27 +57,20 @@ impl Profile {
         }
 
         Self {
-            name: name.to_string(),
             tier,
-            yolo,
             adapters,
-            thinking_budget,
+            memory,
             system_prompt: body,
         }
     }
 
     pub fn profile_dirs() -> Vec<PathBuf> {
-        let home = match dirs::home_dir() {
-            Some(h) => h,
-            None => return Vec::new(),
-        };
-
-        [
-            home.join(".config/rs-agent/profiles"),
-        ]
-        .into_iter()
-        .filter(|p| p.is_dir())
-        .collect()
+        dirs::home_dir()
+            .map(|h| vec![h.join(".config/rs-agent/profiles")])
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|p| p.is_dir())
+            .collect()
     }
 
     pub fn load(profile_name: &str) -> Option<Self> {
@@ -95,7 +78,7 @@ impl Profile {
             let direct = dir.join(format!("{}.md", profile_name));
             if direct.is_file() {
                 if let Ok(content) = fs::read_to_string(&direct) {
-                    return Some(Self::parse(profile_name, &content));
+                    return Some(Self::parse(&content));
                 }
             }
 
@@ -107,7 +90,7 @@ impl Profile {
                         if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                             if stem.replace(['-', '_'], "").to_lowercase() == norm_target {
                                 if let Ok(content) = fs::read_to_string(&path) {
-                                    return Some(Self::parse(stem, &content));
+                                    return Some(Self::parse(&content));
                                 }
                             }
                         }

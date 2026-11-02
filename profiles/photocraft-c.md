@@ -1,10 +1,5 @@
 ---
 description: "PhotoCraft Visual Engine & Automation Specialist (Gemini Flash Lite)"
-category: "Cloud"
-yolo: true
-map: false
-memory: false
-ipython: false
 adapters: false
 reasoning_budget: 256
 ---

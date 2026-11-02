@@ -1,0 +1,11 @@
+[package]
+name = "model-select"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crossterm = "0.27"
+dirs = "5.0"
+regex = "1.10"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

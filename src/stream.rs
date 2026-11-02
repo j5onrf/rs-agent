@@ -65,14 +65,13 @@ impl StreamRenderer {
         self.think_word_buf.clear();
     }
 
-    /// Cleanly closes thinking gutter with proper blank line spacing
+    /// Closes thinking gutter without dumping arbitrary blank lines
     pub fn close_thinking(&mut self) {
         self.flush_think_word();
         if self.thinking_started {
             if !self.at_line_start {
                 print!("\x1b[0m\n");
             }
-            println!();
             self.thinking_started = false;
             self.at_line_start = true;
             self.think_col = 0;
@@ -126,14 +125,16 @@ impl StreamRenderer {
         } else {
             self.answer_chars += chunk.len();
 
-            // Transition from thinking to answer: flush and create clean blank line
+            // Transition from thinking to answer: exactly one clean blank line
             if self.thinking_started && !self.answer_started {
                 self.close_thinking();
+                println!();
                 self.answer_started = true;
                 self.at_line_start = true;
             }
 
             print!("\x1b[0m{}", chunk);
+            self.at_line_start = chunk.ends_with('\n');
             let _ = io::stdout().flush();
         }
     }
@@ -147,7 +148,11 @@ impl StreamRenderer {
             .unwrap_or(0.01)
             .max(0.01);
 
-        print!("\x1b[0m\n\n");
+        // Ensure we end the current line, then leave exactly 1 blank line before telemetry
+        if !self.at_line_start {
+            println!();
+        }
+        println!();
 
         let in_tok = if stats.prompt_tokens > 0 {
             stats.prompt_tokens
@@ -206,7 +211,7 @@ impl StreamRenderer {
         parts.push(format!("{:.1}s @ {:.1} t/s", elapsed_gen, speed));
 
         let stat_line = parts.join(" · ");
-        println!("\x1b[2m  {}\x1b[0m\n", stat_line);
+        println!("  \x1b[2m{}\x1b[0m\n", stat_line);
         let _ = io::stdout().flush();
     }
 }
