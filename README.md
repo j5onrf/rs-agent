@@ -94,7 +94,7 @@
       <td align="center" width="220" valign="top">
         <br>
         <h3>Seamless Handover</h3>
-        <p><code>/t3</code> · <code>/t3 web</code></p>
+        <p>👤 <code>/t3</code> · <code>/t3 web</code></p>
         <sub>Instant desktop or browser launch. Conversational chat isolates to <code>projects/chat</code>; agent sessions inherit workspace root.</sub>
         <br><br>
       </td>
@@ -129,8 +129,8 @@
 | Invocation | Interface | Description |
 | :--- | :---: | :--- |
 | `[shortcut]` | **Shell Teleport** | Sub-millisecond router via `rs-context.md` (e.g. `lfm`, `ling`) |
-| `ai` | **Interactive Chat** | Conversational REPL with thinking gutters and live token stats |
-| `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security kernel |
+| 👤 `ai` | **Interactive Chat** | Conversational REPL with thinking gutters and live token stats |
+| 👤 `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security kernel |
 | `/task [goal]` | **Task Loop** | Autonomous goal loop; auto-discovers `TASK.md` when prompt is omitted |
 | `/t3` / `/t3 web` | **T3 Code IDE** | Handover active workspace to official T3 Code GUI with diffs & security gates |
 | `ai --bridge` | **Headless ACP** | Embedded stdio JSON-RPC 2.0 interface for IDEs and desktop surfaces |
@@ -294,4 +294,5 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <sub>Built for speed, clarity, and terminal minimalism. Licensed under the <b><a href="LICENSE">MIT License</a></b>.</sub>
 </div>
+
 
