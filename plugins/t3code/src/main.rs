@@ -3,6 +3,7 @@ use rs_agent::client::{ChatMessage, LlmClient};
 use rs_agent::config::{self, ProviderConfig, WorkspaceConfig};
 use rs_agent::profile::Profile;
 use rs_agent::security::SecurityBoundary;
+use rs_agent::skill::Skill;
 use rs_agent::tools;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -61,6 +62,38 @@ fn send_acp_chunk(session_id: &str, text: &str, is_thought: bool) {
     let _ = stdout.flush();
 }
 
+fn strip_xml_block(text: &str, tag: &str) -> String {
+    let mut result = text.to_string();
+    let open_pattern = format!("<{}", tag);
+    let close_tag = format!("</{}>", tag);
+    while let Some(start) = result.find(&open_pattern) {
+        let after_tag = &result[start + open_pattern.len()..];
+        if after_tag.starts_with('>') || after_tag.starts_with(' ') || after_tag.starts_with('\n') {
+            if let Some(end_offset) = result[start..].find(&close_tag) {
+                let end = start + end_offset + close_tag.len();
+                result.replace_range(start..end, "");
+                continue;
+            }
+        }
+        break;
+    }
+    result
+}
+
+fn sanitize_t3_prompt(raw: &str) -> String {
+    let tags = [
+        "pull_request_linking",
+        "t3_code_instructions",
+        "runtime_info",
+        "system_information",
+    ];
+    let mut cleaned = raw.to_string();
+    for tag in tags {
+        cleaned = strip_xml_block(&cleaned, tag);
+    }
+    cleaned.trim().to_string()
+}
+
 fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>) {
     let cfg = WorkspaceConfig::load_or_default(workspace);
     let inherited_profile = std::env::var("AI_ACTIVE_PROFILE").unwrap_or_else(|_| cfg.profile_name.clone());
@@ -84,6 +117,15 @@ fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>) {
                 if !trimmed.is_empty() {
                     prompt.push_str(&format!("\n\n---\nWORKSPACE MEMORY (.rs/memory.md):\n{}", trimmed));
                 }
+            }
+        }
+    }
+
+    // Dynamic skills only (opt-in via AI_ACTIVE_SKILLS)
+    if let Ok(extra) = std::env::var("AI_ACTIVE_SKILLS") {
+        for sk_name in extra.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()) {
+            if let Some(sk) = Skill::load(sk_name) {
+                prompt.push_str(&format!("\n\n---\nSKILL DIRECTIVE [{}]:\n{}", sk.name, sk.content));
             }
         }
     }
@@ -177,16 +219,25 @@ async fn main() -> Result<()> {
             }
             "session/prompt" | "prompt" => {
                 let sid = params.get("sessionId").and_then(|v| v.as_str()).unwrap_or(&active_session_id).to_string();
-                let prompt_items = params.get("prompt").and_then(|v| v.as_array()).cloned().unwrap_or_default();
 
-                let mut user_text = String::new();
-                for item in prompt_items {
-                    if item.get("type").and_then(|v| v.as_str()) == Some("text") {
-                        if let Some(t) = item.get("text").and_then(|v| v.as_str()) {
-                            user_text.push_str(t);
-                            user_text.push(' ');
+                let mut raw_user_text = String::new();
+                if let Some(prompt_str) = params.get("prompt").and_then(|v| v.as_str()) {
+                    raw_user_text.push_str(prompt_str);
+                } else if let Some(prompt_items) = params.get("prompt").and_then(|v| v.as_array()) {
+                    for item in prompt_items {
+                        if item.get("type").and_then(|v| v.as_str()) == Some("text") {
+                            if let Some(t) = item.get("text").and_then(|v| v.as_str()) {
+                                raw_user_text.push_str(t);
+                                raw_user_text.push(' ');
+                            }
                         }
                     }
+                }
+
+                let cleaned_user_text = sanitize_t3_prompt(&raw_user_text);
+                if cleaned_user_text.is_empty() {
+                    send_rpc(req_id, Some(json!({ "stopReason": "end_turn" })), None);
+                    continue;
                 }
 
                 let client_ref = client.clone();
@@ -198,7 +249,7 @@ async fn main() -> Result<()> {
                         let mut lock = sessions_ref.lock().await;
                         if let Some(sess) = lock.get_mut(&sid) {
                             sess.cancel_flag.store(false, Ordering::SeqCst);
-                            sess.history.push(ChatMessage::user(user_text.trim()));
+                            sess.history.push(ChatMessage::user(cleaned_user_text));
                             (sess.workspace.clone(), sess.history.clone(), sess.active_tools.clone(), sess.cancel_flag.clone())
                         } else {
                             send_rpc(req_id_owned.as_ref(), Some(json!({ "stopReason": "end_turn" })), None);
@@ -273,7 +324,6 @@ async fn main() -> Result<()> {
                         }
                     }
 
-                    // Save history back to session state
                     {
                         let mut lock = sessions_ref.lock().await;
                         if let Some(sess) = lock.get_mut(&sid) {
