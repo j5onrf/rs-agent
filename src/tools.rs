@@ -1,5 +1,5 @@
 use crate::adapter::heal_json_args;
-use crate::config::ToolTier;
+use crate::config::{get_context_ceilings, ToolTier};
 use crate::security::SecurityBoundary;
 use serde_json::{json, Value};
 use std::fs;
@@ -133,6 +133,7 @@ pub async fn execute_tool(
     boundary: &SecurityBoundary,
 ) -> Result<String, String> {
     let args = heal_json_args(raw_args);
+    let ceilings = get_context_ceilings();
 
     match name {
         "read_file" => {
@@ -163,9 +164,19 @@ pub async fn execute_tool(
                 }
                 let slice = lines[start_idx..end_idx].join("\n");
                 Ok(format!("### File: {} (Lines {}-{} of {})\n{}", path_str, s, end_idx, total, slice))
-            } else if total > 250 {
-                let preview = lines[..100].join("\n");
-                Ok(format!("### File Preview: {} (Showing 1-100 of {} lines)\n{}\n\n... [File truncated: use read_file with line_start/line_end]", path_str, total, preview))
+            } else if total > ceilings.line_ceiling {
+                let preview_count = ceilings.preview_lines.min(total);
+                let preview = lines[..preview_count].join("\n");
+
+                // Write full content to scratchpad.log spillover buffer
+                let scratchpad_dir = workspace.join(".rs");
+                let _ = fs::create_dir_all(&scratchpad_dir);
+                let _ = fs::write(scratchpad_dir.join("scratchpad.log"), &content);
+
+                Ok(format!(
+                    "### File Preview: {} (Showing 1-{} of {} lines)\n{}\n\n... [File truncated: {} lines exceeds {}-line ceiling]\nFull content saved to .rs/scratchpad.log. Use read_file with line_start/line_end to inspect.",
+                    path_str, preview_count, total, preview, total, ceilings.line_ceiling
+                ))
             } else {
                 Ok(format!("### File: {} ({} lines)\n{}", path_str, total, content))
             }
@@ -296,8 +307,8 @@ pub async fn execute_tool(
                 .unwrap_or_else(|_| regex::Regex::new(&regex::escape(pattern)).unwrap());
 
             let mut matches = Vec::new();
-            fn walk_search(dir: &Path, re: &regex::Regex, root: &Path, matches: &mut Vec<String>) {
-                if matches.len() >= 30 {
+            fn walk_search(dir: &Path, re: &regex::Regex, root: &Path, matches: &mut Vec<String>, limit: usize) {
+                if matches.len() >= limit {
                     return;
                 }
                 if let Ok(entries) = fs::read_dir(dir) {
@@ -308,14 +319,14 @@ pub async fn execute_tool(
                             continue;
                         }
                         if path.is_dir() {
-                            walk_search(&path, re, root, matches);
+                            walk_search(&path, re, root, matches, limit);
                         } else if path.is_file() {
                             if let Ok(c) = fs::read_to_string(&path) {
                                 for (idx, line) in c.lines().enumerate() {
                                     if re.is_match(line) {
                                         let rel = path.strip_prefix(root).unwrap_or(&path).display();
                                         matches.push(format!("{}:{}: {}", rel, idx + 1, line.trim()));
-                                        if matches.len() >= 30 {
+                                        if matches.len() >= limit {
                                             return;
                                         }
                                     }
@@ -326,7 +337,7 @@ pub async fn execute_tool(
                 }
             }
 
-            walk_search(&safe_path, &re, workspace, &mut matches);
+            walk_search(&safe_path, &re, workspace, &mut matches, ceilings.search_cap);
             if matches.is_empty() {
                 Ok(format!("No matches found for '{}'", pattern))
             } else {
@@ -354,7 +365,6 @@ pub async fn execute_tool(
                 .map_err(|e| format!("Command spawn failed: {}", e))?;
 
             let pid = child.id().unwrap_or(0) as i32;
-
             let run_res = timeout(Duration::from_secs(30), child.wait_with_output()).await;
 
             let output = match run_res {
@@ -379,8 +389,23 @@ pub async fn execute_tool(
             let combined = format!("{}{}", stdout, stderr);
             let trimmed = combined.trim();
 
-            let result = if trimmed.len() > 15000 {
-                format!("{}\n... [output capped at 15k chars]", &trimmed[..15000])
+            let result = if trimmed.len() > ceilings.char_cap {
+                // Save complete untruncated output to scratchpad buffer
+                let scratchpad_dir = workspace.join(".rs");
+                let _ = fs::create_dir_all(&scratchpad_dir);
+                let _ = fs::write(scratchpad_dir.join("scratchpad.log"), trimmed);
+
+                // Head (1/3) + Tail (2/3) split so errors at the end of the output are always visible
+                let head_size = (ceilings.char_cap / 3).min(trimmed.len());
+                let tail_size = ((ceilings.char_cap * 2) / 3).min(trimmed.len());
+                let head = &trimmed[..head_size];
+                let tail_start = trimmed.len().saturating_sub(tail_size);
+                let tail = &trimmed[tail_start..];
+
+                format!(
+                    "{}\n\n... [Output truncated: {} chars exceeds {} cap. Full raw output saved to .rs/scratchpad.log] ...\n\n{}",
+                    head, trimmed.len(), ceilings.char_cap, tail
+                )
             } else if trimmed.is_empty() {
                 "(exit 0, no output)".into()
             } else {

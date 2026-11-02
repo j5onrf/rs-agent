@@ -1,12 +1,13 @@
 [package]
 name = "rs-agent"
-version = "0.4.0"
+version = "0.4.4"
 edition = "2021"
 
 [workspace]
 members = [
     ".",
-    "plugins/t3code"
+    "plugins/t3code",
+    "tools/model-select",
 ]
 
 [lib]
@@ -14,12 +15,8 @@ name = "rs_agent"
 path = "src/lib.rs"
 
 [[bin]]
-name = "rs-agent"
-path = "src/main.rs"
-[[bin]]
 name = "ai"
 path = "src/main.rs"
-
 
 [dependencies]
 anyhow = "1.0"
