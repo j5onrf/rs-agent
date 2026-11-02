@@ -26,14 +26,14 @@
   <table>
     <tr>
       <td align="center" width="50%" valign="top">
-        <h3>Sub-27B (SLM)</h3>
+        <h3>👤 Sub-27B (SLM)</h3>
         <p><sub>Tool calling, fast refactoring, and single-turn edits</sub></p>
         <code>LFM3-1.7B*</code> &nbsp;•&nbsp; <code>Ling-3.0-tiny</code><br>
         <code>MiniCPM5-2B</code> &nbsp;•&nbsp; <code>Qwen3.5-2B+</code><br>
         <code>MiniCPM-V-4.7-1B</code> &nbsp;•&nbsp; <code>LFM2.5-24B-A2B</code>
       </td>
       <td align="center" width="50%" valign="top">
-        <h3>27B+ (LLM)</h3>
+        <h3>👤 27B+ (LLM)</h3>
         <p><sub>Deep reasoning, complex logic, and multi-turn loops</sub></p>
         <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br>
         <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br>
@@ -294,3 +294,4 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <sub>Built for speed, clarity, and terminal minimalism. Licensed under the <b><a href="LICENSE">MIT License</a></b>.</sub>
 </div>
+
