@@ -1,7 +1,7 @@
 <br>
 
 <div align="center">
-  <img alt="rs-agent" src="logo.svg?v=2" height="90" />
+  <img alt="rs-agent" src="logo.svg?v=2" height="100" />
   <h1>rs-agent</h1>
  
   <p>
