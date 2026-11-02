@@ -1,7 +1,7 @@
 <br>
 
 <div align="center">
-  <img alt="rs-agent" src="logo.svg?v=2" height="175" />
+  <img alt="rs-agent" src="logo.svg?v=2" height="150" />
   <h1>rs-agent</h1>
  
   <p>
@@ -153,7 +153,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 | :--- | :---: | :--- |
 | `ms` | **Model Selector** | Dynamic TUI for toggling universal providers, context budget, and loop limit |
 | `newp` | **Project Creator** | Scaffolds workspace, `.rs/config.json`, and auto-links router aliases |
-| `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) via `syn` |
+| `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) |
 | `ta` | **System Diagnostics** | 10-pass native verification suite testing binary integrity, safety, and UI |
 
 </div>
@@ -260,7 +260,7 @@ source ~/.config/rs-agent/rs-hook.sh
 CUSTOM1_NAME="Google Gemini"
 CUSTOM1_API_KEY="AIzaSyYourGeminiApiKeyHere"
 CUSTOM1_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-CUSTOM1_MODEL="gemini-2.5-flash-lite"
+CUSTOM1_MODEL="gemini-3.5-flash-lite"
 
 # ── 2. OpenRouter ─────────────────────────────────────────────────────────────
 # CUSTOM2_NAME="OpenRouter"
