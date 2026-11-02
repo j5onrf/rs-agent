@@ -81,7 +81,7 @@
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Official Client Surface</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Client Surface</h2>
 
 <p align="center">
   <b><a href="https://t3.codes">T3 Code</a> is the official graphical surface for rs-agent.</b><br>
