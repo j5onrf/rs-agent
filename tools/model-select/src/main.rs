@@ -243,7 +243,7 @@ fn main() -> std::io::Result<()> {
                     }
                 }
                 KeyCode::Char('q') | KeyCode::Esc => {
-                    return Ok(());
+                    break;
                 }
                 _ => {}
             }

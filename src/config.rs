@@ -1,3 +1,23 @@
+fn get_env_val(content: &str, key: &str) -> Option<String> {
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("#") {
+            continue;
+        }
+        if let Some(rest) = trimmed.strip_prefix(key) {
+            let rest = rest.trim_start();
+            if let Some(val_part) = rest.strip_prefix("=") {
+                let val = val_part.trim().split("#").next().unwrap_or(val_part).trim();
+                let clean = val.trim_matches('"').trim_matches('\'').trim();
+                if !clean.is_empty() {
+                    return Some(clean.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -254,88 +274,85 @@ async fn query_local_model_name() -> Option<String> {
 
 impl ProviderConfig {
     pub async fn load() -> Self {
-        ensure_env_file();
         let env_path = get_env_path();
-
-        let mut lines = Vec::new();
-        if let Ok(content) = fs::read_to_string(env_path) {
-            lines = content.lines().map(|s| s.trim().to_string()).collect();
-        }
-
+        let env_content = std::fs::read_to_string(&env_path).unwrap_or_default();
         let max_tokens = get_max_tokens();
 
-        let get_active_key = |key_name: &str| -> Option<String> {
-            for l in &lines {
-                if !l.starts_with('#') && l.contains('=') {
-                    let parts: Vec<&str> = l.splitn(2, '=').collect();
-                    let k = parts[0].trim().trim_start_matches("export ");
-                    if k == key_name {
-                        let v = parts[1].split('#').next().unwrap_or("").trim();
-                        let clean = v.trim_matches('"').trim_matches('\'');
-                        if clean == "not-needed" || (clean.len() >= 8 && !clean.contains("your_key_here")) {
-                            return Some(clean.to_string());
-                        }
-                    }
+        // 1. Check Universal Custom Providers: CUSTOM1..CUSTOM9 (and legacy CUSTOM_API_KEY)
+        for i in 1..=9 {
+            let key_var = format!("CUSTOM{}_API_KEY", i);
+            let legacy_key = if i == 1 { Some("CUSTOM_API_KEY") } else { None };
+
+            let maybe_key = get_env_val(&env_content, &key_var)
+                .or_else(|| legacy_key.and_then(|k| get_env_val(&env_content, k)));
+
+            if let Some(api_key) = maybe_key {
+                let clean_key = api_key.trim();
+                if !clean_key.is_empty() && !clean_key.contains("your_key_here") {
+                    let url_var = format!("CUSTOM{}_URL", i);
+                    let legacy_url = if i == 1 { Some("CUSTOM_URL") } else { None };
+                    let base_url = get_env_val(&env_content, &url_var)
+                        .or_else(|| legacy_url.and_then(|k| get_env_val(&env_content, k)))
+                        .unwrap_or_else(|| "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions".to_string());
+
+                    let model_var = format!("CUSTOM{}_MODEL", i);
+                    let legacy_model = if i == 1 { Some("CUSTOM_MODEL") } else { None };
+                    let model = get_env_val(&env_content, &model_var)
+                        .or_else(|| legacy_model.and_then(|k| get_env_val(&env_content, k)))
+                        .unwrap_or_else(|| "default".to_string());
+
+                    return ProviderConfig {
+                        base_url,
+                        api_key: clean_key.to_string(),
+                        model,
+                        max_tokens,
+                    };
                 }
             }
-            None
-        };
+        }
 
-        let get_var = |var_name: &str| -> Option<String> {
-            for l in &lines {
-                if !l.starts_with('#') && l.contains('=') {
-                    let parts: Vec<&str> = l.splitn(2, '=').collect();
-                    let k = parts[0].trim().trim_start_matches("export ");
-                    if k == var_name {
-                        let v = parts[1].split('#').next().unwrap_or("").trim();
-                        return Some(v.trim_matches('"').trim_matches('\'').to_string());
-                    }
-                }
-            }
-            std::env::var(var_name).ok()
-        };
-
-        let custom_prefixes = [
-            "CUSTOM", "CUSTOM2", "CUSTOM3", "CUSTOM4", "CUSTOM5",
-            "CUSTOM6", "CUSTOM7", "CUSTOM8", "CUSTOM9"
-        ];
-        for prefix in custom_prefixes {
-            let key_name = format!("{}_API_KEY", prefix);
-            if let Some(key) = get_active_key(&key_name) {
-                let url_name = format!("{}_URL", prefix);
-                let mod_name = format!("{}_MODEL", prefix);
-                return Self {
-                    base_url: get_var(&url_name).unwrap_or_else(|| "https://api.openai.com/v1/chat/completions".into()),
-                    api_key: key,
-                    model: get_var(&mod_name).unwrap_or_else(|| "default".into()),
+        // 2. Check OpenRouter
+        if let Some(api_key) = get_env_val(&env_content, "OPENROUTER_API_KEY") {
+            let clean_key = api_key.trim();
+            if !clean_key.is_empty() && !clean_key.contains("your_key_here") {
+                let model = get_env_val(&env_content, "OPENROUTER_MODEL")
+                    .unwrap_or_else(|| "openrouter/free".to_string());
+                return ProviderConfig {
+                    base_url: "https://openrouter.ai/api/v1/chat/completions".to_string(),
+                    api_key: clean_key.to_string(),
+                    model,
                     max_tokens,
                 };
             }
         }
 
-        if let Some(key) = get_active_key("OPENROUTER_API_KEY") {
-            return Self {
-                base_url: get_var("OPENROUTER_URL").unwrap_or_else(|| "https://openrouter.ai/api/v1/chat/completions".into()),
-                api_key: key,
-                model: get_var("OPENROUTER_MODEL").unwrap_or_else(|| "openrouter/free".into()),
-                max_tokens,
-            };
-        }
+        // 3. Fallback: Local llama-server on :8080 (inline probe)
+        let local_url = "http://127.0.0.1:8080/v1/chat/completions".to_string();
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_millis(500))
+            .build()
+            .unwrap_or_default();
 
-        if let Some(key) = get_active_key("GEMINI_API_KEY") {
-            return Self {
-                base_url: get_var("GEMINI_URL").unwrap_or_else(|| "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions".into()),
-                api_key: key,
-                model: get_var("GEMINI_MODEL").unwrap_or_else(|| "gemini-3.5-flash-lite".into()),
-                max_tokens,
-            };
-        }
+        let detected_model = if let Ok(resp) = client.get("http://127.0.0.1:8080/v1/models").send().await {
+            if let Ok(json) = resp.json::<serde_json::Value>().await {
+                json.get("data")
+                    .and_then(|d| d.as_array())
+                    .and_then(|arr| arr.first())
+                    .and_then(|m| m.get("id"))
+                    .and_then(|id| id.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| "LFM3-1.7B".to_string())
+            } else {
+                "LFM3-1.7B".to_string()
+            }
+        } else {
+            "LFM3-1.7B".to_string()
+        };
 
-        let local_model = query_local_model_name().await.unwrap_or_else(|| "LFM3-1.7B".into());
-        Self {
-            base_url: "http://127.0.0.1:8080/v1/chat/completions".into(),
-            api_key: "not-needed".into(),
-            model: local_model,
+        ProviderConfig {
+            base_url: local_url,
+            api_key: "not-needed".to_string(),
+            model: detected_model,
             max_tokens,
         }
     }
