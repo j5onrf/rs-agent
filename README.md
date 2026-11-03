@@ -11,7 +11,7 @@
   </p>
 
   <p>
-    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>t3code</code> &nbsp;•&nbsp; <code>local-first</code>
+    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>t3code</code> &nbsp;•&nbsp; <code>omarchy</code>
   </p>
 
   <p>
@@ -292,5 +292,6 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <sub>Built for speed, clarity, and terminal minimalism. Licensed under the <b><a href="LICENSE">MIT License</a></b>.</sub>
 </div>
+
 
 
