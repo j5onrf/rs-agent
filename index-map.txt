@@ -9,13 +9,15 @@
 #   ├── Cargo.toml                       - name = "rs-agent"
 #   ├── README.md                        - gguf llama.cpp t3code local-first
 #   ├── bin/ai
+#   ├── bin/ms
 #   ├── bin/rs-agent
-#   ├── bin/t3code-bridge
+#   ├── bin/t3code-bridge                - #!/usr/bin/env bash
+#   ├── bin/ta
 #   ├── plugins/t3code/Cargo.toml        - name = "t3code-bridge"
 #   ├── plugins/t3code/Readme.md         - A native Rust Agent Client Protocol (ACP) stdio bridge connecting the `rs-agent`
 #   ├── plugins/t3code/launch.sh         - #!/usr/bin/env bash
 #   ├── plugins/t3code/src/main.rs       - CLI Entrypoint & Runtime Loop
-#   ├── plugins/t3code/t3code-bridge
+#   ├── plugins/t3code/t3code-bridge     - #!/usr/bin/env bash
 #   ├── profiles/chat.md                 - Versatile, articulate, and high-signal conversational partner
 #   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer (Native 6-Tool)
 #   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer (Native 6-Tool)
@@ -23,13 +25,14 @@
 #   ├── profiles/photocraft-l.md         - Ling-3.0-tiny PhotoCraft Automation Engineer (Native 6-Tool)
 #   ├── profiles/purebash.md             - Pure Bash LFM Minimalist Shell Agent
 #   ├── profiles/sage.md                 - InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent
-#   ├── projects/lfm3/test_math.py       - def add(a, b):
+#   ├── projects/lfm3/test_calc.py       - def add(a, b):
 #   ├── rs-context.md                    - Rs-Agent Context Router
 #   ├── rs-hook.sh                       - rs-agent shell hook (ponytail minimalism: < 0.2ms, Bash & Zsh, macOS & Linux)
 #   ├── skills/humanizer.md              - Anti-AI Slop Humanizer Directive
 #   ├── skills/ponytail.md               - Ponytail Architecture Directive for Rust
 #   ├── skills/ub-mode.md                - Uncle Bob Clean Code & Craftsmanship Directive
 #   ├── src/adapter.rs                   - fn: heal_json_args, repair_tool_args
+#   ├── src/bridge.rs                    - fn: run_bridge
 #   ├── src/client.rs                    - types: ChatMessage, LlmClient
 #   ├── src/config.rs                    - types: ToolTier, WorkspaceConfig, ContextCeilings
 #   ├── src/lib.rs
@@ -44,6 +47,7 @@
 #   ├── src/tools.rs                     - fn: get_tools_schema, execute_tool
 #   ├── src/ui.rs                        - fn: render_frame, draw_box
 #   ├── system_instructions.md           - Global System Instructions (identical to .cursorrules or CLAUDE.md):
+#   ├── ta_probe.txt
 #   ├── tools/model-select/Cargo.toml    - name = "model-select"
 #   ├── tools/model-select/model-select
 #   ├── tools/model-select/src/main.rs   - CLI Entrypoint & Runtime Loop
@@ -66,32 +70,33 @@
 ### `src/lib.rs`
 ```rust
   L001: pub mod adapter;
-  L002: pub mod client;
-  L003: pub mod config;
-  L004: pub mod matcher;
-  L005: pub mod profile;
-  L006: pub mod security;
-  L007: pub mod skill;
-  L008: pub mod spinner;
-  L009: pub mod state;
-  L010: pub mod stream;
-  L011: pub mod tools;
-  L012: pub mod ui;
+  L002: pub mod bridge;
+  L003: pub mod client;
+  L004: pub mod config;
+  L005: pub mod matcher;
+  L006: pub mod profile;
+  L007: pub mod security;
+  L008: pub mod skill;
+  L009: pub mod spinner;
+  L010: pub mod state;
+  L011: pub mod stream;
+  L012: pub mod tools;
+  L013: pub mod ui;
 ```
 
 ### `src/main.rs`
 ```rust
   L020: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
   L030: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff }
-  L765: async fn main() -> anyhow :: Result<()>;
+  L768: async fn main() -> anyhow :: Result<()>;
 ```
 
 ### `tools/model-select/src/main.rs`
 ```rust
-  L018: impl Drop for RawModeGuard {
-    L019: fn drop(&mut self);
+  L009: impl Drop for RawModeGuard {
+    L010: fn drop(&mut self);
   }
-  L370: fn main();
+  L062: fn main() -> std :: io :: Result<()>;
 ```
 
 ### `tools/new-project/src/main.rs`
@@ -110,45 +115,51 @@
   L025: pub fn repair_tool_args(fn_name: &str, raw_args: &str) -> String; // Repairs common SLM JSON formatting defects (unescaped newlines, markdown fences, trailing commas)
 ```
 
+### `src/bridge.rs`
+```rust
+  L275: pub async fn run_bridge() -> Result<()>;
+```
+
 ### `src/client.rs`
 ```rust
-  L012: pub struct ChatMessage { pub role: String, pub content: String, pub tool_calls: Option<Value>, pub tool_call_id: Option<String> }
-  L022: impl ChatMessage {
-    L023: pub fn system(content: impl Into<String>) -> Self;
-    L032: pub fn user(content: impl Into<String>) -> Self;
-    L041: pub fn assistant(content: impl Into<String>) -> Self;
-    L050: pub fn tool_response(tool_call_id: String, content: String) -> Self;
+  L014: pub struct ChatMessage { pub role: String, pub content: Value, pub tool_calls: Option<Value>, pub tool_call_id: Option<String> }
+  L024: impl ChatMessage {
+    L025: pub fn system(content: impl Into<String>) -> Self;
+    L034: pub fn user(content: impl Into<String>) -> Self;
+    L043: pub fn assistant(content: impl Into<String>) -> Self;
+    L052: pub fn tool_response(tool_call_id: String, content: String) -> Self;
+    L061: pub fn content_as_str(&self) -> &str;
   }
-  L060: pub struct LlmClient { pub reasoning_budget: std :: sync :: atomic :: AtomicI64 }
-  L066: impl LlmClient {
-    L067: pub fn set_reasoning_budget(&self, budget: Option<usize>);
-    L072: pub fn new(config: ProviderConfig) -> Self;
-    L080: pub async fn stream_chat_raw<F>(&self, messages: &[ChatMessage], tools: Option<Value>, mut on_chunk: F ,) -> Result<(String, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
-    L251: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<Vec<Value>>, UsageStats)>;
+  L066: pub struct LlmClient { pub reasoning_budget: std :: sync :: atomic :: AtomicI64 }
+  L072: impl LlmClient {
+    L073: pub fn set_reasoning_budget(&self, budget: Option<usize>);
+    L078: pub fn new(config: ProviderConfig) -> Self;
+    L086: pub async fn stream_chat_raw<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, mut on_chunk: F ,) -> Result<(String, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
+    L264: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<Vec<Value>>, UsageStats)>;
   }
 ```
 
 ### `src/config.rs`
 ```rust
-  L007: pub enum ToolTier { PureBash, Smol }
-  L013: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, pub adapters: bool }
-  L022: impl Default for WorkspaceConfig {
-    L023: fn default() -> Self;
+  L027: pub enum ToolTier { PureBash, Smol }
+  L033: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, pub adapters: bool }
+  L042: impl Default for WorkspaceConfig {
+    L043: fn default() -> Self;
   }
-  L033: impl WorkspaceConfig {
-    L034: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
-    L051: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
+  L053: impl WorkspaceConfig {
+    L054: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
+    L071: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
   }
-  L060: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
-  L118: pub fn get_env_path() -> PathBuf;
-  L124: pub fn ensure_env_file();
-  L134: pub fn get_max_tokens() -> usize;
-  L158: pub fn get_context_ceilings() -> ContextCeilings;
-  L195: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, pub max_tokens: usize }
-  L224: impl ProviderConfig {
-    L225: pub async fn load() -> Self;
+  L080: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
+  L136: pub fn get_env_path() -> PathBuf;
+  L142: pub fn ensure_env_file();
+  L185: pub fn get_max_tokens() -> usize;
+  L209: pub fn get_context_ceilings() -> ContextCeilings;
+  L246: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, pub max_tokens: usize }
+  L275: impl ProviderConfig {
+    L276: pub async fn load() -> Self;
   }
-  L313: pub fn load_global_instructions() -> Option<String>;
+  L361: pub fn load_global_instructions() -> Option<String>;
 ```
 
 ### `src/matcher.rs`
