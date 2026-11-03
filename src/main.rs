@@ -28,6 +28,13 @@ struct Cli {
 }
 
 #[derive(Subcommand, Debug)]
+enum McpAction {
+    List { server: Option<String> },
+    Call { server: String, tool: String, args: Option<String> },
+    Schema { server: Option<String> },
+}
+
+#[derive(Subcommand, Debug)]
 enum Commands {
     Init {
         path: Option<String>,
@@ -40,6 +47,10 @@ enum Commands {
         intents: Option<String>,
     },
     Handoff,
+    Mcp {
+        #[command(subcommand)]
+        action: McpAction,
+    },
 }
 
 fn expand_path(p: &str) -> PathBuf {
@@ -372,8 +383,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
     let mut system_prompt = build_system_prompt(cfg.is_agent, target_dir, &active_profile, &active_skills);
     let mut history = vec![ChatMessage::system(&system_prompt)];
+    let mcp_servers = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
     let mut active_tools = if cfg.is_agent {
-        Some(tools::get_tools_schema(&cfg.tier))
+        Some(tools::get_tools_schema_with_mcp(&cfg.tier, &mcp_servers).await)
     } else {
         None
     };
@@ -513,8 +525,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
                 history.clear();
                 history.push(ChatMessage::system(&system_prompt));
+                let new_mcp = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
                 active_tools = if cfg.is_agent {
-                    Some(tools::get_tools_schema(&cfg.tier))
+                    Some(tools::get_tools_schema_with_mcp(&cfg.tier, &new_mcp).await)
                 } else {
                     None
                 };
@@ -807,6 +820,59 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    if let Some(Commands::Mcp { action }) = &cli.command {
+        match action {
+            McpAction::List { server } => {
+                let servers = rs_agent::mcp::load_servers_config();
+                if let Some(s) = server {
+                    match rs_agent::mcp::get_server_tools_schema(s).await {
+                        Ok(tools) => {
+                            println!("Server: {} ({} tools)", s, tools.len());
+                            for t in tools {
+                                let name = t["function"]["name"].as_str().unwrap_or("");
+                                let desc = t["function"]["description"].as_str().unwrap_or("");
+                                println!("  - {:<32} {}", name, desc);
+                            }
+                        }
+                        Err(e) => eprintln!("Error loading server {}: {}", s, e),
+                    }
+                } else {
+                    println!("Configured MCP Servers ({}):", servers.len());
+                    for (name, cfg) in servers {
+                        println!("  • {:<16} ({})", name, cfg.command);
+                    }
+                    println!("
+Use: ai mcp list <server> to inspect tools");
+                }
+            }
+            McpAction::Call { server, tool, args } => {
+                let payload: serde_json::Value = args.as_deref()
+                    .and_then(|a| serde_json::from_str(a).ok())
+                    .unwrap_or_else(|| serde_json::json!({}));
+                match rs_agent::mcp::call_tool(server, tool, &payload).await {
+                    Ok(out) => println!("{}", out),
+                    Err(e) => eprintln!("[mcp error] {}", e),
+                }
+            }
+            McpAction::Schema { server } => {
+                let servers = rs_agent::mcp::load_servers_config();
+                let targets: Vec<String> = if let Some(s) = server {
+                    vec![s.clone()]
+                } else {
+                    servers.keys().cloned().collect()
+                };
+                let mut all_schemas = Vec::new();
+                for s in targets {
+                    if let Ok(schemas) = rs_agent::mcp::get_server_tools_schema(&s).await {
+                        all_schemas.extend(schemas);
+                    }
+                }
+                println!("{}", serde_json::to_string_pretty(&all_schemas).unwrap_or_default());
+            }
+        }
+        return Ok(());
+    }
+
     if cli.bridge {
         return rs_agent::bridge::run_bridge().await;
     }
@@ -816,7 +882,7 @@ async fn main() -> anyhow::Result<()> {
             let target_path = path.map(|p| expand_path(&p)).unwrap_or(current_dir);
             run_session(&target_path, true).await?;
         }
-        Some(Commands::Match { .. }) | Some(Commands::New { .. }) | Some(Commands::Handoff) => unreachable!(),
+        Some(Commands::Match { .. }) | Some(Commands::New { .. }) | Some(Commands::Handoff) | Some(Commands::Mcp { .. }) => unreachable!(),
         None => {
             let chat_dir = dirs::home_dir()
                 .map(|h| h.join(".config/rs-agent/projects/chat"))

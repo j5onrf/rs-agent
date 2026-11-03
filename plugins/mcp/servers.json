@@ -1,0 +1,48 @@
+{
+  "servers": {
+    "photocraft": {
+      "command": "photocraft-cli",
+      "args": [
+        "mcp",
+        "--bridge",
+        "127.0.0.1:7878",
+        "--control-token-file",
+        "${HOME}/.config/photocraft/control.token",
+        "--automation-read-root",
+        "${HOME}",
+        "--automation-write-root",
+        "${HOME}"
+      ],
+      "env": {}
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"],
+      "env": {}
+    },
+    "sqlite": {
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "--db-path", "${HOME}/.config/rs-agent/plugins/mcp/mcp.db"],
+      "env": {}
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+      }
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": {}
+    },
+    "firecrawl": {
+      "command": "npx",
+      "args": ["-y", "firecrawl-mcp"],
+      "env": {
+        "FIRECRAWL_API_KEY": "${FIRECRAWL_API_KEY}"
+      }
+    }
+  }
+}

@@ -12,52 +12,72 @@ pub struct Profile {
     pub adapters: bool,
     pub memory: bool,
     pub system_prompt: String,
+    pub mcp_servers: Vec<String>,
 }
 
 impl Profile {
     pub fn parse(raw_content: &str) -> Self {
+        let mut reasoning_budget = None;
         let mut tier = ToolTier::Smol;
         let mut adapters = false;
         let mut memory = false;
-        let mut reasoning_budget = None;
-        let mut body = raw_content.to_string();
+        let mut mcp_servers = Vec::new();
+        let mut body = String::new();
+        let mut in_frontmatter = false;
+        let mut frontmatter_closed = false;
 
-        let trimmed = raw_content.trim_start();
-        if trimmed.starts_with("---") {
-            let parts: Vec<&str> = trimmed.splitn(3, "---").collect();
-            if parts.len() >= 3 {
-                let fm = parts[1];
-                body = parts[2].trim().to_string();
+        for line in raw_content.lines() {
+            let trimmed = line.trim();
+            if trimmed == "---" {
+                if !in_frontmatter && !frontmatter_closed {
+                    in_frontmatter = true;
+                    continue;
+                } else if in_frontmatter {
+                    in_frontmatter = false;
+                    frontmatter_closed = true;
+                    continue;
+                }
+            }
 
-                for line in fm.lines() {
-                    let line = line.trim();
-                    if line.is_empty() || line.starts_with('#') {
-                        continue;
-                    }
-                    if let Some((k, v)) = line.split_once(':') {
-                        let key = k.trim().to_lowercase();
-                        let clean_v = v.split('#').next().unwrap_or("").trim();
-                        let val = clean_v.trim_matches('"').trim_matches('\'').to_lowercase();
-
-                        match key.as_str() {
-                            "purebash" => {
-                                if val == "true" || val == "1" || val == "yes" {
-                                    tier = ToolTier::PureBash;
+            if in_frontmatter {
+                if let Some((k, v)) = trimmed.split_once(':') {
+                    let key = k.trim();
+                    let val = v.trim();
+                    match key {
+                        "reasoning_budget" => {
+                            reasoning_budget = val.parse().ok();
+                        }
+                        "tier" => {
+                            if val.eq_ignore_ascii_case("purebash") {
+                                tier = ToolTier::PureBash;
+                            }
+                        }
+                        "purebash" => {
+                            if val.eq_ignore_ascii_case("true") {
+                                tier = ToolTier::PureBash;
+                            }
+                        }
+                        "adapters" => {
+                            adapters = val.eq_ignore_ascii_case("true");
+                        }
+                        "memory" => {
+                            memory = val.eq_ignore_ascii_case("true");
+                        }
+                        "mcp" => {
+                            let clean = val.trim_matches('[').trim_matches(']').trim();
+                            for item in clean.split(',') {
+                                let s = item.trim().trim_matches('"').trim_matches('\'').trim();
+                                if !s.is_empty() {
+                                    mcp_servers.push(s.to_string());
                                 }
                             }
-                            "adapters" | "adapter" => {
-                                adapters = val == "true" || val == "1" || val == "yes";
-                            }
-                            "memory" | "mem" => {
-                                memory = val == "true" || val == "1" || val == "yes";
-                            }
-                            "reasoning_budget" | "reasoning-budget" | "reasoning" | "thinking_budget" => {
-                                reasoning_budget = clean_v.trim_matches('"').trim_matches('\'').parse::<usize>().ok();
-                            }
-                            _ => {}
                         }
+                        _ => {}
                     }
                 }
+            } else {
+                body.push_str(line);
+                body.push('\n');
             }
         }
 
@@ -66,7 +86,8 @@ impl Profile {
             tier,
             adapters,
             memory,
-            system_prompt: body,
+            system_prompt: body.trim().to_string(),
+            mcp_servers,
         }
     }
 

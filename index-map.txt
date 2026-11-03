@@ -1,18 +1,21 @@
 # CODEBASE ARCHITECTURE MAP
 # Root: /home/j5/.config/rs-agent
 # Target: /home/j5/.config/rs-agent
-# Purpose: gguf llama.cpp t3code local-first
+# Purpose: gguf llama.cpp t3code omarchy local-first
 # Dependencies: anyhow, clap, crossterm, dirs, eventsource-stream, futures-util, regex, reqwest, serde, serde_json, tokio
 # --------------------------------------------------
 
 # Active Architecture Tree:
 #   ├── Cargo.toml                       - name = "rs-agent"
-#   ├── README.md                        - gguf llama.cpp t3code local-first
+#   ├── README.md                        - gguf llama.cpp t3code omarchy local-first
 #   ├── bin/ai
 #   ├── bin/ms
 #   ├── bin/rs-agent
 #   ├── bin/t3code-bridge                - #!/usr/bin/env bash
 #   ├── bin/ta
+#   ├── plugins/mcp/Readme.md            - # Model Context Protocol (MCP) Integration: `plugins/mcp/`
+#   ├── plugins/mcp/photocraft/Readme.md - Headless and live-bridge image editing engine for `rs-agent` via the Model Conte
+#   ├── plugins/mcp/servers.json         - "servers": {
 #   ├── plugins/t3code/Cargo.toml        - name = "t3code-bridge"
 #   ├── plugins/t3code/Readme.md         - A native Rust Agent Client Protocol (ACP) stdio bridge connecting the `rs-agent`
 #   ├── plugins/t3code/launch.sh         - #!/usr/bin/env bash
@@ -22,9 +25,10 @@
 #   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer (Native 6-Tool)
 #   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer (Native 6-Tool)
 #   ├── profiles/photocraft-c.md         - PhotoCraft Visual Engine & Automation Specialist (Gemini Flash Lite)
-#   ├── profiles/photocraft-l.md         - Ling-3.0-tiny PhotoCraft Automation Engineer (Native 6-Tool)
+#   ├── profiles/photocraft-l.md         - LFM3 PhotoCraft Automation Engineer (Native MCP)
 #   ├── profiles/purebash.md             - Pure Bash LFM Minimalist Shell Agent
 #   ├── profiles/sage.md                 - InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent
+#   ├── projects/lfm3/demo.psd           - {"name": "demo.psd", "width": 800, "height": 600}
 #   ├── projects/lfm3/test_calc.py       - def add(a, b):
 #   ├── rs-context.md                    - Rs-Agent Context Router
 #   ├── rs-hook.sh                       - rs-agent shell hook (ponytail minimalism: < 0.2ms, Bash & Zsh, macOS & Linux)
@@ -38,16 +42,16 @@
 #   ├── src/lib.rs
 #   ├── src/main.rs                      - CLI Entrypoint & Runtime Loop
 #   ├── src/matcher.rs                   - types: ContextEntry, ContextRouter
+#   ├── src/mcp.rs                       - types: McpServerConfig, McpSession
 #   ├── src/profile.rs                   - types: Profile
 #   ├── src/security.rs                  - types: SecurityBoundary
 #   ├── src/skill.rs                     - types: Skill, SkillAction
 #   ├── src/spinner.rs                   - types: InlineSpinner
 #   ├── src/state.rs                     - types: AppState
 #   ├── src/stream.rs                    - types: UsageStats, StreamRenderer
-#   ├── src/tools.rs                     - fn: get_tools_schema, execute_tool
+#   ├── src/tools.rs                     - fn: get_tools_schema, get_tools_schema_with_mcp, execute_tool
 #   ├── src/ui.rs                        - fn: render_frame, draw_box
 #   ├── system_instructions.md           - Global System Instructions (identical to .cursorrules or CLAUDE.md):
-#   ├── ta_probe.txt
 #   ├── tools/model-select/Cargo.toml    - name = "model-select"
 #   ├── tools/model-select/model-select
 #   ├── tools/model-select/src/main.rs   - CLI Entrypoint & Runtime Loop
@@ -69,26 +73,27 @@
 
 ### `src/lib.rs`
 ```rust
-  L001: pub mod adapter;
-  L002: pub mod bridge;
-  L003: pub mod client;
-  L004: pub mod config;
-  L005: pub mod matcher;
-  L006: pub mod profile;
-  L007: pub mod security;
-  L008: pub mod skill;
-  L009: pub mod spinner;
-  L010: pub mod state;
-  L011: pub mod stream;
-  L012: pub mod tools;
-  L013: pub mod ui;
+  L001: pub mod mcp;
+  L002: pub mod adapter;
+  L003: pub mod bridge;
+  L004: pub mod client;
+  L005: pub mod config;
+  L006: pub mod matcher;
+  L007: pub mod profile;
+  L008: pub mod security;
+  L009: pub mod skill;
+  L010: pub mod spinner;
+  L011: pub mod state;
+  L012: pub mod stream;
+  L013: pub mod tools;
+  L014: pub mod ui;
 ```
 
 ### `src/main.rs`
 ```rust
   L020: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
-  L030: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff }
-  L768: async fn main() -> anyhow :: Result<()>;
+  L037: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff, Mcp { .. } }
+  L781: async fn main() -> anyhow :: Result<()>;
 ```
 
 ### `tools/model-select/src/main.rs`
@@ -117,7 +122,7 @@
 
 ### `src/bridge.rs`
 ```rust
-  L275: pub async fn run_bridge() -> Result<()>;
+  L276: pub async fn run_bridge() -> Result<()>;
 ```
 
 ### `src/client.rs`
@@ -141,25 +146,25 @@
 
 ### `src/config.rs`
 ```rust
-  L027: pub enum ToolTier { PureBash, Smol }
-  L033: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, pub adapters: bool }
-  L042: impl Default for WorkspaceConfig {
-    L043: fn default() -> Self;
+  L026: pub enum ToolTier { PureBash, Smol }
+  L032: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, pub adapters: bool }
+  L041: impl Default for WorkspaceConfig {
+    L042: fn default() -> Self;
   }
-  L053: impl WorkspaceConfig {
-    L054: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
-    L071: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
+  L052: impl WorkspaceConfig {
+    L053: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
+    L070: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
   }
-  L080: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
-  L136: pub fn get_env_path() -> PathBuf;
-  L142: pub fn ensure_env_file();
-  L185: pub fn get_max_tokens() -> usize;
-  L209: pub fn get_context_ceilings() -> ContextCeilings;
-  L246: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, pub max_tokens: usize }
-  L275: impl ProviderConfig {
-    L276: pub async fn load() -> Self;
+  L079: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
+  L135: pub fn get_env_path() -> PathBuf;
+  L141: pub fn ensure_env_file();
+  L184: pub fn get_max_tokens() -> usize;
+  L208: pub fn get_context_ceilings() -> ContextCeilings;
+  L245: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, pub max_tokens: usize }
+  L254: impl ProviderConfig {
+    L255: pub async fn load() -> Self;
   }
-  L361: pub fn load_global_instructions() -> Option<String>;
+  L340: pub fn load_global_instructions() -> Option<String>;
 ```
 
 ### `src/matcher.rs`
@@ -176,18 +181,33 @@
   }
 ```
 
+### `src/mcp.rs`
+```rust
+  L013: pub struct McpServerConfig { pub command: String, pub args: Vec<String>, pub env: HashMap<String, String> }
+  L034: pub fn load_servers_config() -> HashMap<String, McpServerConfig>;
+  L046: pub fn expand_env_str(val: &str) -> String;
+  L122: pub struct McpSession
+  L128: impl McpSession {
+    L129: pub async fn spawn(cfg: &McpServerConfig) -> Result<Self>;
+    L226: pub async fn list_tools(&mut self) -> Result<Vec<Value>>;
+    L232: pub async fn call_tool(&mut self, tool_name: &str, arguments: &Value) -> Result<String>;
+  }
+  L278: pub async fn get_server_tools_schema(server_name: &str) -> Result<Vec<Value>, String>;
+  L316: pub async fn call_tool(server_name: &str, tool_name: &str, arguments: &Value) -> Result<String, String>;
+```
+
 ### `src/profile.rs`
 ```rust
-  L008: pub struct Profile { pub reasoning_budget: Option<usize>, pub tier: ToolTier, pub adapters: bool, ... (5 fields) }
-  L017: impl Profile {
-    L018: pub fn parse(raw_content: &str) -> Self;
-    L073: pub fn profile_dirs() -> Vec<PathBuf>;
-    L082: pub fn load(profile_name: &str) -> Option<Self>;
-    L110: pub fn list_available() -> Vec<String>;
-    L143: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
-    L166: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
-    L208: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
-    L251: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
+  L008: pub struct Profile { pub reasoning_budget: Option<usize>, pub tier: ToolTier, pub adapters: bool, ... (6 fields) }
+  L018: impl Profile {
+    L019: pub fn parse(raw_content: &str) -> Self;
+    L094: pub fn profile_dirs() -> Vec<PathBuf>;
+    L103: pub fn load(profile_name: &str) -> Option<Self>;
+    L131: pub fn list_available() -> Vec<String>;
+    L164: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
+    L187: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
+    L229: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
+    L272: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
   }
 ```
 
@@ -255,7 +275,8 @@
 ### `src/tools.rs`
 ```rust
   L016: pub fn get_tools_schema(tier: &ToolTier) -> Value;
-  L129: pub async fn execute_tool(name: &str, raw_args: &str, workspace: &Path, boundary: &SecurityBoundary ,) -> Result<String, String>;
+  L020: pub async fn get_tools_schema_with_mcp(tier: &ToolTier, mcp_servers: &[String]) -> Value;
+  L152: pub async fn execute_tool(name: &str, raw_args: &str, workspace: &Path, boundary: &SecurityBoundary ,) -> Result<String, String>;
 ```
 
 ### `src/ui.rs`

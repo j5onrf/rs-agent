@@ -214,7 +214,7 @@ fn sync_acp_skill_stubs(workspace: &Path) {
     }
 }
 
-fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>, bool) {
+async fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>, bool) {
     let cfg = WorkspaceConfig::load_or_default(workspace);
     let inherited_profile = std::env::var("AI_ACTIVE_PROFILE").unwrap_or_else(|_| cfg.profile_name.clone());
 
@@ -263,8 +263,9 @@ fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>, bool) {
         }
     }
 
+    let mcp_servers = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
     let active_tools = if is_agent {
-        Some(tools::get_tools_schema(&cfg.tier))
+        Some(tools::get_tools_schema_with_mcp(&cfg.tier, &mcp_servers).await)
     } else {
         None
     };
@@ -354,7 +355,7 @@ pub async fn run_bridge() -> Result<()> {
                     .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
                 sync_acp_skill_stubs(&cwd);
-                let (sys_prompt, active_tools, is_agent) = assemble_system_prompt(&cwd);
+                let (sys_prompt, active_tools, is_agent) = assemble_system_prompt(&cwd).await;
                 let history = vec![ChatMessage::system(sys_prompt)];
 
                 sessions.lock().await.insert(sid.clone(), SessionState {
@@ -477,7 +478,7 @@ pub async fn run_bridge() -> Result<()> {
                 if cleaned_user_text == "/reset" || cleaned_user_text == "/c" || cleaned_user_text == "/clear" {
                     let mut lock = sessions.lock().await;
                     if let Some(sess) = lock.get_mut(&sid) {
-                        let (sys_prompt, _, _) = assemble_system_prompt(&sess.workspace);
+                        let (sys_prompt, _, _) = assemble_system_prompt(&sess.workspace).await;
                         sess.history = vec![ChatMessage::system(sys_prompt)];
                     }
                     send_acp_chunk(&sid, "✓ Session history reset.", false);

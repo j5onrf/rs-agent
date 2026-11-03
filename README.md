@@ -3,7 +3,7 @@
   <h1>rs-agent</h1>
  
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.6.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.7.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -198,6 +198,7 @@ adapters: true          # Tool argument repair (strips markdown fences, heals ne
 reasoning_budget: 500   # Thinking tokens clamp: 0 (off), 500 (medium), or omit for unrestricted
 memory: false           # Opt-in: injects workspace rules from .rs/memory.md if present
 purebash: false         # Optional: single bash tool (~95t schema). Omit for Native 6-tool suite (~700t)
+mcp: photocraft         # Connect MCP apps (e.g. photocraft, blender). Omit for pure 6-tool
 ---
 ```
 

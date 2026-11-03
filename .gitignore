@@ -10,3 +10,9 @@ state.json
 target/
 projects/chat/
 ta_probe.txt
+plugins/mcp/*.db
+*.db
+plugins/mcp/*.db
+*.db
+plugins/mcp/*.db
+*.db

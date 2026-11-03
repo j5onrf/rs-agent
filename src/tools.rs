@@ -14,6 +14,29 @@ const SIGTERM: i32 = 15;
 const SIGKILL: i32 = 9;
 
 pub fn get_tools_schema(tier: &ToolTier) -> Value {
+    get_base_tools_schema(tier)
+}
+
+pub async fn get_tools_schema_with_mcp(tier: &ToolTier, mcp_servers: &[String]) -> Value {
+    let mut base_schema = get_base_tools_schema(tier);
+    if !mcp_servers.is_empty() {
+        if let Some(arr) = base_schema.as_array_mut() {
+            for server in mcp_servers {
+                match crate::mcp::get_server_tools_schema(server).await {
+                    Ok(schemas) => {
+                        arr.extend(schemas);
+                    }
+                    Err(e) => {
+                        eprintln!("  \x1b[1;33m▲ [mcp warning]\x1b[0m Could not connect to '{}': {}", server, e);
+                    }
+                }
+            }
+        }
+    }
+    base_schema
+}
+
+fn get_base_tools_schema(tier: &ToolTier) -> Value {
     match tier {
         ToolTier::PureBash => json!([
             {
@@ -134,6 +157,14 @@ pub async fn execute_tool(
 ) -> Result<String, String> {
     let args = heal_json_args(raw_args);
     let ceilings = get_context_ceilings();
+
+    if let Some(rest) = name.strip_prefix("mcp_") {
+        if let Some((server, tool_name)) = rest.split_once('_') {
+            return crate::mcp::call_tool(server, tool_name, &args).await;
+        } else {
+            return Err(format!("Malformed MCP tool name '{}'. Expected mcp_<server>_<tool>", name));
+        }
+    }
 
     match name {
         "read_file" => {

@@ -22,7 +22,6 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ToolTier {
@@ -251,26 +250,6 @@ pub struct ProviderConfig {
     pub max_tokens: usize,
 }
 
-async fn query_local_model_name() -> Option<String> {
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_millis(250))
-        .build()
-        .ok()?;
-    let res = client.get("http://127.0.0.1:8080/v1/models").send().await.ok()?;
-    if res.status().is_success() {
-        let json: serde_json::Value = res.json().await.ok()?;
-        if let Some(id) = json["data"].get(0).and_then(|m| m.get("id")).and_then(|s| s.as_str()) {
-            let filename = Path::new(id).file_name()?.to_str()?;
-            let clean = filename
-                .trim_end_matches(".gguf")
-                .split("-Q")
-                .next()
-                .unwrap_or(filename);
-            return Some(clean.to_string());
-        }
-    }
-    None
-}
 
 impl ProviderConfig {
     pub async fn load() -> Self {
