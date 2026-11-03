@@ -1,5 +1,5 @@
 use crossterm::cursor::{Hide, Show};
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType};
 use std::fs;
 use std::io::{self, Write};
@@ -15,7 +15,6 @@ impl Drop for RawModeGuard {
     }
 }
 
-#[derive(Clone, Debug)]
 struct CustomSlot {
     index: usize,
     name: String,
@@ -31,12 +30,16 @@ fn get_icon_for_slot(name: &str) -> &'static str {
         "✨"
     } else if lower.contains("openrouter") {
         "🌐"
+    } else if lower.contains("tokenharb") {
+        "⚓"
+    } else if lower.contains("claude") || lower.contains("anthropic") {
+        "✳️"
+    } else if lower.contains("huggingface") || lower.contains("spaces") || lower.contains("hf") {
+        "🤗"
     } else if lower.contains("grok") || lower.contains("xai") || lower.contains("deepseek") {
         "🪐"
     } else if lower.contains("openai") || lower.contains("gpt") {
         "🤖"
-    } else if lower.contains("claude") || lower.contains("anthropic") {
-        "🎭"
     } else if lower.contains("ollama") {
         "🦙"
     } else {
@@ -45,18 +48,22 @@ fn get_icon_for_slot(name: &str) -> &'static str {
 }
 
 fn get_env_path() -> PathBuf {
-    dirs::home_dir()
-        .map(|h| h.join(".config/rs-agent/.env"))
-        .unwrap_or_else(|| PathBuf::from(".env"))
+    if let Ok(home) = std::env::var("HOME") {
+        PathBuf::from(home).join(".config/rs-agent/.env")
+    } else {
+        dirs::home_dir()
+            .map(|h| h.join(".config/rs-agent/.env"))
+            .unwrap_or_else(|| PathBuf::from(".env"))
+    }
 }
 
-fn extract_quoted_val(line: &str) -> String {
+fn extract_quoted_val(line: &str) -> &str {
     if let Some(pos) = line.find('=') {
         let rest = line[pos + 1..].trim();
         let clean = rest.split('#').next().unwrap_or(rest).trim();
-        return clean.trim_matches('"').trim_matches('\'').to_string();
+        return clean.trim_matches(|c| c == '"' || c == '\'');
     }
-    String::new()
+    ""
 }
 
 fn main() -> std::io::Result<()> {
@@ -66,7 +73,6 @@ fn main() -> std::io::Result<()> {
 
     let mut custom_slots: Vec<CustomSlot> = Vec::new();
 
-    // Dynamically find only the slots present in .env
     for i in 1..=9 {
         let key_prefix = format!("CUSTOM{}_API_KEY", i);
         let name_prefix = format!("CUSTOM{}_NAME", i);
@@ -94,18 +100,18 @@ fn main() -> std::io::Result<()> {
             if uncommented.starts_with(&name_prefix) {
                 let val = extract_quoted_val(uncommented);
                 if !val.is_empty() {
-                    slot_name = val;
+                    slot_name = val.to_string();
                 }
             } else if uncommented.starts_with(&model_prefix) {
                 let val = extract_quoted_val(uncommented);
                 if !val.is_empty() {
-                    slot_model = val;
+                    slot_model = val.to_string();
                 }
             } else if uncommented.starts_with(&key_prefix) || (i == 1 && uncommented.starts_with("CUSTOM_API_KEY")) {
                 key_idx = Some(idx);
                 let val = extract_quoted_val(uncommented);
                 if !val.is_empty() && !val.contains("your_key_here") {
-                    saved_key = val;
+                    saved_key = val.to_string();
                 }
                 is_active = !trimmed.starts_with('#');
             }
@@ -121,9 +127,6 @@ fn main() -> std::io::Result<()> {
         });
     }
 
-    let mut search_grounding = false;
-    let mut grounding_line_idx = None;
-
     let mut max_tokens = 8192;
     let mut tokens_line_idx = None;
 
@@ -134,11 +137,7 @@ fn main() -> std::io::Result<()> {
         let trimmed = line.trim();
         let uncommented = trimmed.trim_start_matches('#').trim();
 
-        if uncommented.starts_with("AI_SEARCH_GROUNDING") {
-            grounding_line_idx = Some(idx);
-            let val = extract_quoted_val(uncommented);
-            search_grounding = val == "true" && !trimmed.starts_with('#');
-        } else if uncommented.starts_with("AI_MAX_TOKENS") {
+        if uncommented.starts_with("AI_MAX_TOKENS") {
             tokens_line_idx = Some(idx);
             let val = extract_quoted_val(uncommented);
             if let Ok(v) = val.parse::<usize>() {
@@ -159,13 +158,16 @@ fn main() -> std::io::Result<()> {
     let _ = crossterm::execute!(stdout, Hide);
 
     let num_slots = custom_slots.len();
-    let total_options = num_slots + 4;
+    let tok_idx = num_slots;
+    let rnd_idx = num_slots + 1;
+    let exit_idx = num_slots + 2;
+    let total_options = num_slots + 3;
     let mut cursor = 0;
 
     loop {
-        let _ = crossterm::execute!(stdout, Clear(ClearType::All), crossterm::cursor::MoveTo(0, 0));
-        println!("\r\n   \x1b[1;37m  Model Select\x1b[0m\r");
-        println!("   \x1b[90m────────────────────────────────────────────────────────────\x1b[0m\r\n");
+        let mut buf = String::with_capacity(2048);
+        buf.push_str("\x1b[2J\x1b[H\r\n   \x1b[1;37m  Model Select\x1b[0m\r\n");
+        buf.push_str("   \x1b[90m────────────────────────────────────────────────────────────\x1b[0m\r\n\r\n");
 
         for (idx, slot) in custom_slots.iter().enumerate() {
             let pointer = if cursor == idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
@@ -175,42 +177,40 @@ fn main() -> std::io::Result<()> {
             } else {
                 "\x1b[90mDISABLED\x1b[0m".to_string()
             };
-            println!("   {} {}  \x1b[1;37m{:<28}\x1b[0m {}\r\n", pointer, icon, slot.name, status);
+            buf.push_str(&format!("   {} {}  \x1b[1;37m{:<28}\x1b[0m {}\r\n", pointer, icon, slot.name, status));
         }
 
-        // Settings
-        let gnd_idx = num_slots;
-        let gnd_ptr = if cursor == gnd_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
-        let gnd_status = if search_grounding {
-            "\x1b[1;33mENABLED\x1b[0m"
-        } else {
-            "\x1b[90mDISABLED\x1b[0m"
-        };
-        println!("   {} 🔍  \x1b[1;37m{:<28}\x1b[0m {}\r", gnd_ptr, "Search Grounding (/gnd)", gnd_status);
+        // Whitespace separation
+        buf.push_str("\r\n");
 
-        let tok_idx = num_slots + 1;
+        // Token Budget
         let tok_ptr = if cursor == tok_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
-        println!("   {} 🧠  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{} tokens\x1b[0m\r", tok_ptr, "Context Budget", max_tokens);
+        buf.push_str(&format!("   {} 🧠  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{} tokens\x1b[0m\r\n", tok_ptr, "Context Budget", max_tokens));
 
-        let rnd_idx = num_slots + 2;
+        // Agent Rounds Limit
         let rnd_ptr = if cursor == rnd_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
-        println!("   {} 🔄  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{} steps\x1b[0m\r\n", rnd_ptr, "Task Loop Limit", max_rounds);
+        buf.push_str(&format!("   {} 🔄  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{} steps\x1b[0m\r\n\r\n", rnd_ptr, "Task Loop Limit", max_rounds));
 
         // Save & Exit
-        let exit_idx = num_slots + 3;
         let exit_ptr = if cursor == exit_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
-        println!("   {} ✕  \x1b[1;32mSave & Exit\x1b[0m\r", exit_ptr);
-        println!("   \x1b[90m────────────────────────────────────────────────────────────\x1b[0m\r");
-        println!("   \x1b[90m▲/▼: Navigate | Space: Toggle | Enter: Select | Q: Quit\x1b[0m\r");
+        buf.push_str(&format!("   {} ✕  \x1b[1;32mSave & Exit\x1b[0m\r\n", exit_ptr));
+        buf.push_str("   \x1b[90m────────────────────────────────────────────────────────────\x1b[0m\r\n");
+        buf.push_str("   \x1b[90m▲/▼: Navigate | Space: Toggle | Enter: Select | Q: Quit\x1b[0m\r\n");
+
+        print!("{}", buf);
         stdout.flush()?;
 
         if let Event::Key(key) = event::read()? {
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
+
             match key.code {
                 KeyCode::Up | KeyCode::Char('k') => {
-                    if cursor > 0 { cursor -= 1; } else { cursor = total_options - 1; }
+                    cursor = if cursor > 0 { cursor - 1 } else { total_options - 1 };
                 }
                 KeyCode::Down | KeyCode::Char('j') => {
-                    if cursor + 1 < total_options { cursor += 1; } else { cursor = 0; }
+                    cursor = if cursor + 1 < total_options { cursor + 1 } else { 0 };
                 }
                 KeyCode::Char(' ') | KeyCode::Enter => {
                     if cursor < num_slots {
@@ -219,8 +219,6 @@ fn main() -> std::io::Result<()> {
                             slot.is_active = false;
                         }
                         custom_slots[cursor].is_active = will_activate;
-                    } else if cursor == gnd_idx {
-                        search_grounding = !search_grounding;
                     } else if cursor == tok_idx {
                         max_tokens = match max_tokens {
                             4096 => 8192,
@@ -250,7 +248,6 @@ fn main() -> std::io::Result<()> {
         }
     }
 
-    // Write back .env preserving all real keys
     for slot in &custom_slots {
         if let Some(l_idx) = slot.key_line_idx {
             let key_val = if slot.saved_key.is_empty() { "sk-your-key-here" } else { &slot.saved_key };
@@ -260,14 +257,6 @@ fn main() -> std::io::Result<()> {
             } else {
                 lines[l_idx] = format!("# {}=\"{}\"", prefix, key_val);
             }
-        }
-    }
-
-    if let Some(l_idx) = grounding_line_idx {
-        if search_grounding {
-            lines[l_idx] = "AI_SEARCH_GROUNDING=\"true\"".to_string();
-        } else {
-            lines[l_idx] = "# AI_SEARCH_GROUNDING=\"false\"".to_string();
         }
     }
 
@@ -285,11 +274,12 @@ fn main() -> std::io::Result<()> {
     }
     fs::write(&env_path, out_content)?;
 
+    let _ = crossterm::execute!(stdout, Clear(ClearType::All), crossterm::cursor::MoveTo(0, 0));
     if let Some(active) = custom_slots.iter().find(|s| s.is_active) {
         let icon = get_icon_for_slot(&active.name);
-        println!("   \x1b[1;32m✓\x1b[0m {}  \x1b[1;37m{}\x1b[0m enabled ({})\r", icon, active.name, active.model);
+        println!("\r\n   \x1b[1;32m✓\x1b[0m {}  \x1b[1;37m{}\x1b[0m enabled ({})\r\n", icon, active.name, active.model);
     } else {
-        println!("   \x1b[1;33m✓\x1b[0m All cloud providers disabled. Using local server on :8080.\r");
+        println!("\r\n   \x1b[1;33m✓\x1b[0m All cloud providers disabled. Using local server on :8080.\r\n");
     }
 
     Ok(())
