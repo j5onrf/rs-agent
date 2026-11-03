@@ -139,19 +139,19 @@ pub fn get_env_path() -> PathBuf {
 }
 
 pub fn ensure_env_file() {
-    let path = get_env_path();
-    if !path.exists() {
-        if let Some(parent) = path.parent() {
+    let env_path = get_env_path();
+    if !env_path.exists() {
+        if let Some(parent) = env_path.parent() {
             let _ = std::fs::create_dir_all(parent);
         }
-        let default_content = r#"# Rs-Agent Provider Cascade (.env) — Priority: First active key | Switch with: ms
+        let template = r#"# Rs-Agent Provider Cascade (.env) — Priority: First active key | Switch with: ms
 # Fallback: Local llama-server (:8080) when all cloud keys are commented with '#'.
 
 # ── 1. Google Gemini ──────────────────────────────────────────────────────────
-# CUSTOM1_NAME="Google Gemini"
-# CUSTOM1_API_KEY="sk-your-key-here"
+CUSTOM1_NAME="Google Gemini"
+# CUSTOM1_API_KEY="AIzaSyYourGeminiApiKeyHere"
 CUSTOM1_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-CUSTOM1_MODEL="gemini-2.5-flash-lite"
+CUSTOM1_MODEL="gemini-3.5-flash-lite"
 
 # ── 2. OpenRouter ─────────────────────────────────────────────────────────────
 # CUSTOM2_NAME="OpenRouter"
@@ -159,16 +159,21 @@ CUSTOM1_MODEL="gemini-2.5-flash-lite"
 CUSTOM2_URL="https://openrouter.ai/api/v1/chat/completions"
 CUSTOM2_MODEL="openrouter/free"
 
-# ── 3. Custom Direct Endpoint ─────────────────────────────────────────────────
+# ── 3. TokenHarbor ────────────────────────────────────────────────────────────
+# CUSTOM3_NAME="TokenHarbor"
+# CUSTOM3_API_KEY="thk_live_your-key-here"
+CUSTOM3_URL="https://tokenharbor.ai/v1/chat/completions"
+CUSTOM3_MODEL="deepseek-v4.1-flash:free"
+
+# ── 4. Custom Direct Endpoint ─────────────────────────────────────────────────
 # Quick Reference URLs & Models:
 #   • DeepSeek: https://api.deepseek.com/chat/completions        (deepseek-chat / deepseek-reasoner)
 #   • xAI:      https://api.x.ai/v1/chat/completions             (grok-2-latest)
 #   • OpenAI:   https://api.openai.com/v1/chat/completions       (gpt-4o / o3-mini)
-#   • Groq:     https://api.groq.com/openai/v1/chat/completions  (llama-3.3-70b-versatile)
-# CUSTOM3_NAME="Custom Provider"
-# CUSTOM3_API_KEY="sk-your-key-here"
-CUSTOM3_URL="https://api.deepseek.com/chat/completions"
-CUSTOM3_MODEL="deepseek-chat"
+# CUSTOM4_NAME="Custom Provider"
+# CUSTOM4_API_KEY="sk-your-key-here"
+CUSTOM4_URL="https://api.deepseek.com/chat/completions"
+CUSTOM4_MODEL="deepseek-chat"
 
 # ── Local llama-server Fallback (Port 8080) ───────────────────────────────────
 # Automatically used when all keys above are commented. Auto-detects loaded .gguf model.
@@ -177,7 +182,7 @@ CUSTOM3_MODEL="deepseek-chat"
 AI_MAX_TOKENS="8192"
 AI_MAX_AGENT_ROUNDS="10"
 "#;
-        let _ = std::fs::write(&path, default_content);
+        let _ = std::fs::write(&env_path, template);
     }
 }
 

@@ -1,9 +1,9 @@
 <div align="center">
-  <img alt="rs-agent" src="logo.svg?v=2" height="350" />
+  <img alt="rs-agent" src="logo.svg?v=2" height="800" />
   <h1>rs-agent</h1>
  
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.7.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.8.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -258,7 +258,7 @@ source ~/.config/rs-agent/rs-hook.sh
 
 # ── 1. Google Gemini ──────────────────────────────────────────────────────────
 CUSTOM1_NAME="Google Gemini"
-CUSTOM1_API_KEY="AIzaSyYourGeminiApiKeyHere"
+# CUSTOM1_API_KEY="AIzaSyYourGeminiApiKeyHere"
 CUSTOM1_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 CUSTOM1_MODEL="gemini-3.5-flash-lite"
 
@@ -268,16 +268,21 @@ CUSTOM1_MODEL="gemini-3.5-flash-lite"
 CUSTOM2_URL="https://openrouter.ai/api/v1/chat/completions"
 CUSTOM2_MODEL="openrouter/free"
 
-# ── 3. Custom Direct Endpoint ─────────────────────────────────────────────────
+# ── 3. TokenHarbor ────────────────────────────────────────────────────────────
+# CUSTOM3_NAME="TokenHarbor"
+# CUSTOM3_API_KEY="thk_live_your-key-here"
+CUSTOM3_URL="https://tokenharbor.ai/v1/chat/completions"
+CUSTOM3_MODEL="deepseek-v4.1-flash:free"
+
+# ── 4. Custom Direct Endpoint ─────────────────────────────────────────────────
 # Quick Reference URLs & Models:
 #   • DeepSeek: https://api.deepseek.com/chat/completions        (deepseek-chat / deepseek-reasoner)
 #   • xAI:      https://api.x.ai/v1/chat/completions             (grok-2-latest)
 #   • OpenAI:   https://api.openai.com/v1/chat/completions       (gpt-4o / o3-mini)
-#   • Groq:     https://api.groq.com/openai/v1/chat/completions  (llama-3.3-70b-versatile)
-# CUSTOM3_NAME="Custom Provider"
-# CUSTOM3_API_KEY="sk-your-key-here"
-CUSTOM3_URL="https://api.deepseek.com/chat/completions"
-CUSTOM3_MODEL="deepseek-chat"
+# CUSTOM4_NAME="Custom Provider"
+# CUSTOM4_API_KEY="sk-your-key-here"
+CUSTOM4_URL="https://api.deepseek.com/chat/completions"
+CUSTOM4_MODEL="deepseek-chat"
 
 # ── Local llama-server Fallback (Port 8080) ───────────────────────────────────
 # Automatically used when all keys above are commented. Auto-detects loaded .gguf model.
