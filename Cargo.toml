@@ -8,6 +8,7 @@ members = [
     ".",
     "plugins/t3code",
     "tools/model-select",
+    "tools/new-project",
 ]
 
 [lib]

@@ -150,7 +150,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 | Binary | Tool | Purpose |
 | :--- | :---: | :--- |
-| `ms` | **Model Selector** | Dynamic TUI for toggling universal providers, context budget, and loop limit |
+| 👤 `ms` | **Model Selector** | Dynamic TUI for toggling universal providers, context budget, and loop limit |
 | `newp` | **Project Creator** | Scaffolds workspace, `.rs/config.json`, and auto-links router aliases |
 | `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) |
 | `ta` | **System Diagnostics** | 10-pass native verification suite testing binary integrity, safety, and UI |

@@ -1,5 +1,5 @@
 {
-  "profile_name": "photocraft-l",
+  "profile_name": "artcraft/photocraft-l",
   "is_agent": true,
   "tier": "Smol",
   "adapters": true
