@@ -1,6 +1,6 @@
 <div align="center">
   <img alt="rs-agent" src="logo.svg?v=2" height="350" />
-  <h1>rs-agent</h1>
+  <h1>Rs-Agent</h1>
  
   <p>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.6.svg?variant=secondary" alt="Version"></a>
@@ -178,7 +178,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 | Operational Tier | Token Budget | Runtime Footprint | Target Workload |
 | :--- | :---: | :---: | :--- |
 | **Pure Chat** (`ai`) | **~180 tokens** | < 1ms startup · 0 MB idle | Conversational queries and fast reasoning |
-| **Pure Bash** (`purebash: true`) | **~95 tokens** | Single-tool dispatch loop | Low-parameter SLMs (1.7B–3B) via shell commands |
+| **Pure Bash** (`purebash: true`) | **~95 tokens** | Single-tool dispatch loop | Low-parameter shell commands |
 | **Native 6-Tool** *(Default)* | **~700 tokens** | Full AST-free surgical suite | Code refactoring, test execution, and file search |
 | **Context Router** (`matcher.rs`) | **0 tokens** | < 0.2ms shell lookup | Instant shortcut teleportation via `rs-context.md` |
 
