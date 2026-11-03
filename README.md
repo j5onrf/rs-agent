@@ -79,7 +79,7 @@
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Client Surface</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Client Surfaces</h2>
 
 <p align="center">
   <b><a href="https://t3.codes">T3 Code</a> is the official graphical surface for rs-agent.</b><br>
@@ -201,8 +201,8 @@ purebash: false         # Optional: single bash tool (~95t schema). Omit for Nat
 ```
 
 * **Profiles (`profiles/`):** Model configurations and system personas (e.g. `lfm3.md`, `lingtiny.md`, `chat.md`). Run `newp` to scaffold new workspaces with interactive profile selection.
-* **Workspace Memory (`.rs/memory.md`):** Optional, project-isolated rules loaded into context when `memory: true` is set in the profile frontmatter.
 * **Skills (`skills/`):** Modular runtime directives toggled via `/s` or T3 Code's `$` picker (e.g. `ponytail.md` for YAGNI minimalism, `humanizer.md` for clean output, `ub-mode.md` for clean craftsmanship).
+* **Workspace Memory (`.rs/memory.md`):** Optional, project-isolated rules loaded into context when `memory: true` is set in the profile frontmatter.
 * **Global Rules (`system_instructions.md`):** Universal directives loaded across every profile and workspace.
 
 ---
