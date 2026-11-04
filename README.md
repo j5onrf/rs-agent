@@ -164,7 +164,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 `rs-agent` discards heavy agent frameworks in favor of simple, predictable primitives:
 
 * **Sub-Millisecond Shell Intercept (`matcher.rs`):** `rs-hook.sh` intercepts terminal input and matches against `rs-context.md` in `< 0.2ms`. Typing `lfm` jumps into the target directory and launches the workspace instantly.
-* **Native 6-Tool Suite (`tools.rs`):** Minimal tool surface built for refactoring without AST bloat: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
+* **Native 6-Tool Suite (`tools.rs`):** Minimal tool surface ready for SLM's and LLM's: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
 * **Embedded ACP Bridge (`bridge.rs`):** Stdio JSON-RPC 2.0 server inside the core binary. Dispatches live file diffs for T3 Code review, handles multimodal image attachments, and streams token cancellation mid-turn.
 * **Autonomous Task Loop (`/task`):** Multi-step goal loop with failure decomposition (reminds models to inspect lines after tool errors) and anti-hallucination verification.
 * **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and heals broken JSON frames on the fly.
@@ -180,7 +180,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 | :--- | :---: | :---: | :--- |
 | **Pure Chat** (`ai`) | **~180 tokens** | < 1ms startup · 0 MB idle | Conversational queries and fast reasoning |
 | **Pure Bash** (`purebash: true`) | **~95 tokens** | Single-tool dispatch loop | Low-parameter shell commands |
-| **Native 6-Tool** *(Default)* | **~700 tokens** | Full AST-free surgical suite | Code refactoring, test execution, and file search |
+| **Native 6-Tool** *(Default)* | **~680 tokens** | Full surgical suite | Code refactoring, test execution, and file search |
 | **Context Router** (`matcher.rs`) | **0 tokens** | < 0.2ms shell lookup | Instant shortcut teleportation via `rs-context.md` |
 
 </div>
@@ -197,7 +197,7 @@ description: "Edge Systems Engineer (Native 6-Tool)"
 adapters: true          # Tool argument repair (strips markdown fences, heals newlines)
 reasoning_budget: 500   # Thinking tokens clamp: 0 (off), 500 (medium), or omit for unrestricted
 memory: false           # Opt-in: injects workspace rules from .rs/memory.md if present
-purebash: false         # Optional: single bash tool (~95t schema). Omit for Native 6-tool suite (~700t)
+purebash: false         # Optional: single bash tool (~95t schema). Omit for Native 6-tool suite (~680t)
 mcp: photocraft         # Connect MCP apps (e.g. photocraft, blender). Omit for pure 6-tool
 ---
 ```
