@@ -213,11 +213,11 @@ Define agent profiles and runtime behavior in Markdown frontmatter (`profiles/*.
 
 ```markdown
 ---
-description: "Edge Systems Engineer (Native 6-Tool)"
+description: "Edge Systems Engineer (Model Profile)"
 adapters: true          # Tool argument repair (strips markdown fences, heals newlines)
 reasoning_budget: 500   # Thinking tokens clamp: 0 (off), 500 (medium), or omit for unrestricted
-memory: false           # Opt-in: injects workspace rules from .rs/memory.md if present
-purebash: false         # Optional: single bash tool (~95t schema). Omit for Native 6-tool suite (~680t)
+memory: true            # Opt-in: injects workspace rules from .rs/memory.md if present
+purebash: true          # Optional: single bash tool (~95t schema). Omit for Native 6-tool (~680t)
 delegate: true          # Opt-in: adds delegate_task tool (~100t) for sub-agents. Omit for Native 6-tool
 mcp: photocraft         # Connect MCP apps (e.g. photocraft, blender). Omit for pure 6-tool
 ---
