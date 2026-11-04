@@ -273,6 +273,11 @@ fn main() -> std::io::Result<()> {
         out_content.push('\n');
     }
     fs::write(&env_path, out_content)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(&env_path, std::fs::Permissions::from_mode(0o600));
+    }
 
     let _ = crossterm::execute!(stdout, Clear(ClearType::All), crossterm::cursor::MoveTo(0, 0));
     if let Some(active) = custom_slots.iter().find(|s| s.is_active) {

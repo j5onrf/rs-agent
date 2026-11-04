@@ -149,7 +149,7 @@ pub fn ensure_env_file() {
 
 # ── 1. Google Gemini ──────────────────────────────────────────────────────────
 CUSTOM1_NAME="Google Gemini"
-# CUSTOM1_API_KEY="AIzaSyYourGeminiApiKeyHere"
+# CUSTOM1_API_KEY="AQ-your-key-here"
 CUSTOM1_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 CUSTOM1_MODEL="gemini-3.5-flash-lite"
 
@@ -166,23 +166,25 @@ CUSTOM3_URL="https://tokenharbor.ai/v1/chat/completions"
 CUSTOM3_MODEL="deepseek-v4.1-flash:free"
 
 # ── 4. Custom Direct Endpoint ─────────────────────────────────────────────────
-# Quick Reference URLs & Models:
-#   • DeepSeek: https://api.deepseek.com/chat/completions        (deepseek-chat / deepseek-reasoner)
-#   • xAI:      https://api.x.ai/v1/chat/completions             (grok-2-latest)
-#   • OpenAI:   https://api.openai.com/v1/chat/completions       (gpt-4o / o3-mini)
+# Add More: Define CUSTOM5_*, CUSTOM6_*, up to CUSTOM9_*
 # CUSTOM4_NAME="Custom Provider"
 # CUSTOM4_API_KEY="sk-your-key-here"
 CUSTOM4_URL="https://api.deepseek.com/chat/completions"
 CUSTOM4_MODEL="deepseek-chat"
 
-# ── Local llama-server Fallback (Port 8080) ───────────────────────────────────
-# Automatically used when all keys above are commented. Auto-detects loaded .gguf model.
+# ── MCP Server Keys (Optional) ────────────────────────────────────────────────
+# FIRECRAWL_API_KEY="fc-your-actual-api-key"
 
 # ── Runtime Governors ─────────────────────────────────────────────────────────
 AI_MAX_TOKENS="8192"
 AI_MAX_AGENT_ROUNDS="10"
 "#;
         let _ = std::fs::write(&env_path, template);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = std::fs::set_permissions(&env_path, std::fs::Permissions::from_mode(0o600));
+        }
     }
 }
 

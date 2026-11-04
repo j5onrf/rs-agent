@@ -689,7 +689,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             let mut renderer = StreamRenderer::new();
 
             if round == 0 && history.len() <= 2 {
-                spinner.start("Preloading...");
+                spinner.start("Prefilling...");
             } else if round == 0 {
                 spinner.start("Working...");
             } else {
