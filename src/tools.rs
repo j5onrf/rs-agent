@@ -149,6 +149,171 @@ fn get_base_tools_schema(tier: &ToolTier) -> Value {
     }
 }
 
+/// Computes Levenshtein distance similarity ratio (0.0 to 1.0)
+fn levenshtein_similarity(a: &str, b: &str) -> f64 {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let n = a_chars.len();
+    let m = b_chars.len();
+    if n == 0 && m == 0 { return 1.0; }
+    if n == 0 || m == 0 { return 0.0; }
+
+    let mut dp = vec![vec![0usize; m + 1]; n + 1];
+    for i in 0..=n { dp[i][0] = i; }
+    for j in 0..=m { dp[0][j] = j; }
+
+    for i in 1..=n {
+        for j in 1..=m {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            dp[i][j] = (dp[i - 1][j] + 1)
+                .min(dp[i][j - 1] + 1)
+                .min(dp[i - 1][j - 1] + cost);
+        }
+    }
+
+    let dist = dp[n][m];
+    let max_len = n.max(m);
+    1.0 - (dist as f64 / max_len as f64)
+}
+
+/// 3-Stage Resilient Replacer ported from py-agent (Exact -> Indent-Delta Whitespace -> Fuzzy)
+pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result<String, String> {
+    // Stage 1: Exact match
+    if original.contains(old_str) {
+        if original.matches(old_str).count() > 1 {
+            return Err("Target 'old_str' matched multiple times. Include more surrounding lines to make it unique.".into());
+        }
+        return Ok(original.replacen(old_str, new_str, 1));
+    }
+
+    let clean_orig = original.replace("\r\n", "\n");
+    let clean_old = old_str.replace("\r\n", "\n");
+    let clean_new = new_str.replace("\r\n", "\n");
+
+    let orig_lines: Vec<&str> = clean_orig.lines().collect();
+    let old_lines: Vec<&str> = clean_old.lines().collect();
+    if old_lines.is_empty() {
+        return Err("Parameter 'old_str' cannot be empty.".into());
+    }
+
+    // Collect non-blank line indices for sliding window
+    let mut non_blank_orig = Vec::new();
+    let mut non_blank_indices = Vec::new();
+    for (idx, line) in orig_lines.iter().enumerate() {
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            non_blank_orig.push(trimmed);
+            non_blank_indices.push(idx);
+        }
+    }
+
+    let norm_old: Vec<&str> = old_lines.iter().map(|l| l.trim()).filter(|l| !l.is_empty()).collect();
+    let old_len = norm_old.len();
+    if old_len == 0 {
+        return Err("Parameter 'old_str' contains no non-whitespace content.".into());
+    }
+
+    // Stage 2: Whitespace-normalized sliding window with indent_delta preservation
+    let mut matches = Vec::new();
+    if non_blank_orig.len() >= old_len {
+        for i in 0..=(non_blank_orig.len() - old_len) {
+            if non_blank_orig[i..i + old_len] == norm_old[..] {
+                let start_idx = non_blank_indices[i];
+                let end_idx = non_blank_indices[i + old_len - 1] + 1;
+                matches.push((start_idx, end_idx));
+            }
+        }
+    }
+
+    if matches.len() == 1 {
+        let (start_idx, end_idx) = matches[0];
+        let orig_first_line = orig_lines[start_idx];
+        let orig_indent = orig_first_line.len() - orig_first_line.trim_start().len();
+        let old_first_line = old_lines[0];
+        let old_indent = old_first_line.len() - old_first_line.trim_start().len();
+        let indent_delta = orig_indent as isize - old_indent as isize;
+
+        let mut adjusted_new_lines = Vec::new();
+        for nl in clean_new.lines() {
+            if nl.trim().is_empty() {
+                adjusted_new_lines.push(String::new());
+            } else if indent_delta > 0 {
+                adjusted_new_lines.push(format!("{}{}", " ".repeat(indent_delta as usize), nl));
+            } else if indent_delta < 0 && nl.starts_with(&" ".repeat(indent_delta.unsigned_abs())) {
+                adjusted_new_lines.push(nl[indent_delta.unsigned_abs()..].to_string());
+            } else {
+                adjusted_new_lines.push(nl.to_string());
+            }
+        }
+
+        let mut reconstructed = String::new();
+        if start_idx > 0 {
+            reconstructed.push_str(&orig_lines[..start_idx].join("\n"));
+            reconstructed.push('\n');
+        }
+        reconstructed.push_str(&adjusted_new_lines.join("\n"));
+        if end_idx < orig_lines.len() {
+            reconstructed.push('\n');
+            reconstructed.push_str(&orig_lines[end_idx..].join("\n"));
+        }
+        return Ok(reconstructed);
+    } else if matches.len() > 1 {
+        return Err(format!("Whitespace-normalized old_str matched {} locations. Include more surrounding lines to make it unique.", matches.len()));
+    }
+
+    // Stage 3: Fuzzy window search (threshold >= 0.85)
+    let old_block_str = norm_old.join("\n");
+    let mut best_ratio = 0.0;
+    let mut best_window = None;
+
+    if non_blank_orig.len() >= old_len {
+        for i in 0..=(non_blank_orig.len() - old_len) {
+            let cand_block_str = non_blank_orig[i..i + old_len].join("\n");
+            let ratio = levenshtein_similarity(&old_block_str, &cand_block_str);
+            if ratio > best_ratio {
+                best_ratio = ratio;
+                best_window = Some((non_blank_indices[i], non_blank_indices[i + old_len - 1] + 1));
+            }
+        }
+    }
+
+    if best_ratio >= 0.85 && best_window.is_some() {
+        let (start_idx, end_idx) = best_window.unwrap();
+        let orig_first_line = orig_lines[start_idx];
+        let orig_indent = orig_first_line.len() - orig_first_line.trim_start().len();
+        let old_first_line = old_lines[0];
+        let old_indent = old_first_line.len() - old_first_line.trim_start().len();
+        let indent_delta = orig_indent as isize - old_indent as isize;
+
+        let mut adjusted_new_lines = Vec::new();
+        for nl in clean_new.lines() {
+            if nl.trim().is_empty() {
+                adjusted_new_lines.push(String::new());
+            } else if indent_delta > 0 {
+                adjusted_new_lines.push(format!("{}{}", " ".repeat(indent_delta as usize), nl));
+            } else if indent_delta < 0 && nl.starts_with(&" ".repeat(indent_delta.unsigned_abs())) {
+                adjusted_new_lines.push(nl[indent_delta.unsigned_abs()..].to_string());
+            } else {
+                adjusted_new_lines.push(nl.to_string());
+            }
+        }
+
+        let mut reconstructed = String::new();
+        if start_idx > 0 {
+            reconstructed.push_str(&orig_lines[..start_idx].join("\n"));
+            reconstructed.push('\n');
+        }
+        reconstructed.push_str(&adjusted_new_lines.join("\n"));
+        if end_idx < orig_lines.len() {
+            reconstructed.push('\n');
+            reconstructed.push_str(&orig_lines[end_idx..].join("\n"));
+        }
+        return Ok(reconstructed);
+    }
+
+    Err("Target 'old_str' not found in file (even with whitespace tolerance and fuzzy matching). Use read_file to inspect exact lines.".into())
+}
+
 pub async fn execute_tool(
     name: &str,
     raw_args: &str,
@@ -199,7 +364,6 @@ pub async fn execute_tool(
                 let preview_count = ceilings.preview_lines.min(total);
                 let preview = lines[..preview_count].join("\n");
 
-                // Write full content to scratchpad.log spillover buffer
                 let scratchpad_dir = workspace.join(".rs");
                 let _ = fs::create_dir_all(&scratchpad_dir);
                 let _ = fs::write(scratchpad_dir.join("scratchpad.log"), &content);
@@ -230,44 +394,9 @@ pub async fn execute_tool(
             }
 
             let original = fs::read_to_string(&safe_path).map_err(|e| e.to_string())?;
-
-            if original.contains(old_str) {
-                if original.matches(old_str).count() > 1 {
-                    return Err("Target 'old_str' matched multiple times. Include more surrounding lines to make it unique.".into());
-                }
-                let updated = original.replacen(old_str, new_str, 1);
-                fs::write(&safe_path, updated).map_err(|e| e.to_string())?;
-                return Ok(format!("Successfully edited {} (replaced {} chars with {} chars).", path_str, old_str.len(), new_str.len()));
-            }
-
-            let clean_orig = original.replace("\r\n", "\n");
-            let clean_old = old_str.replace("\r\n", "\n");
-            let clean_new = new_str.replace("\r\n", "\n");
-
-            let norm_lines_orig: Vec<String> = clean_orig.lines().map(|l| l.trim().to_string()).collect();
-            let norm_lines_old: Vec<String> = clean_old.lines().map(|l| l.trim().to_string()).collect();
-
-            if !norm_lines_old.is_empty() && norm_lines_orig.len() >= norm_lines_old.len() {
-                for i in 0..=(norm_lines_orig.len() - norm_lines_old.len()) {
-                    if norm_lines_orig[i..i + norm_lines_old.len()] == norm_lines_old[..] {
-                        let lines_raw: Vec<&str> = clean_orig.lines().collect();
-                        let mut new_content = lines_raw[..i].join("\n");
-                        if !new_content.is_empty() {
-                            new_content.push('\n');
-                        }
-                        new_content.push_str(&clean_new);
-                        let tail = lines_raw[i + norm_lines_old.len()..].join("\n");
-                        if !tail.is_empty() {
-                            new_content.push('\n');
-                            new_content.push_str(&tail);
-                        }
-                        fs::write(&safe_path, new_content).map_err(|e| e.to_string())?;
-                        return Ok(format!("Successfully edited {} with whitespace tolerance.", path_str));
-                    }
-                }
-            }
-
-            Err("Target 'old_str' not found in file. Use read_file to inspect exact lines.".into())
+            let updated = resilient_replace(&original, old_str, new_str)?;
+            fs::write(&safe_path, updated).map_err(|e| e.to_string())?;
+            Ok(format!("Successfully edited {}.", path_str))
         }
 
         "write_file" => {
@@ -421,12 +550,10 @@ pub async fn execute_tool(
             let trimmed = combined.trim();
 
             let result = if trimmed.len() > ceilings.char_cap {
-                // Save complete untruncated output to scratchpad buffer
                 let scratchpad_dir = workspace.join(".rs");
                 let _ = fs::create_dir_all(&scratchpad_dir);
                 let _ = fs::write(scratchpad_dir.join("scratchpad.log"), trimmed);
 
-                // Head (1/3) + Tail (2/3) split so errors at the end of the output are always visible
                 let head_size = (ceilings.char_cap / 3).min(trimmed.len());
                 let tail_size = ((ceilings.char_cap * 2) / 3).min(trimmed.len());
                 let head = &trimmed[..head_size];
