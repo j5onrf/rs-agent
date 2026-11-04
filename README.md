@@ -80,7 +80,7 @@
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="46" /> Client Surfaces</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Client Surfaces</h2>
 
 <p align="center">
   <b><a href="https://t3.codes">T3 Code</a> is the official graphical surface for rs-agent.</b><br>
@@ -121,7 +121,7 @@
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="46" /> Execution Modes</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Execution Modes</h2>
 
 <div align="center">
 
@@ -142,7 +142,7 @@
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="46" /> Developer Tool Suite</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Developer Tool Suite</h2>
 
 Standalone native Rust binaries deployed in `tools/` for zero-overhead project maintenance:
 
@@ -160,7 +160,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="46" /> Runtime Architecture</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Runtime Architecture</h2>
 
 `rs-agent` discards heavy agent frameworks in favor of simple, predictable primitives:
 
@@ -173,7 +173,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="46" /> Efficiency & Token Footprint</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Efficiency & Token Footprint</h2>
 
 <div align="center">
 
@@ -205,7 +205,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="46" /> Agent Evaluation (<code>eval-stack</code>)</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Agent Evaluation (<code>eval-stack</code>)</h2>
 
 <p align="center">
   Decision-grade evaluation across 5-stage agentic challenges (<code>eval-stack</code>).<br>
@@ -228,7 +228,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="46" /> Workspace Profiles & Skills</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Workspace Profiles & Skills</h2>
 
 Define agent profiles and runtime behavior in Markdown frontmatter (`profiles/*.md`):
 
@@ -251,7 +251,7 @@ mcp: photocraft         # Connect MCP apps (e.g. photocraft, blender). Omit for 
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="46" /> Setup & Installation</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Setup & Installation</h2>
 
 ### 1. 👤 Quick Start (Linux x86_64)
 
