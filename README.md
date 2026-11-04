@@ -192,14 +192,14 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 ### Context Ceilings & Scratchpad Scaling
 <sub>File inspection and command outputs dynamically adapt to <code>AI_MAX_TOKENS</code> to protect the context window:</sub>
 
-| Budget (`AI_MAX_TOKENS`) | Target Environment | Line Ceiling (`read_file`) | Character Cap (`run_command`) |
+| Budget (`AI_MAX_TOKENS`) | Line Ceiling (`read_file`) | Character Cap (`run_command`) |
 | :--- | :---: | :---: |
 | **<= 16k** | **250 lines** | ~20,000 chars |
 | **32k** | **1,000 lines** | ~45,000 chars |
 | **64k** | **2,000 lines** | ~90,000 chars |
 | **>= 128k** | **4,000 lines** | ~180,000 chars |
 
-<p><sub>When outputs exceed limits, raw output is automatically offloaded to <code>.rs/scratchpad.log</code> and a truncated preview is returned to model context.</sub></p>
+<p><sub>When outputs exceed limits, raw output is automatically offloaded to <code>.rs/scratchpad.log</code> with truncated previews returned to model context.</sub></p>
 
 </div>
 
