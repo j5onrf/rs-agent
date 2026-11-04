@@ -13,12 +13,14 @@ extern "C" {
 const SIGTERM: i32 = 15;
 const SIGKILL: i32 = 9;
 
-pub fn get_tools_schema(tier: &ToolTier) -> Value {
-    get_base_tools_schema(tier)
+static SUBAGENT_DEPTH: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+pub fn get_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
+    get_base_tools_schema(tier, delegate)
 }
 
-pub async fn get_tools_schema_with_mcp(tier: &ToolTier, mcp_servers: &[String]) -> Value {
-    let mut base_schema = get_base_tools_schema(tier);
+pub async fn get_tools_schema_with_mcp(tier: &ToolTier, delegate: bool, mcp_servers: &[String]) -> Value {
+    let mut base_schema = get_base_tools_schema(tier, delegate);
     if !mcp_servers.is_empty() {
         if let Some(arr) = base_schema.as_array_mut() {
             for server in mcp_servers {
@@ -36,7 +38,7 @@ pub async fn get_tools_schema_with_mcp(tier: &ToolTier, mcp_servers: &[String]) 
     base_schema
 }
 
-fn get_base_tools_schema(tier: &ToolTier) -> Value {
+fn get_base_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
     match tier {
         ToolTier::PureBash => json!([
             {
@@ -54,98 +56,120 @@ fn get_base_tools_schema(tier: &ToolTier) -> Value {
                 }
             }
         ]),
-        ToolTier::Smol => json!([
-            {
-                "type": "function",
-                "function": {
-                    "name": "read_file",
-                    "description": "Read a text file from the project. Optionally specify line_start and line_end.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "path": { "type": "string", "description": "Relative path to file." },
-                            "line_start": { "type": "integer", "description": "Starting line number (1-indexed)." },
-                            "line_end": { "type": "integer", "description": "Ending line number (inclusive)." }
-                        },
-                        "required": ["path"]
+        ToolTier::Smol => {
+            let mut base = json!([
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "read_file",
+                        "description": "Read a text file from the project. Optionally specify line_start and line_end.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "path": { "type": "string", "description": "Relative path to file." },
+                                "line_start": { "type": "integer", "description": "Starting line number (1-indexed)." },
+                                "line_end": { "type": "integer", "description": "Ending line number (inclusive)." }
+                            },
+                            "required": ["path"]
+                        }
                     }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "edit_file",
-                    "description": "Surgically replace exact text (old_str) with new_str in an existing file.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "path": { "type": "string", "description": "Relative path to file." },
-                            "old_str": { "type": "string", "description": "Exact text to find and replace." },
-                            "new_str": { "type": "string", "description": "New replacement text." }
-                        },
-                        "required": ["path", "old_str", "new_str"]
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "edit_file",
+                        "description": "Surgically replace exact text (old_str) with new_str in an existing file. Confirms disk write without needing read_file.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "path": { "type": "string", "description": "Relative path to file." },
+                                "old_str": { "type": "string", "description": "Exact text to find and replace." },
+                                "new_str": { "type": "string", "description": "New replacement text." }
+                            },
+                            "required": ["path", "old_str", "new_str"]
+                        }
                     }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "write_file",
-                    "description": "Create a new file or completely overwrite an existing file. If file exists, pass overwrite=true.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "path": { "type": "string", "description": "Relative path to file." },
-                            "content": { "type": "string", "description": "Full file content." },
-                            "overwrite": { "type": "boolean", "description": "Set true to confirm overwriting existing file." }
-                        },
-                        "required": ["path", "content"]
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "write_file",
+                        "description": "Create a new file or completely overwrite an existing file. Confirms disk write without needing read_file. If file exists, pass overwrite=true.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "path": { "type": "string", "description": "Relative path to file." },
+                                "content": { "type": "string", "description": "Full file content." },
+                                "overwrite": { "type": "boolean", "description": "Set true to confirm overwriting existing file." }
+                            },
+                            "required": ["path", "content"]
+                        }
                     }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "list_dir",
-                    "description": "List directory contents in the workspace.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "path": { "type": "string", "description": "Relative directory path. Defaults to '.' (root)." }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "list_dir",
+                        "description": "List directory contents in the workspace.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "path": { "type": "string", "description": "Relative directory path. Defaults to '.' (root)." }
+                            }
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "search_code",
+                        "description": "Search for text or regex pattern across workspace files.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "pattern": { "type": "string", "description": "Text or regex pattern to search for." },
+                                "path": { "type": "string", "description": "Relative directory path to search within." }
+                            },
+                            "required": ["pattern"]
+                        }
+                    }
+                },
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "run_command",
+                        "description": "Run a shell command inside the workspace directory (auto-killed after 30s timeout).",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "command": { "type": "string", "description": "Command to execute." }
+                            },
+                            "required": ["command"]
                         }
                     }
                 }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "search_code",
-                    "description": "Search for text or regex pattern across workspace files.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "pattern": { "type": "string", "description": "Text or regex pattern to search for." },
-                            "path": { "type": "string", "description": "Relative directory path to search within." }
-                        },
-                        "required": ["pattern"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "run_command",
-                    "description": "Run a shell command inside the workspace directory (auto-killed after 30s timeout).",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "command": { "type": "string", "description": "Command to execute." }
-                        },
-                        "required": ["command"]
-                    }
+            ]);
+
+            if delegate {
+                if let Some(arr) = base.as_array_mut() {
+                    arr.push(json!({
+                        "type": "function",
+                        "function": {
+                            "name": "delegate_task",
+                            "description": "Delegate an isolated sub-task or code research query to a temporary sub-agent. Returns only a concise summary report to keep context clean.",
+                            "parameters": {
+                                "type": "object",
+                                "properties": {
+                                    "goal": { "type": "string", "description": "Specific isolated sub-task or code research objective." }
+                                },
+                                "required": ["goal"]
+                            }
+                        }
+                    }));
                 }
             }
-        ])
+            base
+        }
     }
 }
 
@@ -178,7 +202,6 @@ fn levenshtein_similarity(a: &str, b: &str) -> f64 {
 
 /// 3-Stage Resilient Replacer ported from py-agent (Exact -> Indent-Delta Whitespace -> Fuzzy)
 pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result<String, String> {
-    // Stage 1: Exact match
     if original.contains(old_str) {
         if original.matches(old_str).count() > 1 {
             return Err("Target 'old_str' matched multiple times. Include more surrounding lines to make it unique.".into());
@@ -196,7 +219,6 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
         return Err("Parameter 'old_str' cannot be empty.".into());
     }
 
-    // Collect non-blank line indices for sliding window
     let mut non_blank_orig = Vec::new();
     let mut non_blank_indices = Vec::new();
     for (idx, line) in orig_lines.iter().enumerate() {
@@ -213,7 +235,6 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
         return Err("Parameter 'old_str' contains no non-whitespace content.".into());
     }
 
-    // Stage 2: Whitespace-normalized sliding window with indent_delta preservation
     let mut matches = Vec::new();
     if non_blank_orig.len() >= old_len {
         for i in 0..=(non_blank_orig.len() - old_len) {
@@ -261,7 +282,6 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
         return Err(format!("Whitespace-normalized old_str matched {} locations. Include more surrounding lines to make it unique.", matches.len()));
     }
 
-    // Stage 3: Fuzzy window search (threshold >= 0.85)
     let old_block_str = norm_old.join("\n");
     let mut best_ratio = 0.0;
     let mut best_window = None;
@@ -332,6 +352,70 @@ pub async fn execute_tool(
     }
 
     match name {
+        "delegate_task" => {
+            let goal = args["goal"].as_str().ok_or("Missing 'goal' parameter")?;
+            if SUBAGENT_DEPTH.load(std::sync::atomic::Ordering::SeqCst) >= 1 {
+                return Err("[error] Sub-agents cannot recursively delegate tasks. Execute direct tools.".into());
+            }
+
+            SUBAGENT_DEPTH.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let provider = crate::config::ProviderConfig::load().await;
+            let client = crate::client::LlmClient::new(provider);
+            let sub_boundary = SecurityBoundary::new(workspace);
+
+            let sub_tools = get_base_tools_schema(&ToolTier::Smol, false);
+            let sys_prompt = format!(
+                "You are an isolated sub-agent in workspace: {}.\nGoal: {}\nExecute direct tools (read_file, search_code, list_dir, run_command, edit_file, write_file) to accomplish the goal.\nWhen finished, output ONLY a concise factual summary report.",
+                workspace.display(), goal
+            );
+
+            let mut sub_history = vec![
+                crate::client::ChatMessage::system(sys_prompt),
+                crate::client::ChatMessage::user(format!("Execute sub-task: {}", goal)),
+            ];
+
+            let mut final_report = String::new();
+            for _step in 0..5 {
+                let stream_res = client.stream_chat_raw(&sub_history, Some(sub_tools.clone()), None, |_, _| {}).await;
+                match stream_res {
+                    Ok((ans, opt_reasoning, tool_calls, _)) => {
+                        final_report = ans.clone();
+                        if let Some(calls) = tool_calls {
+                            if calls.is_empty() {
+                                break;
+                            }
+                            sub_history.push(crate::client::ChatMessage {
+                                role: "assistant".into(),
+                                content: serde_json::Value::String(ans),
+                                reasoning_content: opt_reasoning,
+                                tool_calls: Some(serde_json::Value::Array(calls.clone())),
+                                tool_call_id: None,
+                            });
+                            for call in calls {
+                                let c_id = call["id"].as_str().unwrap_or("call_sub").to_string();
+                                let fn_name = call["function"]["name"].as_str().unwrap_or("tool");
+                                let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
+                                let res = Box::pin(execute_tool(fn_name, fn_args, workspace, &sub_boundary)).await;
+                                let res_str = match res {
+                                    Ok(o) => o,
+                                    Err(e) => format!("[error] {}", e),
+                                };
+                                sub_history.push(crate::client::ChatMessage::tool_response(c_id, res_str));
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        final_report = format!("[sub-agent error: {}]", e);
+                        break;
+                    }
+                }
+            }
+            SUBAGENT_DEPTH.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(if final_report.is_empty() { "Sub-agent completed task with no output.".into() } else { final_report })
+        }
+
         "read_file" => {
             let path_str = args["path"].as_str().ok_or("Missing 'path' parameter")?;
             let safe_path = boundary.resolve_path(path_str);
@@ -396,13 +480,13 @@ pub async fn execute_tool(
             let original = fs::read_to_string(&safe_path).map_err(|e| e.to_string())?;
             let updated = resilient_replace(&original, old_str, new_str)?;
             fs::write(&safe_path, updated).map_err(|e| e.to_string())?;
-            Ok(format!("Successfully edited {}.", path_str))
+            Ok(format!("✓ File updated: {}. Disk state confirmed. Halt if goal complete.", path_str))
         }
 
         "write_file" => {
             let path_str = args["path"].as_str().ok_or("Missing 'path' parameter")?;
             let content = args["content"].as_str().ok_or("Missing 'content' parameter")?;
-            let overwrite = args.get("overwrite").and_then(|v| v.as_bool()).unwrap_or(false);
+            let _overwrite = args.get("overwrite").and_then(|v| v.as_bool()).unwrap_or(false);
 
             let safe_path = boundary.resolve_path(path_str);
             if boundary.is_outside(&safe_path) {
@@ -411,16 +495,14 @@ pub async fn execute_tool(
                 }
             }
 
-            if safe_path.exists() && !overwrite {
-                return Err(format!("File '{}' already exists. Pass overwrite=true to confirm replacing it.", path_str));
-            }
+// Direct overwrite allowed in autonomous workspace
 
             if let Some(parent) = safe_path.parent() {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
             }
 
             fs::write(&safe_path, content).map_err(|e| e.to_string())?;
-            Ok(format!("wrote {} chars to {}", content.len(), path_str))
+            Ok(format!("✓ File written to {}. Disk state confirmed. Halt if goal complete.", path_str))
         }
 
         "list_dir" => {

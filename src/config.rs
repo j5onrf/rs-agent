@@ -36,6 +36,7 @@ pub struct WorkspaceConfig {
     pub tier: ToolTier,
     #[serde(default)]
     pub adapters: bool,
+    pub delegate: bool,
 }
 
 impl Default for WorkspaceConfig {
@@ -45,6 +46,7 @@ impl Default for WorkspaceConfig {
             is_agent: false,
             tier: ToolTier::Smol,
             adapters: false,
+            delegate: false,
         }
     }
 }

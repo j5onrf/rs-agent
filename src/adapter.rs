@@ -1,5 +1,4 @@
 use serde_json::{json, Map, Value};
-use std::collections::HashMap;
 
 /// Strips line-number gutters (e.g., "12: ", "12 | ") copied by SLMs into old_str/new_str
 pub fn strip_line_gutters(text: &str) -> String {
@@ -32,7 +31,7 @@ pub fn strip_line_gutters(text: &str) -> String {
 
 /// Normalizes parameter aliases and sanitizes path / command inputs
 pub fn normalize_params(map: &mut Map<String, Value>) {
-    // 1. Path Aliases
+    // 1. Path Aliases & Accidental Leading Slash Normalization
     if !map.contains_key("path") {
         for alt in &["file", "filename", "filepath", "target", "file_path", "target_file"] {
             if let Some(val) = map.remove(*alt) {
@@ -45,11 +44,17 @@ pub fn normalize_params(map: &mut Map<String, Value>) {
     if let Some(path_val) = map.get_mut("path") {
         if let Some(p_str) = path_val.as_str() {
             let clean = p_str.trim().trim_matches(|c| c == '\'' || c == '"' || c == '`');
-            let stripped_root = clean
+            let mut s = clean
                 .strip_prefix("/workspace/")
                 .or_else(|| clean.strip_prefix("/app/"))
                 .unwrap_or(clean);
-            *path_val = Value::String(stripped_root.to_string());
+
+            // Strip accidental leading slashes on relative workspace files (e.g. "/mod_b.py" -> "mod_b.py")
+            if s.starts_with('/') && !s.starts_with("/home") && !s.starts_with("/tmp") && !s.starts_with("/var") && !s.starts_with("/usr") && !s.starts_with("/etc") {
+                s = s.trim_start_matches('/');
+            }
+
+            *path_val = Value::String(s.to_string());
         }
     }
 
@@ -110,6 +115,16 @@ pub fn normalize_params(map: &mut Map<String, Value>) {
         }
     }
 
+    // 6. Delegate Goal Aliases
+    if !map.contains_key("goal") {
+        for alt in &["task", "objective", "query", "subtask"] {
+            if let Some(val) = map.remove(*alt) {
+                map.insert("goal".to_string(), val);
+                break;
+            }
+        }
+    }
+
     // Strip line numbers from old_str / new_str
     if let Some(old_val) = map.get_mut("old_str") {
         if let Some(s) = old_val.as_str() {
@@ -123,14 +138,12 @@ pub fn normalize_params(map: &mut Map<String, Value>) {
     }
 }
 
-/// Parses and self-heals broken JSON tool arguments from SLMs
 pub fn heal_json_args(raw_args: &str) -> Value {
     let trimmed = raw_args.trim();
     if trimmed.is_empty() {
         return json!({});
     }
 
-    // Direct JSON parse
     if let Ok(mut parsed) = serde_json::from_str::<Value>(trimmed) {
         if let Some(map) = parsed.as_object_mut() {
             normalize_params(map);
@@ -138,7 +151,6 @@ pub fn heal_json_args(raw_args: &str) -> Value {
         }
     }
 
-    // Markdown block unwrap
     let unescaped = if trimmed.starts_with("```") {
         let lines: Vec<&str> = trimmed.lines().collect();
         if lines.len() >= 2 {
@@ -163,7 +175,6 @@ pub fn heal_json_args(raw_args: &str) -> Value {
         }
     }
 
-    // Bracket stack repair
     let mut stack = Vec::new();
     let mut in_str = false;
     let mut esc = false;

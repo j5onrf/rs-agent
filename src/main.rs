@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use rs_agent::adapter;
 use rs_agent::client::{ChatMessage, LlmClient};
-use rs_agent::config::{self, ProviderConfig, WorkspaceConfig};
+use rs_agent::config::{ProviderConfig, WorkspaceConfig};
 use rs_agent::matcher::{self, ContextRouter};
 use rs_agent::profile::Profile;
 use rs_agent::security::SecurityBoundary;
@@ -148,44 +148,16 @@ fn handle_new_project(name: &str, intents_arg: Option<&str>) -> anyhow::Result<(
 }
 
 fn build_system_prompt(
-    is_agent: bool,
-    target_dir: &Path,
+    _is_agent: bool,
+    _target_dir: &Path,
     active_profile: &Option<Profile>,
     active_skills: &[String],
 ) -> String {
-    let mut prompt = if is_agent {
-        if let Some(prof) = active_profile {
-            format!("{}\n\nWorkspace Path: {}", prof.system_prompt, target_dir.display())
-        } else {
-            format!("You are an autonomous agent working in workspace: {}.", target_dir.display())
-        }
+    let mut prompt = if let Some(prof) = active_profile {
+        prof.system_prompt.clone()
     } else {
-        if let Some(prof) = active_profile {
-            prof.system_prompt.clone()
-        } else {
-            "You are an articulate, perceptive, and intellectually honest conversational partner.".to_string()
-        }
+        "You are an articulate, perceptive, and intellectually honest conversational partner.".to_string()
     };
-
-    if let Some(global_rules) = config::load_global_instructions() {
-        prompt.push_str(&format!("\n\n---\nGLOBAL SYSTEM INSTRUCTIONS:\n{}", global_rules));
-    }
-
-    if is_agent {
-        if let Some(prof) = active_profile {
-            if prof.memory {
-                let mem_path = target_dir.join(".rs/memory.md");
-                if mem_path.is_file() {
-                    if let Ok(mem_content) = fs::read_to_string(&mem_path) {
-                        let trimmed = mem_content.trim();
-                        if !trimmed.is_empty() {
-                            prompt.push_str(&format!("\n\n---\nWORKSPACE MEMORY (.rs/memory.md):\n{}", trimmed));
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     for sk_name in active_skills {
         if let Some(sk) = Skill::load(sk_name) {
@@ -207,28 +179,19 @@ async fn execute_task_loop(
     spinner: &mut InlineSpinner,
 ) -> anyhow::Result<bool> {
     let max_rounds = get_max_rounds();
-    let display_goal = if goal.len() > 100 { format!("{}...", &goal[..100]) } else { goal.to_string() };
+    let display_goal = if goal.len() > 100 { format!("{}...", goal.chars().take(80).collect::<String>().as_str()) } else { goal.to_string() };
 
     println!("  \x1b[1;36m✦ [Task Loop]\x1b[0m Starting autonomous run in \x1b[1;37m{}\x1b[0m", target_dir.display());
     println!("  \x1b[2mGoal: {} (Max steps: {})\x1b[0m\n", display_goal, max_rounds);
 
-    history.push(ChatMessage::user(format!(
-        "### Target Goal:\n{}\n\nExecute all necessary tool actions to complete and verify this goal. When 100% finished and verified, output '✓ Task complete: <summary>'.",
-        goal
-    )));
+    history.push(ChatMessage::user(goal.to_string()));
 
     let mut total_tools_run = 0;
-    let mut consecutive_failures = 0;
-
+    
     for turn in 0..max_rounds {
         println!("  \x1b[1;34m─── Step {}/{} ───\x1b[0m", turn + 1, max_rounds);
 
-        if consecutive_failures >= 2 {
-            history.push(ChatMessage::system(
-                "[Harness Directive - Failure Decomposition] Your previous tool action failed repeatedly. Stop retrying the whole file. 1. Inspect exact lines with read_file or search_code. 2. Apply targeted edit_file to only that section. 3. Run verification with run_command."
-            ));
-            consecutive_failures = 0;
-        }
+        // Pure profile mode: no synthetic mid-flight system messages
 
         let mut renderer = StreamRenderer::new();
         spinner.start("Executing autonomous step...");
@@ -243,7 +206,6 @@ async fn execute_task_loop(
         spinner.stop();
         renderer.finish(&stats, 0);
 
-        let mut turn_tool_failures = 0;
 
         if let Some(calls) = tool_calls {
             if !calls.is_empty() {
@@ -286,7 +248,6 @@ async fn execute_task_loop(
                             history.push(ChatMessage::tool_response(call_id, out));
                         }
                         Err(err) => {
-                            turn_tool_failures += 1;
                             println!("  \x1b[1;31m✗\x1b[0m \x1b[2mFailed ({:.1}s): {}\x1b[0m\n", elapsed, err);
                             history.push(ChatMessage::tool_response(call_id, format!("[tool error] {}", err)));
                         }
@@ -299,11 +260,7 @@ async fn execute_task_loop(
             history.push(ChatMessage::assistant(reply.clone()));
         }
 
-        if turn_tool_failures > 0 {
-            consecutive_failures += 1;
-        } else {
-            consecutive_failures = 0;
-        }
+
 
         if is_task_complete(&reply) {
             let lower_goal = goal.to_lowercase();
@@ -326,9 +283,10 @@ async fn execute_task_loop(
             return Ok(true);
         }
 
-        history.push(ChatMessage::user(
-            "Continue with the next step. If completely finished and verified, emit '✓ Task complete: <summary>'."
-        ));
+        let last_is_tool = history.last().map(|m| m.role == "tool").unwrap_or(false);
+        if !last_is_tool {
+            history.push(ChatMessage::user("Continue with the next action."));
+        }
     }
 
     println!("\n  \x1b[1;33m▲ [Task Loop] Reached max limit ({}) without completion marker.\x1b[0m\n", max_rounds);
@@ -385,7 +343,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     let mut history = vec![ChatMessage::system(&system_prompt)];
     let mcp_servers = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
     let mut active_tools = if cfg.is_agent {
-        Some(tools::get_tools_schema_with_mcp(&cfg.tier, &mcp_servers).await)
+        Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &mcp_servers).await)
     } else {
         None
     };
@@ -527,7 +485,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 history.push(ChatMessage::system(&system_prompt));
                 let new_mcp = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
                 active_tools = if cfg.is_agent {
-                    Some(tools::get_tools_schema_with_mcp(&cfg.tier, &new_mcp).await)
+                    Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &new_mcp).await)
                 } else {
                     None
                 };

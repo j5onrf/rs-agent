@@ -1,0 +1,707 @@
+#!/usr/bin/env python3
+"""rs-agent Full-Stack Agentic & Tool-Calling Benchmark Suite [100% Py-Agent Parity Edition]"""
+
+import contextlib
+import json
+import os
+import re
+import select
+import shutil
+import subprocess
+import sys
+import tempfile
+import termios
+import threading
+import time
+import tty
+from typing import Any
+
+CFG_DIR = os.path.expanduser("~/.config/rs-agent")
+EVALS_DIR = os.path.join(CFG_DIR, "tools", "evals")
+AI_BIN = os.path.join(CFG_DIR, "bin", "ai")
+FAILURES_LOG = os.path.join(EVALS_DIR, "last_failure_trace.log")
+RUN_TRACES: list[dict[str, Any]] = []
+
+try:
+    from rich.box import ROUNDED
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.text import Text
+    console = Console()
+    HAS_RICH = True
+except ImportError:
+    HAS_RICH = False
+
+RE_SECRET = re.compile(
+    r"(?:sk-[a-zA-Z0-9_\-]{8}|ghp_[a-zA-Z0-9]{8}|AIzaSy[a-zA-Z0-9_\-]{8}|Bearer\s+[a-zA-Z0-9_\-\.]{8})[a-zA-Z0-9_\-\.]*",
+    re.IGNORECASE,
+)
+RE_ANSI = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\([B0]")
+
+
+def sanitize_terminal_output(raw: str) -> list[str]:
+    """Strips ANSI sequences, cursor codes, and transient spinner lines."""
+    clean = RE_ANSI.sub("", raw)
+    clean = clean.replace("\r\n", "\n").replace("\r", "\n")
+
+    filtered = []
+    for line in clean.splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        if any(token in s for token in (
+            "Executing autonomous step...", "Prefilling...", "Preloading...",
+            "Working...", "Drafting tool action...", "Evaluating tool results..."
+        )):
+            continue
+        if re.match(r"^[·\s○●]+$", s):
+            continue
+        filtered.append(s)
+    return filtered
+
+
+class MinimalSpinner:
+    def __init__(self):
+        self.label = "Working..."
+        self.stop_event = threading.Event()
+        self.thread = None
+        self.chars = ["-", "\\", "|", "/"]
+        self._lock = threading.RLock()
+
+    def start(self, label: str = "Working..."):
+        with self._lock:
+            self.stop()
+            self.label = label
+            self.stop_event = threading.Event()
+            self.start_time = time.time()
+            self.thread = threading.Thread(target=self._spin, daemon=True)
+            self.thread.start()
+
+    def _spin(self):
+        i = 0
+        if sys.stderr.isatty():
+            sys.stderr.write("\033[?25l")
+            sys.stderr.flush()
+
+        while not self.stop_event.is_set():
+            if sys.stderr.isatty():
+                elapsed = time.time() - self.start_time
+                sys.stderr.write(
+                    f"\r\x1b[2K  \033[2m{self.label}\033[0m \033[1;36m{elapsed:.1f}s\033[0m"
+                )
+                sys.stderr.flush()
+            if self.stop_event.wait(0.25):
+                break
+
+    def stop(self):
+        with self._lock:
+            self.stop_event.set()
+            t, self.thread = self.thread, None
+            if t and t.is_alive():
+                t.join(timeout=1.0)
+            if sys.stderr.isatty():
+                sys.stderr.write("\r\033[2K\r\033[?25h")
+                sys.stderr.flush()
+
+
+def _safe_read(path: str) -> str:
+    if os.path.isfile(path):
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                return f.read()
+        except OSError:
+            pass
+    return ""
+
+
+def _write_fixture(ws: str, fname: str, content: str) -> None:
+    target = os.path.join(ws, fname)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    with open(target, "w", encoding="utf-8") as f:
+        f.write(content)
+
+
+def _verify_python_script(script_path: str, cwd: str, timeout: int = 15) -> bool:
+    safe_env = {
+        "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+        "HOME": cwd,
+        "PYTHONPATH": cwd,
+    }
+    try:
+        res = subprocess.run(
+            [sys.executable, script_path],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            stdin=subprocess.DEVNULL,
+            env=safe_env,
+        )
+        return res.returncode == 0
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
+def _verify_ag02(ws: str, out: str) -> bool:
+    cfg_p = os.path.join(ws, "config.json")
+    if not os.path.isfile(cfg_p):
+        return False
+    try:
+        data = json.loads(_safe_read(cfg_p) or "{}")
+        return data.get("version") == 2 and data.get("status") == "ready"
+    except Exception:
+        return False
+
+
+def _verify_ag03(ws: str, out: str) -> bool:
+    calc_p = os.path.join(ws, "calc.py")
+    return "return a * b" in _safe_read(calc_p) and _verify_python_script(calc_p, ws, timeout=15)
+
+
+def _verify_ag04(ws: str, out: str) -> bool:
+    return (
+        "NEW_KEY" in _safe_read(os.path.join(ws, "mod_a.py"))
+        and "NEW_KEY" in _safe_read(os.path.join(ws, "mod_b.py"))
+    )
+
+
+def _verify_ag05(ws: str, out: str) -> bool:
+    return (
+        os.path.isfile(os.path.join(ws, "done.txt"))
+        and "PROCESSED" in _safe_read(os.path.join(ws, "done.txt"))
+    )
+
+
+def _verify_ag06(ws: str, out: str) -> bool:
+    code = _safe_read(os.path.join(ws, "format_test.py"))
+    return "Welcome, {name}!" in code and "def greet(name):" in code
+
+
+# Canonical 7 Agentic Benchmarks from Py-Agent
+AGENTIC_BENCHMARKS = [
+    {
+        "id": "AG-02",
+        "name": "File Create & Overwrite",
+        "tools_tested": "write_file (overwrite)",
+        "par_turns": 4,
+        "prompt": "1. Use write_file to create 'config.json' with {\"version\": 1}.\n2. Rewrite 'config.json' with overwrite=true to {\"version\": 2, \"status\": \"ready\"}.\n3. Conclude immediately with '✓ Task complete: config.json updated'.",
+        "verify_fn": _verify_ag02,
+    },
+    {
+        "id": "AG-03",
+        "name": "Surgical Edit & Test",
+        "tools_tested": "read_file, edit_file, run_command",
+        "par_turns": 6,
+        "setup_fn": lambda ws: _write_fixture(
+            ws,
+            "calc.py",
+            "def multiply(a, b):\n    return a + b\n\nif __name__ == '__main__':\n    assert multiply(3, 4) == 12, 'Test failed'\n    print('PASSED')\n",
+        ),
+        "prompt": "The file 'calc.py' has a bug where multiply(a, b) returns a + b instead of a * b. Inspect it with read_file, fix the formula using edit_file, verify it with run_command('python3 calc.py'), and finish with '✓ Task complete: calc.py fixed'.",
+        "verify_fn": _verify_ag03,
+    },
+    {
+        "id": "AG-04",
+        "name": "Code Search & Multi-File",
+        "tools_tested": "search_code, edit_file",
+        "par_turns": 8,
+        "setup_fn": lambda ws: (
+            _write_fixture(ws, "mod_a.py", "API_KEY = 'OLD_KEY'\n"),
+            _write_fixture(ws, "mod_b.py", "TARGET = 'OLD_KEY'\n"),
+        ),
+        "prompt": "Search for 'OLD_KEY' across all files using search_code. Replace 'OLD_KEY' with 'NEW_KEY' in every matched file using edit_file. Finish with '✓ Task complete: keys replaced'.",
+        "verify_fn": _verify_ag04,
+    },
+    {
+        "id": "AG-05",
+        "name": "One-and-Done Discipline",
+        "tools_tested": "write_file, exit_discipline",
+        "par_turns": 2,
+        "prompt": "Create a file named 'done.txt' containing 'PROCESSED'. Once written, STOP immediately and output: '✓ Task complete: done.txt created'. Do NOT run tests.",
+        "verify_fn": _verify_ag05,
+    },
+    {
+        "id": "AG-06",
+        "name": "Whitespace-Tolerant Edit",
+        "tools_tested": "edit_file (resilient match)",
+        "par_turns": 6,
+        "setup_fn": lambda ws: _write_fixture(
+            ws,
+            "format_test.py",
+            "def greet(name):\n  # 2-space indentation\n  msg = f'Hello, {name}'\n  return msg\n",
+        ),
+        "prompt": "In 'format_test.py', replace `msg = f'Hello, {name}'` with `msg = f'Welcome, {name}!'` using edit_file. Preserve file syntax and complete with '✓ Task complete: greeting updated'.",
+        "verify_fn": _verify_ag06,
+    },
+]
+
+# Canonical 5 Pure Bash Benchmarks from Py-Agent
+PUREBASH_BENCHMARKS = [
+    {
+        "id": "PB-01",
+        "name": "File Create & Overwrite",
+        "tools_tested": "run_command (shell create & overwrite)",
+        "par_turns": 4,
+        "prompt": "1. Create 'config.json' with {\"version\": 1}.\n2. Update 'config.json' to {\"version\": 2, \"status\": \"ready\"}.\n3. Conclude immediately with '✓ Task complete: config.json updated'.",
+        "verify_fn": _verify_ag02,
+    },
+    {
+        "id": "PB-02",
+        "name": "Surgical Edit & Test",
+        "tools_tested": "run_command (shell inspect, sed, verify)",
+        "par_turns": 6,
+        "setup_fn": lambda ws: _write_fixture(
+            ws,
+            "calc.py",
+            "def multiply(a, b):\n    return a + b\n\nif __name__ == '__main__':\n    assert multiply(3, 4) == 12, 'Test failed'\n    print('PASSED')\n",
+        ),
+        "prompt": "The file 'calc.py' has a bug where multiply(a, b) returns a + b instead of a * b. Inspect it, fix the formula, verify it with 'python3 calc.py', and finish with '✓ Task complete: calc.py fixed'.",
+        "verify_fn": _verify_ag03,
+    },
+    {
+        "id": "PB-03",
+        "name": "Code Search & Multi-File",
+        "tools_tested": "run_command (grep, sed multi-file)",
+        "par_turns": 4,
+        "setup_fn": lambda ws: (
+            _write_fixture(ws, "mod_a.py", "API_KEY = 'OLD_KEY'\n"),
+            _write_fixture(ws, "mod_b.py", "TARGET = 'OLD_KEY'\n"),
+        ),
+        "prompt": "Search for 'OLD_KEY' across all files and replace it with 'NEW_KEY' in every matched file. Finish with '✓ Task complete: keys replaced'.",
+        "verify_fn": _verify_ag04,
+    },
+    {
+        "id": "PB-04",
+        "name": "One-and-Done Discipline",
+        "tools_tested": "run_command (shell write & halt)",
+        "par_turns": 2,
+        "prompt": "Create a file named 'done.txt' containing 'PROCESSED'. Once written, STOP immediately and output: '✓ Task complete: done.txt created'.",
+        "verify_fn": _verify_ag05,
+    },
+    {
+        "id": "PB-05",
+        "name": "Whitespace-Tolerant Edit",
+        "tools_tested": "run_command (in-place sed)",
+        "par_turns": 4,
+        "setup_fn": lambda ws: _write_fixture(
+            ws,
+            "format_test.py",
+            "def greet(name):\n  # 2-space indentation\n  msg = f'Hello, {name}'\n  return msg\n",
+        ),
+        "prompt": "In 'format_test.py', replace msg = f'Hello, {name}' with msg = f'Welcome, {name}!'. Preserve file syntax and complete with '✓ Task complete: greeting updated'.",
+        "verify_fn": _verify_ag06,
+    },
+]
+
+
+def list_available_profiles() -> list[str]:
+    prof_dir = os.path.join(CFG_DIR, "profiles")
+    found = []
+    if os.path.isdir(prof_dir):
+        for entry in sorted(os.listdir(prof_dir)):
+            full = os.path.join(prof_dir, entry)
+            if os.path.isdir(full) and not entry.startswith("."):
+                for sub in sorted(os.listdir(full)):
+                    if sub.endswith(".md"):
+                        found.append(f"{entry}/{sub[:-3]}")
+            elif entry.endswith(".md") and entry != "chat.md":
+                found.append(entry[:-3])
+    found.sort(key=lambda x: (1 if "/" in x else 0, x))
+    return found
+
+
+def select_profile_interactive(profiles: list[str], default_key: str = "lingtiny") -> str:
+    current_idx = next((i for i, p in enumerate(profiles) if p == default_key or p.endswith(f"/{default_key}")), 0)
+    num_opts = len(profiles)
+    last_lines = 0
+
+    try:
+        tty_in = open("/dev/tty", "r")
+        tty_fd = tty_in.fileno()
+    except Exception:
+        tty_in = None
+        tty_fd = sys.stdin.fileno() if sys.stdin.isatty() else None
+
+    def _get_k() -> str | None:
+        if tty_fd is not None:
+            try:
+                old = termios.tcgetattr(tty_fd)
+                try:
+                    tty.setraw(tty_fd)
+                    termios.tcflush(tty_fd, termios.TCIFLUSH)
+                    b = os.read(tty_fd, 1)
+                    if not b:
+                        return None
+                    if b == b"\x1b" and select.select([tty_fd], [], [], 0.05)[0]:
+                        b += os.read(tty_fd, 2)
+                    return b.decode("utf-8", errors="ignore")
+                finally:
+                    termios.tcsetattr(tty_fd, termios.TCSADRAIN, old)
+            except Exception:
+                return None
+        return None
+
+    try:
+        sys.stderr.write("\033[?25l")
+        while True:
+            if last_lines > 0:
+                sys.stderr.write(f"\033[{last_lines}A\r\033[J")
+
+            lines_count = 2
+            sys.stderr.write(
+                "\n\033[1;36mSelect rs-agent Profile to Benchmark:\033[0m \033[2m(↑/↓ navigate, Enter run, Esc default, q abort)\033[0m\n"
+            )
+
+            for idx, p in enumerate(profiles):
+                prefix = (
+                    f"\033[1;36m  ❯ \033[1;37m{idx+1:2d}. \033[1;36m{p:<28}\033[0m\n"
+                    if idx == current_idx
+                    else f"\033[2m    {idx+1:2d}. {p:<28}\033[0m\n"
+                )
+                sys.stderr.write(prefix)
+                lines_count += 1
+
+            sys.stderr.write(f"\n\033[2m:: Enter: confirm [{profiles[current_idx]}]  Esc: default  q: abort\033[0m\n")
+            lines_count += 2
+            sys.stderr.flush()
+
+            last_lines = lines_count
+            key = _get_k()
+
+            if key is None:
+                break
+            if key in ("\x1b[A", "k", "K"):
+                current_idx = (current_idx - 1 + num_opts) % num_opts
+            elif key in ("\x1b[B", "j", "J"):
+                current_idx = (current_idx + 1) % num_opts
+            elif key.isdigit() and 1 <= int(key) <= num_opts:
+                current_idx = int(key) - 1
+                break
+            elif key in ("\r", "\n"):
+                break
+            elif key in ("\x03", "q", "Q"):
+                sys.stderr.write(f"\033[{last_lines}A\r\033[J\nBenchmark aborted.\n")
+                sys.exit(0)
+            elif key == "\x1b":
+                break
+
+        sys.stderr.write(f"\033[{last_lines}A\r\033[J")
+        sys.stderr.flush()
+        return profiles[current_idx]
+    finally:
+        sys.stderr.write("\033[?25h")
+        sys.stderr.flush()
+        if tty_in:
+            with contextlib.suppress(Exception):
+                tty_in.close()
+
+
+def get_current_model_info() -> tuple[str, str]:
+    env_file = os.path.join(CFG_DIR, ".env")
+    if os.path.isfile(env_file):
+        with open(env_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        for i in range(1, 10):
+            k_key = f"CUSTOM{i}_API_KEY"
+            m_key = f"CUSTOM{i}_MODEL"
+            u_key = f"CUSTOM{i}_URL"
+            has_active_key = any(l.strip().startswith(k_key) for l in lines)
+            if has_active_key:
+                model = next((l.split("=")[1].strip().strip('"\'') for l in lines if l.strip().startswith(m_key)), f"custom-{i}")
+                url = next((l.split("=")[1].strip().strip('"\'') for l in lines if l.strip().startswith(u_key)), "cloud")
+                return model, url
+
+    # Live query local llama-server
+    try:
+        import urllib.request
+        req = urllib.request.Request("http://127.0.0.1:8080/v1/models", headers={"User-Agent": "rs-agent-eval"})
+        with urllib.request.urlopen(req, timeout=1.5) as resp:
+            data = json.loads(resp.read().decode())
+            if "data" in data and len(data["data"]) > 0:
+                mid = data["data"][0].get("id", "").strip()
+                if mid:
+                    return mid, "http://127.0.0.1:8080"
+    except Exception:
+        pass
+
+    return "local-model", "http://127.0.0.1:8080"
+
+
+def _log_failure_trace(bench: dict, model_name: str, prof: str, output: str, ws: str):
+    try:
+        os.makedirs(EVALS_DIR, exist_ok=True)
+        fd = os.open(FAILURES_LOG, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+        with open(fd, "a", encoding="utf-8", errors="replace") as f:
+            f.write(f"\n{'='*80}\n")
+            f.write(f"FAILED TEST: {bench['id']} - {bench['name']}\n")
+            f.write(f"MODEL: {model_name} | PROFILE: {prof}\n")
+            f.write(f"TIMESTAMP: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"{'='*80}\n\n")
+            f.write("--- ENGINE STDOUT / REPL TRACE ---\n")
+            f.write(RE_SECRET.sub("[REDACTED]", output) + "\n\n")
+            f.write("--- WORKSPACE RESIDUAL FILES ---\n")
+            for root, _, files in os.walk(ws):
+                for file in files:
+                    fp = os.path.join(root, file)
+                    rel = os.path.relpath(fp, ws)
+                    f.write(f"[{rel}]:\n{_safe_read(fp)[:1000]}\n\n")
+    except Exception:
+        pass
+
+
+def run_single_agentic_test(bench: dict, prof_name: str, is_purebash: bool, model_name: str) -> tuple[bool, float, int, int, str]:
+    bare_name = prof_name.split("/")[-1]
+    sandbox_parent = os.path.join(tempfile.gettempdir(), "rs_evals")
+    os.makedirs(sandbox_parent, exist_ok=True)
+    sandbox_dir = tempfile.mkdtemp(prefix=f"{bare_name}_", dir=sandbox_parent)
+
+    t0 = time.time()
+    captured_stdout = ""
+    turns = 0
+    total_tokens = 0
+
+    try:
+        rs_meta = os.path.join(sandbox_dir, ".rs")
+        os.makedirs(rs_meta, exist_ok=True)
+        with open(os.path.join(rs_meta, "config.json"), "w", encoding="utf-8") as f:
+            json.dump({
+                "profile_name": prof_name,
+                "tier": "PureBash" if is_purebash else "Smol",
+                "is_agent": True,
+                "adapters": True
+            }, f, indent=2)
+
+        if "setup_fn" in bench:
+            bench["setup_fn"](sandbox_dir)
+
+        proc = subprocess.Popen(
+            [AI_BIN, "init", sandbox_dir],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            cwd=sandbox_dir,
+        )
+
+        clean_prompt = " ".join(bench["prompt"].split())
+        task_payload = f"/task {clean_prompt}\nexit\n"
+        try:
+            captured_stdout, _ = proc.communicate(input=task_payload, timeout=90)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            captured_stdout, _ = proc.communicate()
+
+        elapsed = time.time() - t0
+
+        step_matches = re.findall(r"─── Step (\d+)/\d+ ───", captured_stdout)
+        turns = len(step_matches) if step_matches else (1 if "Task complete" in captured_stdout else 0)
+
+        tok_matches = re.findall(r"↑([\d\.]+)k", captured_stdout)
+        if tok_matches:
+            with contextlib.suppress(Exception):
+                total_tokens = int(float(tok_matches[-1]) * 1000)
+
+        passed = False
+        try:
+            passed = bool(bench["verify_fn"](sandbox_dir, captured_stdout))
+        except Exception:
+            passed = False
+
+        if not passed:
+            _log_failure_trace(bench, model_name, prof_name, captured_stdout, sandbox_dir)
+
+        par_val = bench.get("par_turns", 1)
+        detail = f"{elapsed:.2f}s ({turns}/{par_val}t)" if passed else "State verification failed"
+
+        # Record sanitized line-by-line trace array
+        RUN_TRACES.append({
+            "id": bench["id"],
+            "name": bench["name"],
+            "passed": passed,
+            "elapsed_seconds": round(elapsed, 2),
+            "turns": turns,
+            "par_turns": par_val,
+            "tokens": total_tokens,
+            "trace": sanitize_terminal_output(captured_stdout),
+        })
+
+        return passed, elapsed, turns, total_tokens, detail
+    finally:
+        shutil.rmtree(sandbox_dir, ignore_errors=True)
+
+
+def main():
+    if not os.path.isfile(AI_BIN):
+        sys.stderr.write(f"Error: rs-agent binary not found at {AI_BIN}. Run 'cargo build --release' first.\n")
+        sys.exit(1)
+
+    profiles = list_available_profiles()
+    if not profiles:
+        sys.stderr.write("Error: No profiles found in ~/.config/rs-agent/profiles/\n")
+        sys.exit(1)
+
+    model_name, endpoint = get_current_model_info()
+    m_low = model_name.lower()
+    default_p = "lingtiny" if "ling" in m_low else ("lfm3" if "lfm" in m_low else ("sage" if "sage" in m_low else "lingtiny"))
+
+    cli_prof = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else None
+    chosen_prof = cli_prof if cli_prof and cli_prof in profiles else select_profile_interactive(profiles, default_key=default_p)
+
+    prof_file = os.path.join(CFG_DIR, "profiles", f"{chosen_prof}.md")
+    is_purebash = False
+    is_py_enabled = False
+    if os.path.isfile(prof_file):
+        content = _safe_read(prof_file)
+        is_purebash = "purebash: true" in content.lower()
+        has_delegate = "delegate: true" in content.lower()
+
+    mode_label = "Pure Bash (1-Tool Shell)" if is_purebash else ("Native 7-Tool (Delegate)" if has_delegate else "Native 6-Tool")
+
+    if HAS_RICH:
+        console.print(
+            Panel(
+                "[bold cyan]Rs-Agent Full-Stack Agentic & Tool-Calling Benchmark Suite[/bold cyan]\n"
+                "[dim]Decision-grade evaluation: Par efficiency, token economy, tool resilience, and execution speed[/dim]",
+                border_style="cyan",
+            )
+        )
+        console.print(f"Target Model: [bold]{model_name}[/bold]")
+        console.print(f"Target Endpoint: {endpoint}")
+        console.print(f"Harness Profile: [cyan]{chosen_prof}[/cyan] ({mode_label})\n")
+    else:
+        print(f"\n  rs-agent Benchmark Suite: {model_name} | {chosen_prof} ({mode_label})\n")
+
+    if os.path.isfile(FAILURES_LOG):
+        with contextlib.suppress(OSError):
+            os.remove(FAILURES_LOG)
+
+    active_benches = PUREBASH_BENCHMARKS if is_purebash else AGENTIC_BENCHMARKS
+    results = []
+    passed_count = 0
+    total_time = 0.0
+    total_tokens = 0
+    total_actual_turns = 0
+    total_par_turns = 0
+    evaluated_count = 0
+    task_scores = []
+    spinner = MinimalSpinner()
+
+    try:
+        for idx, bench in enumerate(active_benches, start=1):
+
+
+            evaluated_count += 1
+            par = bench.get("par_turns", 1)
+            total_par_turns += par
+
+            spinner.start(f"[{idx}/{len(active_benches)}] Running {bench['id']} ({bench['name']})...")
+            passed, elapsed, turns, toks, detail = run_single_agentic_test(bench, chosen_prof, is_purebash, model_name)
+            spinner.stop()
+
+            total_time += elapsed
+            total_tokens += toks
+            total_actual_turns += turns
+
+            if passed:
+                passed_count += 1
+                status_str = "[bold green]PASS[/bold green]" if HAS_RICH else "PASS"
+                turn_ratio = min(1.0, par / turns) if turns > 0 else 1.0
+                task_scores.append(60.0 + (40.0 * turn_ratio))
+            else:
+                status_str = "[bold red]FAIL[/bold red]" if HAS_RICH else "FAIL"
+                task_scores.append(0.0)
+
+            tps = (toks / elapsed) if elapsed > 0 else 0
+            turn_metrics = f"{turns}t (Par {par})" if passed else "FAILED"
+            results.append((
+                bench["id"],
+                bench["name"],
+                bench["tools_tested"],
+                status_str,
+                turn_metrics,
+                f"{toks:,}t" if toks else "-",
+                f"{tps:.1f} t/s" if tps else "-",
+            ))
+
+            prefix_icon = "[green]OK[/green]" if passed else "[red]XX[/red]"
+            if HAS_RICH:
+                console.print(
+                    f"  {prefix_icon} {status_str} : [bold]{bench['id']}[/bold] {bench['name']:<33} {detail:<20} @ [cyan]{tps:.1f} t/s[/cyan]"
+                )
+            else:
+                print(f"  {status_str} : {bench['id']} {bench['name']:<33} {detail}")
+    finally:
+        spinner.stop()
+
+    accuracy = (passed_count / evaluated_count * 100) if evaluated_count > 0 else 0
+    par_eff = (total_par_turns / total_actual_turns * 100) if total_actual_turns > 0 else 0
+    avg_tps = (total_tokens / total_time) if total_time > 0 else 0
+    toks_per_turn = (total_tokens / total_actual_turns) if total_actual_turns > 0 else 0
+
+    agent_index = (sum(task_scores) / len(task_scores)) if task_scores else 0.0
+    grade = "A+" if agent_index >= 95 else "A" if agent_index >= 88 else "B" if agent_index >= 75 else "C" if agent_index >= 60 else "F"
+
+    if HAS_RICH:
+        table = Table(title=f"\nAgentic Stack Benchmark: {model_name} [{chosen_prof}]", border_style="bright_black")
+        table.add_column("ID", style="cyan", justify="left")
+        table.add_column("Agent Challenge", style="white")
+        table.add_column("Tools Exercised", style="dim")
+        table.add_column("Result", justify="center")
+        table.add_column("Turns / Par", justify="center")
+        table.add_column("Context", justify="right")
+        table.add_column("Speed", style="green", justify="right")
+
+        for row in results:
+            table.add_row(*row)
+        console.print(table)
+
+        summary = Text()
+        summary.append(f"Pass Rate:        {passed_count}/{evaluated_count} ({accuracy:.1f}%)\n", style="bold green" if accuracy >= 80 else "bold red")
+        summary.append(f"Par Efficiency:   {par_eff:.1f}% ({total_actual_turns} actual turns / {total_par_turns} par target)\n", style="cyan")
+        summary.append(f"Token Economy:    {total_tokens:,} total tokens (~{toks_per_turn:.0f} tokens/turn)\n", style="dim")
+        summary.append(f"Effective Speed:  {avg_tps:.1f} tokens/second (Total elapsed: {total_time:.2f}s)\n", style="dim")
+        summary.append(f"\nAgent Performance Index: {agent_index:.1f}/100 [Grade: {grade}]", style="bold yellow")
+        console.print(Panel(summary, title="Conclusive Benchmark Evaluation", border_style="green" if accuracy == 100 else "yellow", box=ROUNDED))
+    else:
+        print(f"\n{'='*60}\nPass Rate:        {passed_count}/{evaluated_count} ({accuracy:.1f}%)\nPar Efficiency:   {par_eff:.1f}%\nAgent Index:      {agent_index:.1f}/100 [Grade: {grade}]\n{'='*60}\n")
+
+    # Save dedicated lightweight JSON run trace file per run
+    try:
+        os.makedirs(EVALS_DIR, exist_ok=True)
+        safe_model = re.sub(r"[^a-zA-Z0-9_\-]", "_", model_name).strip("_")
+        safe_prof = re.sub(r"[^a-zA-Z0-9_\-]", "_", chosen_prof).strip("_")
+        ts_str = time.strftime("%Y%m%d_%H%M%S")
+        trace_file = os.path.join(EVALS_DIR, f"eval_trace_{safe_model}_{safe_prof}_{ts_str}.json")
+
+        run_payload = {
+            "timestamp": int(time.time()),
+            "model": model_name,
+            "profile": chosen_prof,
+            "mode": mode_label,
+            "accuracy": round(accuracy, 1),
+            "par_efficiency": round(par_eff, 1),
+            "total_tokens": total_tokens,
+            "tokens_per_turn": round(toks_per_turn, 1),
+            "avg_tps": round(avg_tps, 1),
+            "total_time": round(total_time, 2),
+            "agent_index": round(agent_index, 1),
+            "grade": grade,
+            "traces": RUN_TRACES,
+        }
+
+        tmp_trace = f"{trace_file}.tmp.{os.getpid()}"
+        with open(tmp_trace, "w", encoding="utf-8") as wf:
+            json.dump(run_payload, wf, indent=2)
+        os.replace(tmp_trace, trace_file)
+
+        if HAS_RICH:
+            console.print(f"[dim]Run trace saved: [cyan]{trace_file}[/cyan][/dim]\n")
+        else:
+            print(f"Run trace saved: {trace_file}\n")
+    except Exception as e:
+        sys.stderr.write(f"Warning: Failed to save trace log: {e}\n")
+
+
+if __name__ == "__main__":
+    main()

@@ -21,21 +21,28 @@
 #   ├── plugins/t3code/launch.sh         - #!/usr/bin/env bash
 #   ├── plugins/t3code/src/main.rs       - CLI Entrypoint & Runtime Loop
 #   ├── plugins/t3code/t3code-bridge     - #!/usr/bin/env bash
+#   ├── profiles/artcraft/photocraft-c.md - PhotoCraft Visual Engine & Automation Specialist (Gemini Flash Lite)
+#   ├── profiles/artcraft/photocraft-l.md - LFM3 PhotoCraft Automation Engineer (Native MCP)
 #   ├── profiles/chat.md                 - Versatile, articulate, and high-signal conversational partner
 #   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer (Native 6-Tool)
 #   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer (Native 6-Tool)
-#   ├── profiles/photocraft-c.md         - PhotoCraft Visual Engine & Automation Specialist (Gemini Flash Lite)
-#   ├── profiles/photocraft-l.md         - LFM3 PhotoCraft Automation Engineer (Native MCP)
 #   ├── profiles/purebash.md             - Pure Bash LFM Minimalist Shell Agent
 #   ├── profiles/sage.md                 - InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent
+#   ├── projects/lfm3/acp:/skill/humanizer - ROLE DIRECTIVE: Direct, grounded, and intellectually honest collaborator.
+#   ├── projects/lfm3/acp:/skill/ponytail - ROLE DIRECTIVE: Ponytail Systems & Rust Architect.
+#   ├── projects/lfm3/acp:/skill/ub-mode - ROLE DIRECTIVE: Uncle Bob Clean Code & Architecture Practitioner.
+#   ├── projects/lfm3/binary_search_tree.py - class TreeNode:
+#   ├── projects/lfm3/bst.py             - class Node:
 #   ├── projects/lfm3/demo.psd           - {"name": "demo.psd", "width": 800, "height": 600}
 #   ├── projects/lfm3/test_calc.py       - def add(a, b):
+#   ├── projects/ling-tiny/__pycache__/binary_search_tree.cpython-314.pyc
+#   ├── projects/ling-tiny/binary_search_tree.py - class Node:
 #   ├── rs-context.md                    - Rs-Agent Context Router
 #   ├── rs-hook.sh                       - rs-agent shell hook (ponytail minimalism: < 0.2ms, Bash & Zsh, macOS & Linux)
 #   ├── skills/humanizer.md              - Anti-AI Slop Humanizer Directive
 #   ├── skills/ponytail.md               - Ponytail Architecture Directive for Rust
 #   ├── skills/ub-mode.md                - Uncle Bob Clean Code & Craftsmanship Directive
-#   ├── src/adapter.rs                   - fn: heal_json_args, repair_tool_args
+#   ├── src/adapter.rs                   - fn: strip_line_gutters, normalize_params, heal_json_args
 #   ├── src/bridge.rs                    - fn: run_bridge
 #   ├── src/client.rs                    - types: ChatMessage, LlmClient
 #   ├── src/config.rs                    - types: ToolTier, WorkspaceConfig, ContextCeilings
@@ -49,7 +56,7 @@
 #   ├── src/spinner.rs                   - types: InlineSpinner
 #   ├── src/state.rs                     - types: AppState
 #   ├── src/stream.rs                    - types: UsageStats, StreamRenderer
-#   ├── src/tools.rs                     - fn: get_tools_schema, get_tools_schema_with_mcp, execute_tool
+#   ├── src/tools.rs                     - fn: get_tools_schema, get_tools_schema_with_mcp, resilient_replace
 #   ├── src/ui.rs                        - fn: render_frame, draw_box
 #   ├── system_instructions.md           - Global System Instructions (identical to .cursorrules or CLAUDE.md):
 #   ├── tools/model-select/Cargo.toml    - name = "model-select"
@@ -60,8 +67,7 @@
 #   ├── tools/new-project/src/main.rs    - CLI Entrypoint & Runtime Loop
 #   ├── tools/test-agent/Cargo.toml      - name = "test-agent"
 #   ├── tools/test-agent/src/main.rs     - CLI Entrypoint & Runtime Loop
-#   ├── tools/test-agent/test-agent
-#   └── var/model_cache.json             - {"free":["openrouter/free","recursive/flint-v1.0:free","xingchen-agi/xing4.0-29b
+#   └── tools/test-agent/test-agent
 # --------------------------------------------------
 
 ## Rust API Skeleton:
@@ -93,7 +99,7 @@
 ```rust
   L020: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
   L037: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff, Mcp { .. } }
-  L781: async fn main() -> anyhow :: Result<()>;
+  L786: async fn main() -> anyhow :: Result<()>;
 ```
 
 ### `tools/model-select/src/main.rs`
@@ -101,12 +107,12 @@
   L009: impl Drop for RawModeGuard {
     L010: fn drop(&mut self);
   }
-  L062: fn main() -> std :: io :: Result<()>;
+  L069: fn main() -> std :: io :: Result<()>;
 ```
 
 ### `tools/new-project/src/main.rs`
 ```rust
-  L032: fn main();
+  L058: fn main();
 ```
 
 ### `tools/test-agent/src/main.rs`
@@ -116,8 +122,10 @@
 
 ### `src/adapter.rs`
 ```rust
-  L003: pub fn heal_json_args(raw_args: &str) -> Value; // Parses and heals JSON arguments into a serde_json::Value (used by tools.rs)
-  L025: pub fn repair_tool_args(fn_name: &str, raw_args: &str) -> String; // Repairs common SLM JSON formatting defects (unescaped newlines, markdown fences, trailing commas)
+  L003: pub fn strip_line_gutters(text: &str) -> String; // Strips line-number gutters (e.g., "12: ", "12 | ") copied by SLMs into old_str/new_str
+  L032: pub fn normalize_params(map: &mut Map<String, Value>); // Normalizes parameter aliases and sanitizes path / command inputs
+  L141: pub fn heal_json_args(raw_args: &str) -> Value;
+  L222: pub fn repair_tool_args(_fn_name: &str, raw_args: &str) -> String;
 ```
 
 ### `src/bridge.rs`
@@ -127,44 +135,45 @@
 
 ### `src/client.rs`
 ```rust
-  L014: pub struct ChatMessage { pub role: String, pub content: Value, pub tool_calls: Option<Value>, pub tool_call_id: Option<String> }
-  L024: impl ChatMessage {
-    L025: pub fn system(content: impl Into<String>) -> Self;
-    L034: pub fn user(content: impl Into<String>) -> Self;
-    L043: pub fn assistant(content: impl Into<String>) -> Self;
-    L052: pub fn tool_response(tool_call_id: String, content: String) -> Self;
-    L061: pub fn content_as_str(&self) -> &str;
+  L014: pub struct ChatMessage { pub role: String, pub content: Value, pub reasoning_content: Option<String>, ... (5 fields) }
+  L026: impl ChatMessage {
+    L027: pub fn system(content: impl Into<String>) -> Self;
+    L037: pub fn user(content: impl Into<String>) -> Self;
+    L047: pub fn assistant(content: impl Into<String>) -> Self;
+    L057: pub fn assistant_with_reasoning(content: impl Into<String>, reasoning: Option<String>) -> Self;
+    L067: pub fn tool_response(tool_call_id: String, content: String) -> Self;
+    L077: pub fn content_as_str(&self) -> &str;
   }
-  L066: pub struct LlmClient { pub reasoning_budget: std :: sync :: atomic :: AtomicI64 }
-  L072: impl LlmClient {
-    L073: pub fn set_reasoning_budget(&self, budget: Option<usize>);
-    L078: pub fn new(config: ProviderConfig) -> Self;
-    L086: pub async fn stream_chat_raw<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, mut on_chunk: F ,) -> Result<(String, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
-    L264: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<Vec<Value>>, UsageStats)>;
+  L082: pub struct LlmClient { pub reasoning_budget: std :: sync :: atomic :: AtomicI64 }
+  L088: impl LlmClient {
+    L089: pub fn set_reasoning_budget(&self, budget: Option<usize>);
+    L094: pub fn new(config: ProviderConfig) -> Self;
+    L102: pub async fn stream_chat_raw<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, mut on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
+    L292: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>;
   }
 ```
 
 ### `src/config.rs`
 ```rust
   L026: pub enum ToolTier { PureBash, Smol }
-  L032: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, pub adapters: bool }
-  L041: impl Default for WorkspaceConfig {
-    L042: fn default() -> Self;
+  L032: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, ... (5 fields) }
+  L042: impl Default for WorkspaceConfig {
+    L043: fn default() -> Self;
   }
-  L052: impl WorkspaceConfig {
-    L053: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
-    L070: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
+  L054: impl WorkspaceConfig {
+    L055: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
+    L072: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
   }
-  L079: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
-  L135: pub fn get_env_path() -> PathBuf;
-  L141: pub fn ensure_env_file();
-  L184: pub fn get_max_tokens() -> usize;
-  L208: pub fn get_context_ceilings() -> ContextCeilings;
-  L245: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, pub max_tokens: usize }
-  L254: impl ProviderConfig {
-    L255: pub async fn load() -> Self;
+  L081: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
+  L137: pub fn get_env_path() -> PathBuf;
+  L143: pub fn ensure_env_file();
+  L193: pub fn get_max_tokens() -> usize;
+  L217: pub fn get_context_ceilings() -> ContextCeilings;
+  L254: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, pub max_tokens: usize }
+  L263: impl ProviderConfig {
+    L264: pub async fn load() -> Self;
   }
-  L340: pub fn load_global_instructions() -> Option<String>;
+  L349: pub fn load_global_instructions() -> Option<String>;
 ```
 
 ### `src/matcher.rs`
@@ -198,16 +207,16 @@
 
 ### `src/profile.rs`
 ```rust
-  L008: pub struct Profile { pub reasoning_budget: Option<usize>, pub tier: ToolTier, pub adapters: bool, ... (6 fields) }
-  L018: impl Profile {
-    L019: pub fn parse(raw_content: &str) -> Self;
-    L094: pub fn profile_dirs() -> Vec<PathBuf>;
-    L103: pub fn load(profile_name: &str) -> Option<Self>;
-    L131: pub fn list_available() -> Vec<String>;
-    L164: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
-    L187: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
-    L229: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
-    L272: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
+  L009: pub struct Profile { pub reasoning_budget: Option<usize>, pub tier: ToolTier, pub adapters: bool, ... (7 fields) }
+  L037: impl Profile {
+    L038: pub fn parse(raw_content: &str) -> Self;
+    L118: pub fn profile_dirs() -> Vec<PathBuf>;
+    L127: pub fn load(profile_name: &str) -> Option<Self>;
+    L198: pub fn list_available() -> Vec<String>;
+    L259: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
+    L287: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
+    L336: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
+    L379: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
   }
 ```
 
@@ -274,9 +283,10 @@
 
 ### `src/tools.rs`
 ```rust
-  L016: pub fn get_tools_schema(tier: &ToolTier) -> Value;
-  L020: pub async fn get_tools_schema_with_mcp(tier: &ToolTier, mcp_servers: &[String]) -> Value;
-  L152: pub async fn execute_tool(name: &str, raw_args: &str, workspace: &Path, boundary: &SecurityBoundary ,) -> Result<String, String>;
+  L018: pub fn get_tools_schema(tier: &ToolTier, delegate: bool) -> Value;
+  L022: pub async fn get_tools_schema_with_mcp(tier: &ToolTier, delegate: bool, mcp_servers: &[String]) -> Value;
+  L203: pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result<String, String>; // 3-Stage Resilient Replacer ported from py-agent (Exact -> Indent-Delta Whitespace -> Fuzzy)
+  L337: pub async fn execute_tool(name: &str, raw_args: &str, workspace: &Path, boundary: &SecurityBoundary ,) -> Result<String, String>;
 ```
 
 ### `src/ui.rs`

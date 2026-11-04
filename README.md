@@ -1,9 +1,9 @@
 <div align="center">
-  <img alt="rs-agent" src="logo.svg?v=2" height="800" />
+  <img alt="rs-agent" src="logo.svg?v=2" height="220" />
   <h1>rs-agent</h1>
  
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.8.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.9.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -154,6 +154,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 | `newp` | **Project Creator** | Scaffolds workspace, `.rs/config.json`, and auto-links router aliases |
 | `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) |
 | `ta` | **System Diagnostics** | 10-pass native verification suite testing binary integrity, safety, and UI |
+| `eva` | **Agentic Benchmark** | Full-stack `eval-stack` suite measuring par efficiency, token economy, and speed |
 
 </div>
 
@@ -164,7 +165,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 `rs-agent` discards heavy agent frameworks in favor of simple, predictable primitives:
 
 * **Sub-Millisecond Shell Intercept (`matcher.rs`):** `rs-hook.sh` intercepts terminal input and matches against `rs-context.md` in `< 0.2ms`. Typing `lfm` jumps into the target directory and launches the workspace instantly.
-* **Native 6-Tool Suite (`tools.rs`):** Minimal tool surface ready for SLM's and LLM's: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
+* **Native 6-Tool Suite (`tools.rs`):** Minimal tool surface ready for SLM and LLM: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
 * **Embedded ACP Bridge (`bridge.rs`):** Stdio JSON-RPC 2.0 server inside the core binary. Dispatches live file diffs for T3 Code review, handles multimodal image attachments, and streams token cancellation mid-turn.
 * **Autonomous Task Loop (`/task`):** Multi-step goal loop with failure decomposition (reminds models to inspect lines after tool errors) and anti-hallucination verification.
 * **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and heals broken JSON frames on the fly.
@@ -181,7 +182,26 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 | **Pure Chat** (`ai`) | **~180 tokens** | < 1ms startup · 0 MB idle | Conversational queries and fast reasoning |
 | **Pure Bash** (`purebash: true`) | **~95 tokens** | Single-tool dispatch loop | Low-parameter shell commands |
 | **Native 6-Tool** *(Default)* | **~680 tokens** | Full surgical suite | Code refactoring, test execution, and file search |
+| **Native 7-Tool** (`delegate: true`) | **~780 tokens** | Sub-agent recursion barrier | Complex code research & isolated sub-tasks |
 | **Context Router** (`matcher.rs`) | **0 tokens** | < 0.2ms shell lookup | Instant shortcut teleportation via `rs-context.md` |
+
+</div>
+
+---
+
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Agent Evaluation (<code>eval-stack</code>)</h2>
+
+<div align="center">
+
+| Rank | Model | Par Eff | Agent Index |
+| :---: | :--- | :---: | :---: |
+| **1** | **Flint-40B-A2.5B** | **120.0%** | **100.0 (A+)** |
+| **2** | **Sage-A1.5-35B** | **111.1%** | **100.0 (A+)** |
+| **3** | **Qwen3.8-35B-Distill** *(MTP)* | **136.4%** | **92.2 (A)** |
+| **—** | **LFM3-1.7B** *(SLM)* | **162.5%** | **100.0 (A+)** |
+| **—** | **Ling-3.0-tiny** *(SLM)* | **130.0%** | **97.3 (A+)** |
+
+<p><sub>Decision-grade evaluation via <code>eva</code>: 5-task autonomous suite measuring par efficiency, tool resilience, and token economy.</sub></p>
 
 </div>
 
@@ -198,6 +218,7 @@ adapters: true          # Tool argument repair (strips markdown fences, heals ne
 reasoning_budget: 500   # Thinking tokens clamp: 0 (off), 500 (medium), or omit for unrestricted
 memory: false           # Opt-in: injects workspace rules from .rs/memory.md if present
 purebash: false         # Optional: single bash tool (~95t schema). Omit for Native 6-tool suite (~680t)
+delegate: true          # Opt-in: adds delegate_task tool (~100t) for sub-agents. Omit for Native 6-tool
 mcp: photocraft         # Connect MCP apps (e.g. photocraft, blender). Omit for pure 6-tool
 ---
 ```

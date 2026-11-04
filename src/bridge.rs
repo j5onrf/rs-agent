@@ -265,7 +265,7 @@ async fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>, boo
 
     let mcp_servers = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
     let active_tools = if is_agent {
-        Some(tools::get_tools_schema_with_mcp(&cfg.tier, &mcp_servers).await)
+        Some(tools::get_tools_schema_with_mcp(&cfg.tier, false, &mcp_servers).await)
     } else {
         None
     };
@@ -750,7 +750,7 @@ pub async fn run_bridge() -> Result<()> {
                 let sess_lock = sessions.lock().await;
                 let is_agent = sess_lock.get(&active_session_id).map(|s| s.is_agent).unwrap_or(true);
                 let schema = if is_agent {
-                    tools::get_tools_schema(&config::ToolTier::Smol)
+                    tools::get_tools_schema(&config::ToolTier::Smol, false)
                 } else {
                     json!([])
                 };

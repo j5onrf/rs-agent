@@ -12,6 +12,7 @@ pub struct Profile {
     pub tier: ToolTier,
     pub adapters: bool,
     pub memory: bool,
+    pub delegate: bool,
     pub system_prompt: String,
     pub mcp_servers: Vec<String>,
 }
@@ -39,6 +40,7 @@ impl Profile {
         let mut tier = ToolTier::Smol;
         let mut adapters = false;
         let mut memory = false;
+        let mut delegate = false;
         let mut mcp_servers = Vec::new();
         let mut body = String::new();
         let mut in_frontmatter = false;
@@ -81,6 +83,9 @@ impl Profile {
                         "memory" => {
                             memory = val.eq_ignore_ascii_case("true");
                         }
+                        "delegate" | "subagent" | "subagents" => {
+                            delegate = val.eq_ignore_ascii_case("true");
+                        }
                         "mcp" => {
                             let clean = val.trim_matches('[').trim_matches(']').trim();
                             for item in clean.split(',') {
@@ -104,6 +109,7 @@ impl Profile {
             tier,
             adapters,
             memory,
+            delegate,
             system_prompt: body.trim().to_string(),
             mcp_servers,
         }
