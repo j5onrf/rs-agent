@@ -134,6 +134,7 @@ impl LlmClient {
 
         let mut stream = response.bytes_stream().eventsource();
         let mut full_response = String::new();
+        let mut full_reasoning = String::new();
         let mut in_thinking = false;
         let mut stats = UsageStats::default();
         let mut tool_calls_map: std::collections::BTreeMap<usize, (String, String, String)> = std::collections::BTreeMap::new();
@@ -188,6 +189,7 @@ impl LlmClient {
                     {
                         if !reasoning.is_empty() {
                             on_chunk(reasoning, true);
+                            full_reasoning.push_str(reasoning);
                         }
                     }
 
@@ -202,6 +204,7 @@ impl LlmClient {
                             if chunk_slice.contains("</think>") {
                                 let parts: Vec<&str> = chunk_slice.splitn(2, "</think>").collect();
                                 on_chunk(parts[0], true);
+                                full_reasoning.push_str(parts[0]);
                                 in_thinking = false;
                                 if parts.len() > 1 && !parts[1].is_empty() {
                                     on_chunk(parts[1], false);
@@ -209,7 +212,9 @@ impl LlmClient {
                                 }
                             } else {
                                 on_chunk(chunk_slice, in_thinking);
-                                if !in_thinking {
+                                if in_thinking {
+                                    full_reasoning.push_str(chunk_slice);
+                                } else {
                                     full_response.push_str(chunk_slice);
                                 }
                             }
@@ -258,7 +263,14 @@ impl LlmClient {
             None
         };
 
-        Ok((full_response, tool_calls, stats))
+        // Reconstruct <think> block in returned assistant message so llama-server retains 95%+ KV cache hit
+        let final_response = if !full_reasoning.is_empty() {
+            format!("<think>\n{}\n</think>\n\n{}", full_reasoning.trim(), full_response.trim_start())
+        } else {
+            full_response
+        };
+
+        Ok((final_response, tool_calls, stats))
     }
 
     pub async fn stream_chat(
@@ -310,6 +322,7 @@ impl LlmClient {
 
         let mut stream = response.bytes_stream().eventsource();
         let mut full_response = String::new();
+        let mut full_reasoning = String::new();
         let mut in_thinking = false;
         let mut stats = UsageStats::default();
         let mut tool_calls_map: std::collections::BTreeMap<usize, (String, String, String)> = std::collections::BTreeMap::new();
@@ -359,6 +372,7 @@ impl LlmClient {
                         if !reasoning.is_empty() {
                             spinner.stop();
                             renderer.on_chunk(reasoning, true);
+                            full_reasoning.push_str(reasoning);
                         }
                     }
 
@@ -374,6 +388,7 @@ impl LlmClient {
                             if chunk_slice.contains("</think>") {
                                 let parts: Vec<&str> = chunk_slice.splitn(2, "</think>").collect();
                                 renderer.on_chunk(parts[0], true);
+                                full_reasoning.push_str(parts[0]);
                                 in_thinking = false;
                                 if parts.len() > 1 && !parts[1].is_empty() {
                                     renderer.on_chunk(parts[1], false);
@@ -381,7 +396,9 @@ impl LlmClient {
                                 }
                             } else {
                                 renderer.on_chunk(chunk_slice, in_thinking);
-                                if !in_thinking {
+                                if in_thinking {
+                                    full_reasoning.push_str(chunk_slice);
+                                } else {
                                     full_response.push_str(chunk_slice);
                                 }
                             }
@@ -436,6 +453,13 @@ impl LlmClient {
             None
         };
 
-        Ok((full_response, tool_calls, stats))
+        // Reconstruct <think> block in returned assistant message so llama-server retains 95%+ KV cache hit
+        let final_response = if !full_reasoning.is_empty() {
+            format!("<think>\n{}\n</think>\n\n{}", full_reasoning.trim(), full_response.trim_start())
+        } else {
+            full_response
+        };
+
+        Ok((final_response, tool_calls, stats))
     }
 }
