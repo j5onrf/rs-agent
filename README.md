@@ -154,7 +154,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 | `newp` | **Project Creator** | Scaffolds workspace, `.rs/config.json`, and auto-links router aliases |
 | `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) |
 | `ta` | **System Diagnostics** | 10-pass native verification suite testing binary integrity, safety, and UI |
-| `eva` | **Agentic Benchmark** | Full-stack `eval-stack` suite measuring par efficiency, token economy, and speed |
+| `eva` | **Agentic Benchmark** | Full-stack `eval-stack` measuring par efficiency and token economy |
 
 </div>
 
