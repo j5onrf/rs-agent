@@ -16,6 +16,8 @@ pub struct ChatMessage {
     pub role: String,
     pub content: Value,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_calls: Option<Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
@@ -26,6 +28,7 @@ impl ChatMessage {
         Self {
             role: "system".into(),
             content: Value::String(content.into()),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: None,
         }
@@ -35,6 +38,7 @@ impl ChatMessage {
         Self {
             role: "user".into(),
             content: Value::String(content.into()),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: None,
         }
@@ -44,6 +48,17 @@ impl ChatMessage {
         Self {
             role: "assistant".into(),
             content: Value::String(content.into()),
+            reasoning_content: None,
+            tool_calls: None,
+            tool_call_id: None,
+        }
+    }
+
+    pub fn assistant_with_reasoning(content: impl Into<String>, reasoning: Option<String>) -> Self {
+        Self {
+            role: "assistant".into(),
+            content: Value::String(content.into()),
+            reasoning_content: reasoning,
             tool_calls: None,
             tool_call_id: None,
         }
@@ -53,6 +68,7 @@ impl ChatMessage {
         Self {
             role: "tool".into(),
             content: Value::String(content),
+            reasoning_content: None,
             tool_calls: None,
             tool_call_id: Some(tool_call_id),
         }
@@ -89,7 +105,7 @@ impl LlmClient {
         tools: Option<Value>,
         cancel_flag: Option<Arc<AtomicBool>>,
         mut on_chunk: F,
-    ) -> Result<(String, Option<Vec<Value>>, UsageStats)>
+    ) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>
     where
         F: FnMut(&str, bool) + Send,
     {
@@ -97,6 +113,7 @@ impl LlmClient {
             "model": self.config.model,
             "messages": messages,
             "stream": true,
+            "cache_prompt": true,
             "stream_options": { "include_usage": true }
         });
 
@@ -263,14 +280,13 @@ impl LlmClient {
             None
         };
 
-        // Reconstruct <think> block in returned assistant message so llama-server retains 95%+ KV cache hit
-        let final_response = if !full_reasoning.is_empty() {
-            format!("<think>\n{}\n</think>\n\n{}", full_reasoning.trim(), full_response.trim_start())
+        let opt_reasoning = if !full_reasoning.is_empty() {
+            Some(full_reasoning)
         } else {
-            full_response
+            None
         };
 
-        Ok((final_response, tool_calls, stats))
+        Ok((full_response, opt_reasoning, tool_calls, stats))
     }
 
     pub async fn stream_chat(
@@ -279,11 +295,12 @@ impl LlmClient {
         tools: Option<Value>,
         renderer: &mut StreamRenderer,
         spinner: &mut InlineSpinner,
-    ) -> Result<(String, Option<Vec<Value>>, UsageStats)> {
+    ) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)> {
         let mut body = serde_json::json!({
             "model": self.config.model,
             "messages": messages,
             "stream": true,
+            "cache_prompt": true,
             "stream_options": { "include_usage": true }
         });
 
@@ -453,13 +470,12 @@ impl LlmClient {
             None
         };
 
-        // Reconstruct <think> block in returned assistant message so llama-server retains 95%+ KV cache hit
-        let final_response = if !full_reasoning.is_empty() {
-            format!("<think>\n{}\n</think>\n\n{}", full_reasoning.trim(), full_response.trim_start())
+        let opt_reasoning = if !full_reasoning.is_empty() {
+            Some(full_reasoning)
         } else {
-            full_response
+            None
         };
 
-        Ok((final_response, tool_calls, stats))
+        Ok((full_response, opt_reasoning, tool_calls, stats))
     }
 }

@@ -233,7 +233,7 @@ async fn execute_task_loop(
         let mut renderer = StreamRenderer::new();
         spinner.start("Executing autonomous step...");
 
-        let (reply, tool_calls, stats) = client.stream_chat(
+        let (reply, reasoning, tool_calls, stats) = client.stream_chat(
             history,
             active_tools.clone(),
             &mut renderer,
@@ -247,7 +247,7 @@ async fn execute_task_loop(
 
         if let Some(calls) = tool_calls {
             if !calls.is_empty() {
-                let mut assistant_msg = ChatMessage::assistant(reply.clone());
+                let mut assistant_msg = ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone());
                 assistant_msg.tool_calls = Some(serde_json::Value::Array(calls.clone()));
                 history.push(assistant_msg);
 
@@ -696,7 +696,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 spinner.start("Evaluating tool results...");
             }
 
-            let (reply, tool_calls, stats) = client.stream_chat(
+            let (reply, reasoning, tool_calls, stats) = client.stream_chat(
                 &history,
                 active_tools.clone(),
                 &mut renderer,
@@ -713,12 +713,12 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     println!("  \x1b[2m{}\x1b[0m\n", formatted_skills);
                 }
 
-                history.push(ChatMessage::assistant(reply));
+                history.push(ChatMessage::assistant_with_reasoning(reply, reasoning));
                 break;
             }
 
             let calls = tool_calls.unwrap();
-            let mut assistant_msg = ChatMessage::assistant(reply);
+            let mut assistant_msg = ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone());
             assistant_msg.tool_calls = Some(serde_json::Value::Array(calls.clone()));
             history.push(assistant_msg);
 

@@ -551,6 +551,7 @@ pub async fn run_bridge() -> Result<()> {
                                 sess.history.push(ChatMessage {
                                     role: "user".into(),
                                     content: Value::Array(parts),
+                    reasoning_content: None,
                                     tool_calls: None,
                                     tool_call_id: None,
                                 });
@@ -589,7 +590,7 @@ pub async fn run_bridge() -> Result<()> {
                         ).await;
 
                         match stream_res {
-                            Ok((reply, tool_calls, _stats)) => {
+                            Ok((reply, reasoning, tool_calls, _stats)) => {
                                 if cancel_flag.load(Ordering::SeqCst) {
                                     send_acp_chunk(&sid, "\n\n*(Cancelled)*", false);
                                     break;
@@ -597,7 +598,7 @@ pub async fn run_bridge() -> Result<()> {
 
                                 if let Some(calls) = tool_calls {
                                     if !calls.is_empty() && is_agent {
-                                        let mut assistant_msg = ChatMessage::assistant(reply.clone());
+                                        let mut assistant_msg = ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone());
                                         assistant_msg.tool_calls = Some(Value::Array(calls.clone()));
                                         history.push(assistant_msg);
 
@@ -720,11 +721,11 @@ pub async fn run_bridge() -> Result<()> {
                                             history.push(ChatMessage::tool_response(call_id, out));
                                         }
                                     } else {
-                                        history.push(ChatMessage::assistant(reply));
+                                        history.push(ChatMessage::assistant_with_reasoning(reply, reasoning));
                                         break;
                                     }
                                 } else {
-                                    history.push(ChatMessage::assistant(reply));
+                                    history.push(ChatMessage::assistant_with_reasoning(reply, reasoning));
                                     break;
                                 }
                             }
