@@ -191,6 +191,11 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 <h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="46" /> Agent Evaluation (<code>eval-stack</code>)</h2>
 
+<p align="center">
+  Decision-grade evaluation across 5-stage agentic challenges (<code>eval-stack</code>).<br>
+  <sub>Results scale with tuning: select a model foundation and optimize for your workload via profile directives, sampling flags, and <code>adapters</code>.</sub>
+</p>
+
 <div align="center">
 
 | Rank | Model | Par Eff | Agent Index |
