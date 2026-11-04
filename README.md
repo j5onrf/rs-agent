@@ -246,7 +246,7 @@ mcp: photocraft         # Connect MCP apps (e.g. photocraft, blender). Omit for 
 
 * **Profiles (`profiles/`):** Model configurations and system personas (e.g. `lfm3.md`, `lingtiny.md`, `chat.md`). Run `newp` to scaffold new workspaces with interactive profile selection.
 * **Skills (`skills/`):** Modular runtime directives toggled via `/s` or T3 Code's `$` picker (e.g. `ponytail.md` for YAGNI minimalism, `humanizer.md` for clean output, `ub-mode.md` for clean craftsmanship).
-* **Runtime Adapters (`adapters: true`):** In-memory heuristic kernel (`adapter.rs`) that strips copied line gutters, heals broken JSON, and normalizes key aliases. Recommended for both SLMs and ~35B LLMs to eliminate tool retry loops.
+* **Runtime Adapters (`adapters: true`):** In-memory heuristic kernel (`adapter.rs`) that strips copied line gutters, heals broken JSON, and normalizes key aliases. Strongly recommended for both SLMs and ~35B 4-bit quant LLMs to eliminate syntax retry loops.
 * **Workspace Memory (`.rs/memory.md`):** Optional, project-isolated rules loaded into context when `memory: true` is set in the profile frontmatter.
 * **Global Rules (`system_instructions.md`):** Universal directives loaded across every profile and workspace.
 
