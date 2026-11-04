@@ -187,6 +187,22 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 </div>
 
+<div align="center">
+
+### Context Ceilings & Scratchpad Scaling
+<sub>File inspection and command outputs dynamically adapt to <code>AI_MAX_TOKENS</code> to protect the context window:</sub>
+
+| Budget (`AI_MAX_TOKENS`) | Target Environment | Line Ceiling (`read_file`) | Character Cap (`run_command`) |
+| :--- | :--- | :---: | :---: |
+| **<= 16k** | Edge / Local SLM (LFM3, Ling) | **250 lines** | ~20,000 chars |
+| **32k** | Balanced Local LLM | **1,000 lines** | ~45,000 chars |
+| **64k** | Extended Reasoning | **2,000 lines** | ~90,000 chars |
+| **>= 128k** | Cloud / Massive LLMs (Gemini, DeepSeek) | **4,000 lines** | ~180,000 chars |
+
+<p><sub>When outputs exceed limits, raw output is automatically offloaded to <code>.rs/scratchpad.log</code> and a truncated preview is returned to model context.</sub></p>
+
+</div>
+
 ---
 
 <h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="46" /> Agent Evaluation (<code>eval-stack</code>)</h2>
