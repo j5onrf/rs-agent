@@ -20,8 +20,6 @@
     <sub>Sub-millisecond boot, autonomous 6-tool execution loop, zero-trust security kernel, and edge-model JSON repair.</sub>
   </p>
 
-  <br>
-
   <table>
     <tr>
       <td align="center" width="28%" valign="top">
