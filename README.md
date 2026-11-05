@@ -223,7 +223,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 | **—** | **LFM3-1.7B** *(SLM)* | **162.5%** | **100.0 (A+)** |
 | **—** | **Ling-3.0-tiny** *(SLM)* | **130.0%** | **97.3 (A+)** |
 
-<p><sub>Decision-grade evaluation via <code>eva</code>: 5-task autonomous suite measuring par efficiency, tool resilience, and token economy.</sub></p>
+<p><sub>Decision-grade evaluation via <code>eva</code>: Autonomous eval measuring par efficiency, tool resilience, and token economy.</sub></p>
 
 </div>
 
