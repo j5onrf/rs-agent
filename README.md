@@ -181,8 +181,8 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 | :--- | :---: | :---: | :--- |
 | **Pure Chat** (`ai`) | **~180 tokens** | < 1ms startup · 0 MB idle | Conversational queries and fast reasoning |
 | **Pure Bash** (`purebash: true`) | **~95 tokens** | Single-tool dispatch loop | Low-parameter shell commands |
-| **Core 4-Tool** (`core4: true`) | **~480 tokens** | Minimal coding suite | 35B+ LLMs and Cloud endpoints relying on shell tools |
-| **Native 6-Tool** *(Default)* | **~680 tokens** | Full surgical suite | Code refactoring, test execution, and file search |
+| **Core 4-Tool** (`core4: true`) | **~480 tokens** | Minimal | 27B+ LLMs and Cloud endpoints relying on shell tools |
+| **Native 6-Tool** *(Default)* | **~680 tokens** | Full | Code refactoring, test execution, and file search |
 | **Native 7-Tool** (`delegate: true`) | **~780 tokens** | Sub-agent recursion barrier | Complex code research & isolated sub-tasks |
 | **Context Router** (`matcher.rs`) | **0 tokens** | < 0.2ms shell lookup | Instant shortcut teleportation via `rs-context.md` |
 
