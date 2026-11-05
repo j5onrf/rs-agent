@@ -223,7 +223,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 | **—** | **LFM3-1.7B** *(SLM)* | **162.5%** | **100.0 (A+)** |
 | **—** | **Ling-3.0-tiny** *(SLM)* | **130.0%** | **97.3 (A+)** |
 
-<p><sub>Decision-grade evaluation via <code>eva</code>: Autonomous eval measuring par efficiency, tool resilience, and token economy.</sub></p>
+<p><sub>Decision-grade evaluation via <code>eva</code>: autonomous eval measuring par efficiency, tool resilience, and token economy.</sub></p>
 
 </div>
 
@@ -249,6 +249,7 @@ mcp: photocraft         # Connect MCP apps (e.g. photocraft, blender). Omit for 
 * **Profiles (`profiles/`):** Model configurations and system personas (e.g. `lfm3.md`, `lingtiny.md`, `chat.md`). Run `newp` to scaffold new workspaces with interactive profile selection.
 * **Skills (`skills/`):** Modular runtime directives toggled via `/s` or T3 Code's `$` picker (e.g. `ponytail.md` for YAGNI minimalism, `humanizer.md` for clean output, `ub-mode.md` for clean craftsmanship).
 * **Runtime Adapters (`adapters: true`):** In-memory heuristic kernel (`adapter.rs`) that strips copied line gutters, heals broken JSON, and normalizes key aliases. Strongly recommended for both SLMs and ~35B 4-bit quant LLMs to eliminate syntax retry loops.
+* **Core 4-Tool (`core4: true`):** Minimal option (`read_file`, `edit_file`, `write_file`, `run_command`) saving ~200t/turn. Designed for low token usage on 27B+ and cloud models that handle discovery directly via `run_command`.
 * **Workspace Memory (`.rs/memory.md`):** Optional, project-isolated rules loaded into context when `memory: true` is set in the profile frontmatter.
 * **Global Rules (`system_instructions.md`):** Universal directives loaded across every profile and workspace.
 
