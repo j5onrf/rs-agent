@@ -142,7 +142,7 @@
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Developer Tool Suite</h2>
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Developer Tools</h2>
 
 Standalone native Rust binaries deployed in `tools/` for zero-overhead project maintenance:
 
