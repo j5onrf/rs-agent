@@ -332,7 +332,7 @@ pub async fn run_bridge() -> Result<()> {
                         },
                         "agentInfo": {
                             "name": "rs-agent",
-                            "version": "0.4.5"
+                            "version": env!("CARGO_PKG_VERSION")
                         }
                     })),
                     None,

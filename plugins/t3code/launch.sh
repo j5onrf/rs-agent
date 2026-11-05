@@ -3,7 +3,7 @@ set -eo pipefail
 
 PLUGIN_DIR="$HOME/.config/rs-agent/plugins/t3code"
 BRIDGE_BIN="$HOME/.config/rs-agent/plugins/t3code/t3code-bridge"
-[[ -f "$BRIDGE_BIN" ]] || BRIDGE_BIN="$HOME/.config/rs-agent/plugins/t3code/t3code-bridge"
+[[ -x "$BRIDGE_BIN" ]] || BRIDGE_BIN="$HOME/.config/rs-agent/bin/ai"
 
 T3_BIN="$(command -v t3code || command -v t3 || true)"
 T3_CLI="$HOME/.t3/bin/t3"
@@ -41,10 +41,7 @@ fi
 
 export AI_WORKSPACE_PATH="$TARGET_WORKSPACE"
 export RSAGENT_BRIDGE="$BRIDGE_BIN"
-export PYAGENT_BRIDGE="$BRIDGE_BIN"
-export PYAGENT_BRIDGE="$BRIDGE_BIN"
-export PYAGENT_BRIDGE="$BRIDGE_BIN --bridge"
-export PYAGENT_BRIDGE="$BRIDGE_BIN"
+export AI_INSTANCE_ID="${AI_INSTANCE_ID:-1}"
 export T3CODE_HOME="${T3CODE_HOME:-$HOME/.t3}"
 
 cd "$TARGET_WORKSPACE"

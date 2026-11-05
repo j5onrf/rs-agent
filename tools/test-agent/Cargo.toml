@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 dirs = "5.0"
+
+[workspace]

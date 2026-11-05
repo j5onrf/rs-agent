@@ -147,6 +147,44 @@ fn handle_new_project(name: &str, intents_arg: Option<&str>) -> anyhow::Result<(
     Ok(())
 }
 
+
+extern "C" {
+    fn kill(pid: i32, sig: i32) -> i32;
+}
+
+fn resolve_instance_number(profile: &str) -> (usize, PathBuf) {
+    let shm_dir = PathBuf::from("/dev/shm/rs-agent-instances");
+    let _ = fs::create_dir_all(&shm_dir);
+
+    // Clean up stale PIDs and count active matching instances
+    let mut active_count = 0;
+    if let Ok(entries) = fs::read_dir(&shm_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
+                let parts: Vec<&str> = fname.split('.').collect();
+                if parts.len() == 2 {
+                    if let Ok(pid) = parts[0].parse::<i32>() {
+                        // Check if process is still running
+                        let is_alive = unsafe { kill(pid, 0) == 0 };
+                        if !is_alive {
+                            let _ = fs::remove_file(&path);
+                        } else if parts[1] == profile {
+                            active_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let instance_num = active_count + 1;
+    let my_pid = std::process::id();
+    let lock_file = shm_dir.join(format!("{}.{}", my_pid, profile));
+    let _ = fs::write(&lock_file, instance_num.to_string());
+    (instance_num, lock_file)
+}
+
 fn build_system_prompt(
     _is_agent: bool,
     _target_dir: &Path,
@@ -334,7 +372,24 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     client.set_reasoning_budget(active_profile.as_ref().and_then(|p| p.reasoning_budget));
 
     let mut active_skills: Vec<String> = Vec::new();
-    let second_line = if cfg.is_agent { cfg.profile_name.clone() } else { "chat".to_string() };
+    let (instance_num, _lock_guard) = resolve_instance_number(&cfg.profile_name);
+    let second_line = if cfg.is_agent {
+        if instance_num > 1 {
+            format!("{} · {}", cfg.profile_name, instance_num)
+        } else {
+            cfg.profile_name.clone()
+        }
+    } else {
+        if instance_num > 1 {
+            format!("chat · {}", instance_num)
+        } else {
+            "chat".to_string()
+        }
+    };
+
+    // Update Kitty / Hyprland window title
+    print!("\x1b]0;rs-agent: {}\x07", second_line);
+    let _ = io::stdout().flush();
 
     let mut current_box_style = state::get_box_style();
     let mut buffered_char = ui::draw_box(&provider.model, &second_line, current_box_style, true);
