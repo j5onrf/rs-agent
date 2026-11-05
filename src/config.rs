@@ -26,6 +26,7 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ToolTier {
     PureBash,
+    Core4,
     Smol,
 }
 

@@ -56,9 +56,9 @@ fn get_base_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
                 }
             }
         ]),
-        ToolTier::Smol => {
-            let mut base = json!([
-                {
+        ToolTier::Core4 | ToolTier::Smol => {
+            let mut tools_vec = vec![
+                json!({
                     "type": "function",
                     "function": {
                         "name": "read_file",
@@ -73,8 +73,8 @@ fn get_base_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
                             "required": ["path"]
                         }
                     }
-                },
-                {
+                }),
+                json!({
                     "type": "function",
                     "function": {
                         "name": "edit_file",
@@ -89,8 +89,8 @@ fn get_base_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
                             "required": ["path", "old_str", "new_str"]
                         }
                     }
-                },
-                {
+                }),
+                json!({
                     "type": "function",
                     "function": {
                         "name": "write_file",
@@ -105,8 +105,11 @@ fn get_base_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
                             "required": ["path", "content"]
                         }
                     }
-                },
-                {
+                }),
+            ];
+
+            if matches!(tier, ToolTier::Smol) {
+                tools_vec.push(json!({
                     "type": "function",
                     "function": {
                         "name": "list_dir",
@@ -118,8 +121,8 @@ fn get_base_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
                             }
                         }
                     }
-                },
-                {
+                }));
+                tools_vec.push(json!({
                     "type": "function",
                     "function": {
                         "name": "search_code",
@@ -133,42 +136,42 @@ fn get_base_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
                             "required": ["pattern"]
                         }
                     }
-                },
-                {
+                }));
+            }
+
+            tools_vec.push(json!({
+                "type": "function",
+                "function": {
+                    "name": "run_command",
+                    "description": "Run a shell command inside the workspace directory (auto-killed after 30s timeout).",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "command": { "type": "string", "description": "Command to execute." }
+                        },
+                        "required": ["command"]
+                    }
+                }
+            }));
+
+            if delegate {
+                tools_vec.push(json!({
                     "type": "function",
                     "function": {
-                        "name": "run_command",
-                        "description": "Run a shell command inside the workspace directory (auto-killed after 30s timeout).",
+                        "name": "delegate_task",
+                        "description": "Delegate an isolated sub-task or code research query to a temporary sub-agent. Returns only a concise summary report to keep context clean.",
                         "parameters": {
                             "type": "object",
                             "properties": {
-                                "command": { "type": "string", "description": "Command to execute." }
+                                "goal": { "type": "string", "description": "Specific isolated sub-task or code research objective." }
                             },
-                            "required": ["command"]
+                            "required": ["goal"]
                         }
                     }
-                }
-            ]);
-
-            if delegate {
-                if let Some(arr) = base.as_array_mut() {
-                    arr.push(json!({
-                        "type": "function",
-                        "function": {
-                            "name": "delegate_task",
-                            "description": "Delegate an isolated sub-task or code research query to a temporary sub-agent. Returns only a concise summary report to keep context clean.",
-                            "parameters": {
-                                "type": "object",
-                                "properties": {
-                                    "goal": { "type": "string", "description": "Specific isolated sub-task or code research objective." }
-                                },
-                                "required": ["goal"]
-                            }
-                        }
-                    }));
-                }
+                }));
             }
-            base
+
+            Value::Array(tools_vec)
         }
     }
 }
