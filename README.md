@@ -54,6 +54,8 @@
 
 ---
 
+<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Cli Box Styles</h2>
+
 ```console
 ~ ❯ ai
 ╭─ ○ ────────────────────────────────────────╮
