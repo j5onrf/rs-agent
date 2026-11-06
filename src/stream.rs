@@ -218,11 +218,7 @@ impl StreamRenderer {
         parts.push(format!("{:.1}s @ {:.1} t/s", elapsed_gen, speed));
 
         let stat_line = parts.join(" · ");
-        if self.pad {
-            println!("  \x1b[2m{}\x1b[0m\n", stat_line);
-        } else {
-            println!("  \x1b[2m{}\x1b[0m", stat_line);
-        }
+        println!("  \x1b[2m{}\x1b[0m\n", stat_line);
         let _ = io::stdout().flush();
     }
 }
