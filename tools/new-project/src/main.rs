@@ -55,6 +55,43 @@ fn list_profiles(root: &Path) -> Vec<String> {
     out
 }
 
+fn create_profile_file(root: &Path, raw_name: &str) -> String {
+    let clean = raw_name
+        .trim()
+        .trim_end_matches(".md")
+        .replace(' ', "-")
+        .to_lowercase();
+
+    let profiles_dir = root.join("profiles");
+    let _ = fs::create_dir_all(&profiles_dir);
+
+    let target_file = if clean.contains('/') {
+        let p = profiles_dir.join(format!("{}.md", clean));
+        if let Some(parent) = p.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        p
+    } else {
+        profiles_dir.join(format!("{}.md", clean))
+    };
+
+    if !target_file.exists() {
+        let content = format!(
+            "---\ndescription: \"{} Workspace Profile\"\nadapters: true\ncore4: false\nmemory: true\n---\nROLE: Autonomous Systems & Software Engineer for {}.\n\nDIRECTIVES:\n- Inspect -> Edit -> Verify.\n- Fast, clean, minimal execution without dead code or conversational filler.\n- Stop immediately when tests pass with '✓ Task complete: <summary>'.\n",
+            clean, clean
+        );
+        if let Err(e) = fs::write(&target_file, content) {
+            eprintln!("\x1b[1;31m[warn]\x1b[0m Could not write profile file: {}", e);
+        } else {
+            println!("\x1b[1;32m✓ Created new profile:\x1b[0m {}", target_file.display());
+        }
+    } else {
+        println!("\x1b[1;33m[info]\x1b[0m Profile file already exists: {}", target_file.display());
+    }
+
+    clean
+}
+
 fn main() {
     println!("\n{}=================================================={}", CYAN, RESET);
     println!("{}           rs-agent Project Creator               {}", CYAN, RESET);
@@ -96,19 +133,39 @@ fn main() {
     };
 
     println!("\n{}Available profiles:{} {}", YELLOW, RESET, profiles.join(", "));
+    println!("{}Tip:{} Choose an existing profile, enter 'new', or type a custom profile name.", CYAN, RESET);
     print!("{}Choose profile [default: {}]:{} ", GREEN, default_prof, RESET);
     io::stdout().flush().unwrap();
+
     let mut prof_input = String::new();
     io::stdin().read_line(&mut prof_input).unwrap();
     let input_str = prof_input.trim();
+
     let chosen_prof = if input_str.is_empty() {
         default_prof.to_string()
+    } else if input_str == "new" || input_str == "create" {
+        print!("{}Enter name for new profile [default: {}]:{} ", GREEN, clean_name, RESET);
+        io::stdout().flush().unwrap();
+        let mut new_prof_input = String::new();
+        io::stdin().read_line(&mut new_prof_input).unwrap();
+        let np = new_prof_input.trim();
+        let target_name = if np.is_empty() { &clean_name } else { np };
+        create_profile_file(&root, target_name)
+    } else if let Some(found) = profiles.iter().find(|p| *p == input_str || p.ends_with(&format!("/{}", input_str))) {
+        found.clone()
     } else {
-        profiles
-            .iter()
-            .find(|p| *p == input_str || p.ends_with(&format!("/{}", input_str)))
-            .cloned()
-            .unwrap_or_else(|| input_str.to_string())
+        // Name was entered that does not exist in profiles/
+        print!("{}Profile '{}' does not exist. Create ~/.config/rs-agent/profiles/{}.md? [Y/n]:{} ", YELLOW, input_str, input_str, RESET);
+        io::stdout().flush().unwrap();
+        let mut conf = String::new();
+        io::stdin().read_line(&mut conf).unwrap();
+        let conf_trim = conf.trim().to_lowercase();
+        if conf_trim.is_empty() || conf_trim == "y" || conf_trim == "yes" {
+            create_profile_file(&root, input_str)
+        } else {
+            println!("{}Falling back to default profile: {}{}", YELLOW, default_prof, RESET);
+            default_prof.to_string()
+        }
     };
 
     let meta_dir = proj_dir.join(".rs");

@@ -152,7 +152,10 @@ fn is_permission_approved(res: &Value) -> bool {
             let outcome_type = outcome.get("outcome").and_then(|v| v.as_str()).unwrap_or("");
             if outcome_type == "selected" {
                 let opt = outcome.get("optionId").and_then(|v| v.as_str()).unwrap_or("");
-                return opt != "deny" && opt != "reject" && opt != "reject_once" && opt != "reject_always";
+                return opt != "deny" && opt != "reject" && opt != "reject_once" && opt != "reject_always" && opt != "cancel";
+            }
+            if outcome_type == "cancelled" || outcome_type == "dismissed" {
+                return false;
             }
             return false;
         }
@@ -517,7 +520,6 @@ pub async fn run_bridge() -> Result<()> {
 
                 let clean_query = remaining_words.join(" ");
 
-                // If user only clicked/typed $skill without any query, acknowledge and finish turn immediately
                 if clean_query.trim().is_empty() && !found_skills.is_empty() {
                     let names: Vec<String> = found_skills.iter().map(|s| format!("${}", s.name)).collect();
                     send_acp_chunk(&sid, &format!("✓ Skill active: {}. Directives attached to system context for subsequent turns.", names.join(", ")), false);
@@ -551,7 +553,7 @@ pub async fn run_bridge() -> Result<()> {
                                 sess.history.push(ChatMessage {
                                     role: "user".into(),
                                     content: Value::Array(parts),
-                    reasoning_content: None,
+                                    reasoning_content: None,
                                     tool_calls: None,
                                     tool_call_id: None,
                                 });
@@ -601,6 +603,8 @@ pub async fn run_bridge() -> Result<()> {
                                         let mut assistant_msg = ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone());
                                         assistant_msg.tool_calls = Some(Value::Array(calls.clone()));
                                         history.push(assistant_msg);
+
+                                        let mut any_declined = false;
 
                                         for call in calls {
                                             if cancel_flag.load(Ordering::SeqCst) {
@@ -700,7 +704,8 @@ pub async fn run_bridge() -> Result<()> {
                                                 let perm_res = rx.await.unwrap_or_else(|_| json!({}));
                                                 if !is_permission_approved(&perm_res) {
                                                     send_acp_chunk(&sid, &format!("\n\n*Action `{}` was declined by user.*\n", fn_name), false);
-                                                    history.push(ChatMessage::tool_response(call_id, "User declined permission for this tool action.".to_string()));
+                                                    history.push(ChatMessage::tool_response(call_id, "User declined permission for this tool action. Do not retry this action; ask the user what to do next.".to_string()));
+                                                    any_declined = true;
                                                     continue;
                                                 }
                                             }
@@ -720,6 +725,11 @@ pub async fn run_bridge() -> Result<()> {
                                             };
                                             history.push(ChatMessage::tool_response(call_id, out));
                                         }
+
+                                        // If user explicitly denied permission, break loop cleanly instead of letting agent loop indefinitely
+                                        if any_declined {
+                                            break;
+                                        }
                                     } else {
                                         history.push(ChatMessage::assistant_with_reasoning(reply, reasoning));
                                         break;
@@ -730,7 +740,8 @@ pub async fn run_bridge() -> Result<()> {
                                 }
                             }
                             Err(e) => {
-                                send_acp_chunk(&sid, &format!("\n\n[Error: {}]\n", e), false);
+                                // Graceful non-crashing error output to T3 stream
+                                send_acp_chunk(&sid, &format!("\n\n*(Notice: {})*\n", e), false);
                                 break;
                             }
                         }
@@ -743,6 +754,7 @@ pub async fn run_bridge() -> Result<()> {
                         }
                     }
 
+                    // Turn terminates cleanly with end_turn stopReason
                     send_rpc(req_id_owned.as_ref(), Some(json!({ "stopReason": "end_turn" })), None);
                 });
             }

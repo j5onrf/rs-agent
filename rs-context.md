@@ -2,6 +2,8 @@
 
 ```properties
 # --- Workspaces ---
+ai init ~/.config/rs-agent/projects/newtes2 ---> newtes2
+ai init ~/.config/rs-agent/projects/testp ---> testp
 ai init ~/.config/rs-agent/projects/lfm3 ---> lfm3, lfm
 ai init ~/.config/rs-agent/projects/ling-tiny ---> ling, ling-tiny, lingtiny
 ai init ~/.config/rs-agent/projects/clover ---> clover, clov

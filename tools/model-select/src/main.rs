@@ -3,7 +3,7 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType};
 use std::fs;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 struct RawModeGuard;
 impl Drop for RawModeGuard {
@@ -21,7 +21,6 @@ struct CustomSlot {
     model: String,
     key_line_idx: Option<usize>,
     is_active: bool,
-    saved_key: String,
 }
 
 fn get_icon_for_slot(name: &str) -> &'static str {
@@ -66,6 +65,56 @@ fn extract_quoted_val(line: &str) -> &str {
     ""
 }
 
+fn strip_leading_comment(line: &str) -> &str {
+    line.trim().trim_start_matches('#').trim_start()
+}
+
+// Atomic .env writer with 0600 permissions
+fn save_to_env(
+    env_path: &Path,
+    lines: &mut [String],
+    custom_slots: &[CustomSlot],
+    max_tokens: usize,
+    tokens_line_idx: Option<usize>,
+    max_rounds: usize,
+    rounds_line_idx: Option<usize>,
+) -> std::io::Result<()> {
+    for slot in custom_slots {
+        if let Some(l_idx) = slot.key_line_idx {
+            let raw = strip_leading_comment(&lines[l_idx]);
+            if slot.is_active {
+                lines[l_idx] = raw.to_string();
+            } else {
+                lines[l_idx] = format!("# {}", raw);
+            }
+        }
+    }
+
+    if let Some(l_idx) = tokens_line_idx {
+        lines[l_idx] = format!("AI_MAX_TOKENS=\"{}\"", max_tokens);
+    }
+
+    if let Some(l_idx) = rounds_line_idx {
+        lines[l_idx] = format!("AI_MAX_AGENT_ROUNDS=\"{}\"", max_rounds);
+    }
+
+    let mut out_content = lines.join("\n");
+    if !out_content.ends_with('\n') {
+        out_content.push('\n');
+    }
+
+    let parent = env_path.parent().unwrap_or(Path::new("."));
+    let tmp_path = parent.join(format!(".env.tmp.{}", std::process::id()));
+    fs::write(&tmp_path, &out_content)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&tmp_path, fs::Permissions::from_mode(0o600));
+    }
+    fs::rename(&tmp_path, env_path)?;
+    Ok(())
+}
+
 fn main() -> std::io::Result<()> {
     let env_path = get_env_path();
     let raw_env = fs::read_to_string(&env_path).unwrap_or_default();
@@ -91,7 +140,6 @@ fn main() -> std::io::Result<()> {
         let mut slot_model = "default".to_string();
         let mut key_idx = None;
         let mut is_active = false;
-        let mut saved_key = String::new();
 
         for (idx, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
@@ -109,10 +157,6 @@ fn main() -> std::io::Result<()> {
                 }
             } else if uncommented.starts_with(&key_prefix) || (i == 1 && uncommented.starts_with("CUSTOM_API_KEY")) {
                 key_idx = Some(idx);
-                let val = extract_quoted_val(uncommented);
-                if !val.is_empty() && !val.contains("your_key_here") {
-                    saved_key = val.to_string();
-                }
                 is_active = !trimmed.starts_with('#');
             }
         }
@@ -123,7 +167,6 @@ fn main() -> std::io::Result<()> {
             model: slot_model,
             key_line_idx: key_idx,
             is_active,
-            saved_key,
         });
     }
 
@@ -163,6 +206,7 @@ fn main() -> std::io::Result<()> {
     let exit_idx = num_slots + 2;
     let total_options = num_slots + 3;
     let mut cursor = 0;
+    let mut status_message: Option<String> = None;
 
     loop {
         let mut buf = String::with_capacity(2048);
@@ -173,21 +217,20 @@ fn main() -> std::io::Result<()> {
             let pointer = if cursor == idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
             let icon = get_icon_for_slot(&slot.name);
             let status = if slot.is_active {
-                format!("\x1b[1;33m{}\x1b[0m", slot.model)
+                format!("\x1b[1;32m{}\x1b[0m", slot.model)
             } else {
                 "\x1b[90mDISABLED\x1b[0m".to_string()
             };
             buf.push_str(&format!("   {} {}  \x1b[1;37m{:<28}\x1b[0m {}\r\n", pointer, icon, slot.name, status));
         }
 
-        // Whitespace separation
         buf.push_str("\r\n");
 
-        // Token Budget
+        // Context Budget
         let tok_ptr = if cursor == tok_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
         buf.push_str(&format!("   {} 🧠  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{} tokens\x1b[0m\r\n", tok_ptr, "Context Budget", max_tokens));
 
-        // Agent Rounds Limit
+        // Task Loop Limit
         let rnd_ptr = if cursor == rnd_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
         buf.push_str(&format!("   {} 🔄  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{} steps\x1b[0m\r\n\r\n", rnd_ptr, "Task Loop Limit", max_rounds));
 
@@ -195,7 +238,13 @@ fn main() -> std::io::Result<()> {
         let exit_ptr = if cursor == exit_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
         buf.push_str(&format!("   {} ✕  \x1b[1;32mSave & Exit\x1b[0m\r\n", exit_ptr));
         buf.push_str("   \x1b[90m────────────────────────────────────────────────────────────\x1b[0m\r\n");
-        buf.push_str("   \x1b[90m▲/▼: Navigate | Space: Toggle | Enter: Select | Q: Quit\x1b[0m\r\n");
+
+        // Status or navigation help
+        if let Some(ref msg) = status_message {
+            buf.push_str(&format!("   {}\r\n", msg));
+        } else {
+            buf.push_str("   \x1b[90m▲/▼: Navigate | Enter/Space: Toggle | Q/Esc: Exit\x1b[0m\r\n");
+        }
 
         print!("{}", buf);
         stdout.flush()?;
@@ -212,13 +261,25 @@ fn main() -> std::io::Result<()> {
                 KeyCode::Down | KeyCode::Char('j') => {
                     cursor = if cursor + 1 < total_options { cursor + 1 } else { 0 };
                 }
-                KeyCode::Char(' ') | KeyCode::Enter => {
+                KeyCode::Enter | KeyCode::Char(' ') => {
                     if cursor < num_slots {
+                        // Toggle state: if currently on, turn off; if off, turn on
                         let will_activate = !custom_slots[cursor].is_active;
+
                         for slot in &mut custom_slots {
                             slot.is_active = false;
                         }
                         custom_slots[cursor].is_active = will_activate;
+
+                        // Atomic write immediately to .env
+                        let _ = save_to_env(&env_path, &mut lines, &custom_slots, max_tokens, tokens_line_idx, max_rounds, rounds_line_idx);
+
+                        let icon = get_icon_for_slot(&custom_slots[cursor].name);
+                        if will_activate {
+                            status_message = Some(format!("\x1b[1;32m✓\x1b[0m {} \x1b[1;37m{}\x1b[0m enabled ({}) \x1b[2m[saved]\x1b[0m", icon, custom_slots[cursor].name, custom_slots[cursor].model));
+                        } else {
+                            status_message = Some(format!("\x1b[1;33m✓\x1b[0m {} \x1b[1;37m{}\x1b[0m disabled. Local :8080 active \x1b[2m[saved]\x1b[0m", icon, custom_slots[cursor].name));
+                        }
                     } else if cursor == tok_idx {
                         max_tokens = match max_tokens {
                             4096 => 8192,
@@ -227,6 +288,8 @@ fn main() -> std::io::Result<()> {
                             32768 => 65536,
                             _ => 4096,
                         };
+                        let _ = save_to_env(&env_path, &mut lines, &custom_slots, max_tokens, tokens_line_idx, max_rounds, rounds_line_idx);
+                        status_message = Some(format!("\x1b[1;32m✓\x1b[0m Context Budget: \x1b[1;33m{} tokens\x1b[0m \x1b[2m[saved]\x1b[0m", max_tokens));
                     } else if cursor == rnd_idx {
                         max_rounds = match max_rounds {
                             5 => 10,
@@ -236,7 +299,10 @@ fn main() -> std::io::Result<()> {
                             25 => 30,
                             _ => 5,
                         };
+                        let _ = save_to_env(&env_path, &mut lines, &custom_slots, max_tokens, tokens_line_idx, max_rounds, rounds_line_idx);
+                        status_message = Some(format!("\x1b[1;32m✓\x1b[0m Task Loop Limit: \x1b[1;33m{} steps\x1b[0m \x1b[2m[saved]\x1b[0m", max_rounds));
                     } else {
+                        // cursor == exit_idx ("Save & Exit")
                         break;
                     }
                 }
@@ -248,41 +314,11 @@ fn main() -> std::io::Result<()> {
         }
     }
 
-    for slot in &custom_slots {
-        if let Some(l_idx) = slot.key_line_idx {
-            let key_val = if slot.saved_key.is_empty() { "sk-your-key-here" } else { &slot.saved_key };
-            let prefix = format!("CUSTOM{}_API_KEY", slot.index);
-            if slot.is_active {
-                lines[l_idx] = format!("{}=\"{}\"", prefix, key_val);
-            } else {
-                lines[l_idx] = format!("# {}=\"{}\"", prefix, key_val);
-            }
-        }
-    }
-
-    if let Some(l_idx) = tokens_line_idx {
-        lines[l_idx] = format!("AI_MAX_TOKENS=\"{}\"", max_tokens);
-    }
-
-    if let Some(l_idx) = rounds_line_idx {
-        lines[l_idx] = format!("AI_MAX_AGENT_ROUNDS=\"{}\"", max_rounds);
-    }
-
-    let mut out_content = lines.join("\n");
-    if !out_content.ends_with('\n') {
-        out_content.push('\n');
-    }
-    fs::write(&env_path, out_content)?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(&env_path, std::fs::Permissions::from_mode(0o600));
-    }
-
+    drop(_guard);
     let _ = crossterm::execute!(stdout, Clear(ClearType::All), crossterm::cursor::MoveTo(0, 0));
     if let Some(active) = custom_slots.iter().find(|s| s.is_active) {
         let icon = get_icon_for_slot(&active.name);
-        println!("\r\n   \x1b[1;32m✓\x1b[0m {}  \x1b[1;37m{}\x1b[0m enabled ({})\r\n", icon, active.name, active.model);
+        println!("\r\n   \x1b[1;32m✓\x1b[0m {}  \x1b[1;37m{}\x1b[0m active ({})\r\n", icon, active.name, active.model);
     } else {
         println!("\r\n   \x1b[1;33m✓\x1b[0m All cloud providers disabled. Using local server on :8080.\r\n");
     }

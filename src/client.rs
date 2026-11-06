@@ -85,6 +85,19 @@ pub struct LlmClient {
     config: ProviderConfig,
 }
 
+#[inline]
+fn is_local_endpoint(url: &str) -> bool {
+    let u = url.to_lowercase();
+    u.contains("127.0.0.1")
+        || u.contains("localhost")
+        || u.contains("0.0.0.0")
+        || u.contains("::1")
+        || u.contains(":8080")
+        || u.contains(":11434")
+        || u.contains(":20128")
+        || u.contains(".local")
+}
+
 impl LlmClient {
     pub fn set_reasoning_budget(&self, budget: Option<usize>) {
         let val = budget.map(|b| b as i64).unwrap_or(-1);
@@ -99,6 +112,95 @@ impl LlmClient {
         }
     }
 
+    fn build_request_body(&self, messages: &[ChatMessage], tools: Option<Value>) -> Value {
+        let is_local = is_local_endpoint(&self.config.base_url);
+        let is_google = self.config.base_url.contains("googleapis.com")
+            || self.config.model.to_lowercase().contains("gemini");
+
+        let mut sanitized_messages = serde_json::to_value(messages).unwrap_or_else(|_| serde_json::json!([]));
+
+        // Google Gemini strict multi-turn tool verification:
+        // Ensure all assistant tool_calls carry either their real thought_signature or the official bypass sentinel
+        if is_google {
+            if let Some(arr) = sanitized_messages.as_array_mut() {
+                for msg in arr {
+                    if msg.get("role").and_then(|r| r.as_str()) == Some("assistant") {
+                        if let Some(tcs) = msg.get_mut("tool_calls").and_then(|v| v.as_array_mut()) {
+                            for tc in tcs {
+                                let has_sig = tc.get("extra_content")
+                                    .and_then(|ec| ec.get("google"))
+                                    .and_then(|g| g.get("thought_signature"))
+                                    .and_then(|s| s.as_str())
+                                    .map(|s| !s.is_empty())
+                                    .unwrap_or(false);
+
+                                if !has_sig {
+                                    if let Some(obj) = tc.as_object_mut() {
+                                        obj.insert(
+                                            "extra_content".to_string(),
+                                            serde_json::json!({
+                                                "google": {
+                                                    "thought_signature": "skip_thought_signature_validator"
+                                                }
+                                            }),
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut body = serde_json::json!({
+            "model": self.config.model,
+            "messages": sanitized_messages,
+            "stream": true,
+            "stream_options": { "include_usage": true }
+        });
+
+        if let Some(tool_specs) = tools {
+            body["tools"] = tool_specs;
+        }
+
+        // Vendor-specific extensions are only injected for local engines (llama.cpp, vLLM, Ollama)
+        if is_local {
+            body["cache_prompt"] = serde_json::json!(true);
+
+            let rb = self.reasoning_budget.load(Ordering::Relaxed);
+            if rb >= 0 {
+                if let Some(obj) = body.as_object_mut() {
+                    obj.insert("reasoning_budget".to_string(), serde_json::json!(rb));
+                    obj.insert("reasoning_budget_tokens".to_string(), serde_json::json!(rb));
+                    obj.insert("thinking_budget_tokens".to_string(), serde_json::json!(rb));
+                    if rb == 0 {
+                        obj.insert("chat_template_kwargs".to_string(), serde_json::json!({ "enable_thinking": false }));
+                    }
+                }
+            }
+        }
+
+        body
+    }
+
+    fn prepare_request(&self, body: &Value) -> reqwest::RequestBuilder {
+        let mut req = self.http.post(&self.config.base_url)
+            .header("Content-Type", "application/json")
+            .json(body);
+
+        if self.config.api_key != "not-needed" && !self.config.api_key.is_empty() {
+            req = req.header("Authorization", format!("Bearer {}", self.config.api_key));
+        }
+
+        if self.config.base_url.contains("openrouter.ai") {
+            req = req.header("HTTP-Referer", "https://github.com/j5onrf/rs-agent");
+            req = req.header("X-Title", "rs-agent");
+        }
+
+        req
+    }
+
     pub async fn stream_chat_raw<F>(
         &self,
         messages: &[ChatMessage],
@@ -109,38 +211,8 @@ impl LlmClient {
     where
         F: FnMut(&str, bool) + Send,
     {
-        let mut body = serde_json::json!({
-            "model": self.config.model,
-            "messages": messages,
-            "stream": true,
-            "cache_prompt": true,
-            "stream_options": { "include_usage": true }
-        });
-
-        if let Some(tool_specs) = tools {
-            body["tools"] = tool_specs;
-        }
-
-        let rb = self.reasoning_budget.load(Ordering::Relaxed);
-        if rb >= 0 {
-            if let Some(obj) = body.as_object_mut() {
-                obj.insert("reasoning_budget".to_string(), serde_json::json!(rb));
-                obj.insert("reasoning_budget_tokens".to_string(), serde_json::json!(rb));
-                obj.insert("thinking_budget_tokens".to_string(), serde_json::json!(rb));
-                if rb == 0 {
-                    obj.insert("chat_template_kwargs".to_string(), serde_json::json!({ "enable_thinking": false }));
-                }
-            }
-        }
-
-        let mut req = self.http.post(&self.config.base_url)
-            .header("Content-Type", "application/json")
-            .json(&body);
-
-        if self.config.api_key != "not-needed" && !self.config.api_key.is_empty() {
-            req = req.header("Authorization", format!("Bearer {}", self.config.api_key));
-        }
-
+        let body = self.build_request_body(messages, tools);
+        let req = self.prepare_request(&body);
         let response = req.send().await.context("Failed to send request to LLM endpoint")?;
 
         if !response.status().is_success() {
@@ -154,7 +226,7 @@ impl LlmClient {
         let mut full_reasoning = String::new();
         let mut in_thinking = false;
         let mut stats = UsageStats::default();
-        let mut tool_calls_map: std::collections::BTreeMap<usize, (String, String, String)> = std::collections::BTreeMap::new();
+        let mut tool_calls_map: std::collections::BTreeMap<usize, (String, String, String, Option<Value>)> = std::collections::BTreeMap::new();
 
         while let Some(event_res) = stream.next().await {
             if let Some(ref flag) = cancel_flag {
@@ -213,13 +285,16 @@ impl LlmClient {
                     if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
                         if !content.is_empty() {
                             let mut chunk_slice = content;
-                            if chunk_slice.contains("<think>") {
+                            if chunk_slice.contains("<think>") || chunk_slice.contains("<thought>") {
                                 in_thinking = true;
-                                chunk_slice = chunk_slice.trim_start_matches("<think>");
+                                chunk_slice = chunk_slice
+                                    .trim_start_matches("<think>")
+                                    .trim_start_matches("<thought>");
                             }
 
-                            if chunk_slice.contains("</think>") {
-                                let parts: Vec<&str> = chunk_slice.splitn(2, "</think>").collect();
+                            if chunk_slice.contains("</think>") || chunk_slice.contains("</thought>") {
+                                let delimiter = if chunk_slice.contains("</think>") { "</think>" } else { "</thought>" };
+                                let parts: Vec<&str> = chunk_slice.splitn(2, delimiter).collect();
                                 on_chunk(parts[0], true);
                                 full_reasoning.push_str(parts[0]);
                                 in_thinking = false;
@@ -245,6 +320,7 @@ impl LlmClient {
                                 tc.get("id").and_then(|v| v.as_str()).unwrap_or("call_0").to_string(),
                                 String::new(),
                                 String::new(),
+                                None,
                             ));
 
                             if let Some(id) = tc.get("id").and_then(|v| v.as_str()) {
@@ -258,6 +334,12 @@ impl LlmClient {
                                     entry.2.push_str(args);
                                 }
                             }
+                            // Preserve incoming extra_content / thought_signature
+                            if let Some(ec) = tc.get("extra_content") {
+                                entry.3 = Some(ec.clone());
+                            } else if let Some(ec) = delta.get("extra_content") {
+                                entry.3 = Some(ec.clone());
+                            }
                         }
                     }
                 }
@@ -265,15 +347,19 @@ impl LlmClient {
         }
 
         let tool_calls = if !tool_calls_map.is_empty() {
-            let calls: Vec<Value> = tool_calls_map.into_values().map(|(id, name, args)| {
-                serde_json::json!({
+            let calls: Vec<Value> = tool_calls_map.into_values().map(|(id, name, args, extra_content)| {
+                let mut call = serde_json::json!({
                     "id": id,
                     "type": "function",
                     "function": {
                         "name": name,
                         "arguments": args
                     }
-                })
+                });
+                if let Some(ec) = extra_content {
+                    call["extra_content"] = ec;
+                }
+                call
             }).collect();
             Some(calls)
         } else {
@@ -296,38 +382,8 @@ impl LlmClient {
         renderer: &mut StreamRenderer,
         spinner: &mut InlineSpinner,
     ) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)> {
-        let mut body = serde_json::json!({
-            "model": self.config.model,
-            "messages": messages,
-            "stream": true,
-            "cache_prompt": true,
-            "stream_options": { "include_usage": true }
-        });
-
-        if let Some(tool_specs) = tools {
-            body["tools"] = tool_specs;
-        }
-
-        let rb = self.reasoning_budget.load(Ordering::Relaxed);
-        if rb >= 0 {
-            if let Some(obj) = body.as_object_mut() {
-                obj.insert("reasoning_budget".to_string(), serde_json::json!(rb));
-                obj.insert("reasoning_budget_tokens".to_string(), serde_json::json!(rb));
-                obj.insert("thinking_budget_tokens".to_string(), serde_json::json!(rb));
-                if rb == 0 {
-                    obj.insert("chat_template_kwargs".to_string(), serde_json::json!({ "enable_thinking": false }));
-                }
-            }
-        }
-
-        let mut req = self.http.post(&self.config.base_url)
-            .header("Content-Type", "application/json")
-            .json(&body);
-
-        if self.config.api_key != "not-needed" && !self.config.api_key.is_empty() {
-            req = req.header("Authorization", format!("Bearer {}", self.config.api_key));
-        }
-
+        let body = self.build_request_body(messages, tools);
+        let req = self.prepare_request(&body);
         let response = req.send().await.context("Failed to send request to LLM endpoint")?;
 
         if !response.status().is_success() {
@@ -342,7 +398,7 @@ impl LlmClient {
         let mut full_reasoning = String::new();
         let mut in_thinking = false;
         let mut stats = UsageStats::default();
-        let mut tool_calls_map: std::collections::BTreeMap<usize, (String, String, String)> = std::collections::BTreeMap::new();
+        let mut tool_calls_map: std::collections::BTreeMap<usize, (String, String, String, Option<Value>)> = std::collections::BTreeMap::new();
 
         while let Some(event_res) = stream.next().await {
             let event = event_res.context("Error reading SSE event")?;
@@ -397,13 +453,16 @@ impl LlmClient {
                         if !content.is_empty() {
                             spinner.stop();
                             let mut chunk_slice = content;
-                            if chunk_slice.contains("<think>") {
+                            if chunk_slice.contains("<think>") || chunk_slice.contains("<thought>") {
                                 in_thinking = true;
-                                chunk_slice = chunk_slice.trim_start_matches("<think>");
+                                chunk_slice = chunk_slice
+                                    .trim_start_matches("<think>")
+                                    .trim_start_matches("<thought>");
                             }
 
-                            if chunk_slice.contains("</think>") {
-                                let parts: Vec<&str> = chunk_slice.splitn(2, "</think>").collect();
+                            if chunk_slice.contains("</think>") || chunk_slice.contains("</thought>") {
+                                let delimiter = if chunk_slice.contains("</think>") { "</think>" } else { "</thought>" };
+                                let parts: Vec<&str> = chunk_slice.splitn(2, delimiter).collect();
                                 renderer.on_chunk(parts[0], true);
                                 full_reasoning.push_str(parts[0]);
                                 in_thinking = false;
@@ -432,6 +491,7 @@ impl LlmClient {
                                 tc.get("id").and_then(|v| v.as_str()).unwrap_or("call_0").to_string(),
                                 String::new(),
                                 String::new(),
+                                None,
                             ));
 
                             if let Some(id) = tc.get("id").and_then(|v| v.as_str()) {
@@ -445,6 +505,12 @@ impl LlmClient {
                                     entry.2.push_str(args);
                                 }
                             }
+                            // Preserve incoming extra_content / thought_signature
+                            if let Some(ec) = tc.get("extra_content") {
+                                entry.3 = Some(ec.clone());
+                            } else if let Some(ec) = delta.get("extra_content") {
+                                entry.3 = Some(ec.clone());
+                            }
                         }
                     }
                 }
@@ -455,15 +521,19 @@ impl LlmClient {
         spinner.stop();
 
         let tool_calls = if !tool_calls_map.is_empty() {
-            let calls: Vec<Value> = tool_calls_map.into_values().map(|(id, name, args)| {
-                serde_json::json!({
+            let calls: Vec<Value> = tool_calls_map.into_values().map(|(id, name, args, extra_content)| {
+                let mut call = serde_json::json!({
                     "id": id,
                     "type": "function",
                     "function": {
                         "name": name,
                         "arguments": args
                     }
-                })
+                });
+                if let Some(ec) = extra_content {
+                    call["extra_content"] = ec;
+                }
+                call
             }).collect();
             Some(calls)
         } else {
