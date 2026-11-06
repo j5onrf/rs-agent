@@ -1,9 +1,9 @@
 <div align="center">
-  <img alt="rs-agent" src="logo.svg?v=2" height="220" />
+  <img alt="rs-agent" src="logo.svg?v=2" height="460" />
   <h1>Rs-Agent</h1>
  
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.4.9.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.5.1.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -71,11 +71,21 @@
 ·  LFM3-1.7B  · · · · · · · · · · · · · · · · ·
 ·  chat       · · · · · · · · · · · · · · · · ·
 
+╭────────────────────────────────────────────╮
+│  ╭────╮  LFM3-1.7B                         │
+│  │ Lf │  chat                              │
+│  ╰────╯  git: master · clean               │
+╰────────────────────────────────────────────╯
+
+  ╭────╮  LFM3-1.7B
+  │ Lf │  chat · 3
+  ╰────╯  git: master · clean
+
 ❯ █
 ```
 
 <div align="center">
-  <p><sub>Switch terminal styles with <code>/box [1-3]</code> · Progressive 350ms wake-on-key reveal</sub></p>
+  <p><sub>Switch terminal styles with <code>/box [1-5]</code> · Progressive 350ms wake-on-key reveal</sub></p>
 </div>
 
 ---

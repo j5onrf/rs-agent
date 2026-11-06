@@ -24,7 +24,7 @@ pub fn get_box_style() -> usize {
     if p.exists() {
         if let Ok(c) = fs::read_to_string(&p) {
             if let Ok(s) = serde_json::from_str::<AppState>(&c) {
-                return s.box_style.clamp(1, 4);
+                return s.box_style.clamp(1, 5);
             }
         }
     }
@@ -37,7 +37,7 @@ pub fn set_box_style(style: usize) {
         let _ = fs::create_dir_all(parent);
     }
     let s = AppState {
-        box_style: style.clamp(1, 4),
+        box_style: style.clamp(1, 5),
     };
     if let Ok(c) = serde_json::to_string_pretty(&s) {
         let _ = fs::write(p, c);
