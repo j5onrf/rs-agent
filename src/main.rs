@@ -17,8 +17,43 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+extern "C" {
+    fn kill(pid: i32, sig: i32) -> i32;
+}
+
+fn resolve_instance_number(profile: &str) -> (usize, PathBuf) {
+    let shm_dir = PathBuf::from("/dev/shm/rs-agent-instances");
+    let _ = fs::create_dir_all(&shm_dir);
+
+    let mut active_count = 0;
+    if let Ok(entries) = fs::read_dir(&shm_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
+                let parts: Vec<&str> = fname.split('.').collect();
+                if parts.len() == 2 {
+                    if let Ok(pid) = parts[0].parse::<i32>() {
+                        let is_alive = unsafe { kill(pid, 0) == 0 };
+                        if !is_alive {
+                            let _ = fs::remove_file(&path);
+                        } else if parts[1] == profile {
+                            active_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let instance_num = active_count + 1;
+    let my_pid = std::process::id();
+    let lock_file = shm_dir.join(format!("{}.{}", my_pid, profile));
+    let _ = fs::write(&lock_file, instance_num.to_string());
+    (instance_num, lock_file)
+}
+
 #[derive(Parser, Debug)]
-#[command(name = "rs-agent", about = "Blazing-fast minimal Rust AI Agent")]
+#[command(name = "rs-agent", about = "Minimal Rust AI Agent")]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
@@ -147,47 +182,7 @@ fn handle_new_project(name: &str, intents_arg: Option<&str>) -> anyhow::Result<(
     Ok(())
 }
 
-
-extern "C" {
-    fn kill(pid: i32, sig: i32) -> i32;
-}
-
-fn resolve_instance_number(profile: &str) -> (usize, PathBuf) {
-    let shm_dir = PathBuf::from("/dev/shm/rs-agent-instances");
-    let _ = fs::create_dir_all(&shm_dir);
-
-    // Clean up stale PIDs and count active matching instances
-    let mut active_count = 0;
-    if let Ok(entries) = fs::read_dir(&shm_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
-                let parts: Vec<&str> = fname.split('.').collect();
-                if parts.len() == 2 {
-                    if let Ok(pid) = parts[0].parse::<i32>() {
-                        // Check if process is still running
-                        let is_alive = unsafe { kill(pid, 0) == 0 };
-                        if !is_alive {
-                            let _ = fs::remove_file(&path);
-                        } else if parts[1] == profile {
-                            active_count += 1;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    let instance_num = active_count + 1;
-    let my_pid = std::process::id();
-    let lock_file = shm_dir.join(format!("{}.{}", my_pid, profile));
-    let _ = fs::write(&lock_file, instance_num.to_string());
-    (instance_num, lock_file)
-}
-
 fn build_system_prompt(
-    _is_agent: bool,
-    _target_dir: &Path,
     active_profile: &Option<Profile>,
     active_skills: &[String],
 ) -> String {
@@ -217,7 +212,11 @@ async fn execute_task_loop(
     spinner: &mut InlineSpinner,
 ) -> anyhow::Result<bool> {
     let max_rounds = get_max_rounds();
-    let display_goal = if goal.len() > 100 { format!("{}...", goal.chars().take(80).collect::<String>().as_str()) } else { goal.to_string() };
+    let display_goal: String = if goal.chars().count() > 80 {
+        format!("{}...", goal.chars().take(80).collect::<String>())
+    } else {
+        goal.to_string()
+    };
 
     println!("  \x1b[1;36m✦ [Task Loop]\x1b[0m Starting autonomous run in \x1b[1;37m{}\x1b[0m", target_dir.display());
     println!("  \x1b[2mGoal: {} (Max steps: {})\x1b[0m\n", display_goal, max_rounds);
@@ -225,11 +224,10 @@ async fn execute_task_loop(
     history.push(ChatMessage::user(goal.to_string()));
 
     let mut total_tools_run = 0;
-    
+    let mut last_total_tokens = 0;
+
     for turn in 0..max_rounds {
         println!("  \x1b[1;34m─── Step {}/{} ───\x1b[0m", turn + 1, max_rounds);
-
-        // Pure profile mode: no synthetic mid-flight system messages
 
         let mut renderer = StreamRenderer::new();
         spinner.start("Executing autonomous step...");
@@ -242,8 +240,8 @@ async fn execute_task_loop(
         ).await?;
 
         spinner.stop();
-        renderer.finish(&stats, 0);
-
+        renderer.finish(&stats, last_total_tokens);
+        last_total_tokens = stats.prompt_tokens + stats.completion_tokens;
 
         if let Some(calls) = tool_calls {
             if !calls.is_empty() {
@@ -292,13 +290,11 @@ async fn execute_task_loop(
                     }
                 }
             } else {
-                history.push(ChatMessage::assistant(reply.clone()));
+                history.push(ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone()));
             }
         } else {
-            history.push(ChatMessage::assistant(reply.clone()));
+            history.push(ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone()));
         }
-
-
 
         if is_task_complete(&reply) {
             let lower_goal = goal.to_lowercase();
@@ -310,9 +306,9 @@ async fn execute_task_loop(
                 || lower_goal.contains("add");
 
             if total_tools_run == 0 && requires_action {
-                println!("  \x1b[1;33m▲ [Task Loop]\x1b[0m Completion declared without tool execution. Enforcing verification...");
+                println!("  \x1b[1;33m▲ [Task Loop]\x1b[0m Completion declared without tool execution. Enforcing action...");
                 history.push(ChatMessage::user(
-                    "You declared completion without running tools. Execute the required write_file or run_command now."
+                    "You declared completion without running tools. Execute the required tool action now."
                 ));
                 continue;
             }
@@ -356,6 +352,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         if let Some(p) = Profile::load(&c.profile_name) {
             c.tier = p.tier.clone();
             c.adapters = p.adapters;
+            c.delegate = p.delegate;
         }
 
         let _ = c.save(target_dir);
@@ -371,7 +368,6 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     };
     client.set_reasoning_budget(active_profile.as_ref().and_then(|p| p.reasoning_budget));
 
-    let mut active_skills: Vec<String> = Vec::new();
     let (instance_num, _lock_guard) = resolve_instance_number(&cfg.profile_name);
     let second_line = if cfg.is_agent {
         if instance_num > 1 {
@@ -387,14 +383,15 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         }
     };
 
-    // Update Kitty / Hyprland window title
+    // Update terminal window title
     print!("\x1b]0;rs-agent: {}\x07", second_line);
     let _ = io::stdout().flush();
 
+    let mut active_skills: Vec<String> = Vec::new();
     let mut current_box_style = state::get_box_style();
     let mut buffered_char = ui::draw_box(&provider.model, &second_line, current_box_style, true);
 
-    let mut system_prompt = build_system_prompt(cfg.is_agent, target_dir, &active_profile, &active_skills);
+    let mut system_prompt = build_system_prompt(&active_profile, &active_skills);
     let mut history = vec![ChatMessage::system(&system_prompt)];
     let mcp_servers = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
     let mut active_tools = if cfg.is_agent {
@@ -404,6 +401,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     };
 
     let mut spinner = InlineSpinner::new();
+    let mut last_total_tokens = 0;
 
     loop {
         print!("❯ ");
@@ -531,12 +529,14 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 if let Some(p) = &active_profile {
                     cfg.tier = p.tier.clone();
                     cfg.adapters = p.adapters;
+                    cfg.delegate = p.delegate;
                 }
 
-                system_prompt = build_system_prompt(cfg.is_agent, target_dir, &active_profile, &active_skills);
+                system_prompt = build_system_prompt(&active_profile, &active_skills);
                 let _ = cfg.save(target_dir);
 
                 history.clear();
+                last_total_tokens = 0;
                 history.push(ChatMessage::system(&system_prompt));
                 let new_mcp = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
                 active_tools = if cfg.is_agent {
@@ -602,7 +602,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     }
                 }
 
-                system_prompt = build_system_prompt(cfg.is_agent, target_dir, &active_profile, &active_skills);
+                system_prompt = build_system_prompt(&active_profile, &active_skills);
                 if let Some(first) = history.first_mut() {
                     first.content = serde_json::Value::String(system_prompt.clone());
                 }
@@ -614,9 +614,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         if input.starts_with("/box") {
             let parts: Vec<&str> = input.split_whitespace().collect();
             current_box_style = if parts.len() > 1 {
-                parts[1].parse::<usize>().unwrap_or((current_box_style % 3) + 1)
+                parts[1].parse::<usize>().unwrap_or((current_box_style % 4) + 1)
             } else {
-                (current_box_style % 3) + 1
+                (current_box_style % 4) + 1
             };
             state::set_box_style(current_box_style);
 
@@ -634,7 +634,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             let _ = io::stdout().flush();
 
             history.clear();
-            system_prompt = build_system_prompt(cfg.is_agent, target_dir, &active_profile, &active_skills);
+            last_total_tokens = 0;
+            system_prompt = build_system_prompt(&active_profile, &active_skills);
             history.push(ChatMessage::system(&system_prompt));
 
             print!("\x1b[H\x1b[2J");
@@ -698,7 +699,6 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
         let max_rounds = get_max_rounds();
         for round in 0..max_rounds {
-            let prompt_chars: usize = history.iter().map(|m| m.content_as_str().len()).sum();
             let mut renderer = StreamRenderer::new();
 
             if round == 0 && history.len() <= 2 {
@@ -719,7 +719,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             spinner.stop();
 
             if tool_calls.is_none() || tool_calls.as_ref().map(|v| v.is_empty()).unwrap_or(true) {
-                renderer.finish(&stats, prompt_chars);
+                renderer.finish(&stats, last_total_tokens);
+                last_total_tokens = stats.prompt_tokens + stats.completion_tokens;
 
                 if !active_skills.is_empty() {
                     let formatted_skills = active_skills.join(" · ");
@@ -854,8 +855,7 @@ async fn main() -> anyhow::Result<()> {
                     for (name, cfg) in servers {
                         println!("  • {:<16} ({})", name, cfg.command);
                     }
-                    println!("
-Use: ai mcp list <server> to inspect tools");
+                    println!("\nUse: ai mcp list <server> to inspect tools");
                 }
             }
             McpAction::Call { server, tool, args } => {

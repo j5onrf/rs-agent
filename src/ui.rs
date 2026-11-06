@@ -1,260 +1,212 @@
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use std::collections::HashMap;
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 
-const ANSI_RESET: &str = "\x1b[0m";
-const ANSI_DIM: &str = "\x1b[2m";
-const ANSI_MUTED: &str = "\x1b[90m";
-const ANSI_ACCENT: &str = "\x1b[36m";
-const ANSI_BRIGHT: &str = "\x1b[1;36m";
-const ANSI_WHITE: &str = "\x1b[1;37m";
-
-fn slab_shader(x: usize) -> &'static str {
-    let ratio = x as f64 / 46.0;
-    if ratio < 0.35 {
-        ANSI_DIM
-    } else if ratio < 0.70 {
-        ANSI_MUTED
-    } else if ratio < 0.90 {
-        ANSI_ACCENT
-    } else {
-        ANSI_BRIGHT
-    }
+fn cell_dither_threshold(x: usize, y: usize) -> f64 {
+    let mut n = (x as u64 * 374761393) ^ (y as u64 * 668265263);
+    n = (n ^ (n >> 13)).wrapping_mul(1274126177);
+    ((n ^ (n >> 16)) % 1000) as f64 / 1000.0
 }
 
 pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) -> (Vec<String>, usize) {
-    let mut lines = Vec::new();
+    let box_w: usize = 46;
 
     match style {
-        // Preset #3: 2-Line Minimal Floating Dots
+        1 => {
+            let top_border = format!("╭─ ○ {:─<w$}╮", "", w = box_w - 6);
+            let model_line = format!("│  {:<w$}│", model, w = box_w - 4);
+            let prof_line = format!("│  {:<w$}│", profile, w = box_w - 4);
+            let bot_border = format!("╰{:─<w$}╯", "", w = box_w - 2);
+
+            if progress >= 1.0 {
+                (vec![top_border, model_line, prof_line, bot_border], 4)
+            } else {
+                let max_col = (box_w as f64 * progress) as usize;
+                (vec![
+                    top_border.chars().take(max_col).collect(),
+                    model_line.chars().take(max_col).collect(),
+                    prof_line.chars().take(max_col).collect(),
+                    bot_border.chars().take(max_col).collect(),
+                ], 4)
+            }
+        }
+        2 => {
+            let top = "· · ○ · · · · · · · · · · · · · · · · · · · · ·".to_string();
+            let m_str = format!("·  {:<12} · · · · · · · · · · · · · · ·", model);
+            let p_str = format!("·  {:<12} · · · · · · · · · · · · · · ·", profile);
+            let bot = "· · · · · · · · · · · · · · · · · · · · · · · ·".to_string();
+
+            if progress >= 1.0 {
+                (vec![top, m_str, p_str, bot], 4)
+            } else {
+                let max_col = (box_w as f64 * progress) as usize;
+                (vec![
+                    top.chars().take(max_col).collect(),
+                    m_str.chars().take(max_col).collect(),
+                    p_str.chars().take(max_col).collect(),
+                    bot.chars().take(max_col).collect(),
+                ], 4)
+            }
+        }
         3 => {
-            let box_w = 47;
-            let max_txt = model.chars().count().max(profile.chars().count()).min(26);
-            let cutout_end = (((3 + max_txt + 3) / 2) * 2).min(box_w - 6);
-            let front_x = (box_w as f64 + 8.0) * progress;
+            let m_str = format!("·  {:<12} · · · · · · · · · · · · · · ·", model);
+            let p_str = format!("·  {:<12} · · · · · · · · · · · · · · ·", profile);
 
-            for (text, color) in [(model, ANSI_WHITE), (profile, ANSI_MUTED)] {
-                let mut row = String::new();
-                let clean_txt: String = text.chars().take(max_txt).collect();
+            if progress >= 1.0 {
+                (vec![m_str, p_str], 2)
+            } else {
+                let max_col = (box_w as f64 * progress) as usize;
+                (vec![
+                    m_str.chars().take(max_col).collect(),
+                    p_str.chars().take(max_col).collect(),
+                ], 2)
+            }
+        }
+        4 => {
+            let line_count: usize = 5;
+            let initials = if model.len() >= 2 { &model[..2] } else { "RA" };
 
-                if front_x > 0.0 {
-                    row.push_str(&format!("{}·{}  ", slab_shader(0), ANSI_RESET));
-                } else {
-                    row.push_str("   ");
-                }
+            let mut lines = Vec::with_capacity(line_count);
+            lines.push("╭────────────────────────────────────────────╮".to_string());
 
-                for (idx, ch) in clean_txt.chars().enumerate() {
-                    let col_idx = 3 + idx;
-                    if front_x > col_idx as f64 {
-                        row.push_str(&format!("{}{}{}", color, ch, ANSI_RESET));
-                    } else {
-                        row.push(' ');
-                    }
-                }
+            let mut real_chars: HashMap<(usize, usize), (char, &'static str)> = HashMap::new();
 
-                let cur_len = 3 + clean_txt.chars().count();
-                for _ in cur_len..cutout_end {
-                    row.push(' ');
-                }
+            // 1. Avatar frame (cols 3..9, rows 1..3)
+            let av1 = "╭────╮";
+            let av2 = format!("│ {:<2} │", initials);
+            let av3 = "╰────╯";
+            for (i, c) in av1.chars().enumerate() { real_chars.insert((3 + i, 1), (c, "\x1b[38;2;0;242;254m")); }
+            for (i, c) in av2.chars().enumerate() { real_chars.insert((3 + i, 2), (c, "\x1b[1;37m")); }
+            for (i, c) in av3.chars().enumerate() { real_chars.insert((3 + i, 3), (c, "\x1b[38;2;58;123;213m")); }
 
-                for x in cutout_end..box_w {
-                    if x % 2 == 0 {
-                        if front_x > x as f64 {
-                            row.push_str(&format!("{}·{}", slab_shader(x), ANSI_RESET));
+            // 2. Dynamic model line (row 1, col 11..)
+            for (i, c) in model.chars().enumerate() {
+                if 11 + i < box_w - 2 { real_chars.insert((11 + i, 1), (c, "\x1b[1;37m")); }
+            }
+
+            // 3. Dynamic profile line (row 2, col 11..)
+            for (i, c) in profile.chars().enumerate() {
+                if 11 + i < box_w - 2 { real_chars.insert((11 + i, 2), (c, "\x1b[38;2;0;242;254m")); }
+            }
+
+            let bars: [(usize, usize, usize); 5] = [
+                (3, 1, 6),
+                (3, 2, 6),
+                (3, 3, 6),
+                (11, 1, model.len().max(16).min(box_w - 13)),
+                (11, 2, profile.len().max(12).min(box_w - 13)),
+            ];
+
+            let reveal = if progress < 0.35 {
+                0.0
+            } else if progress >= 1.0 {
+                1.0
+            } else {
+                ((progress - 0.35) / 0.65).min(1.0)
+            };
+
+            let t = progress * 2.0;
+
+            for y in 1..=3 {
+                let mut row = String::with_capacity(256);
+                row.push('│');
+
+                for x in 1..=(box_w - 2) {
+                    let is_avatar = x >= 3 && x < 9 && y >= 1 && y <= 3;
+                    let cell_thresh = if is_avatar { cell_dither_threshold(3, 1) } else { cell_dither_threshold(x, y) };
+                    let in_bar = bars.iter().any(|&(bx, by, bl)| y == by && x >= bx && x < bx + bl);
+
+                    if progress >= 1.0 || (reveal > 0.0 && cell_thresh < reveal) {
+                        if let Some(&(ch, col)) = real_chars.get(&(x, y)) {
+                            row.push_str(col);
+                            row.push(ch);
+                            row.push_str("\x1b[0m");
                         } else {
                             row.push(' ');
+                        }
+                    } else if in_bar {
+                        let band = ((x as f64 * 0.16 - y as f64 * 0.32 - t * 2.8) * 1.3).cos();
+                        let intensity = if band > 0.0 { band.powi(6) } else { 0.0 };
+
+                        if intensity > 0.6 {
+                            row.push_str("\x1b[38;2;235;248;255m●\x1b[0m");
+                        } else if intensity > 0.25 {
+                            row.push_str("\x1b[38;2;0;242;254m•\x1b[0m");
+                        } else if intensity > 0.05 {
+                            row.push_str("\x1b[38;2;58;123;213m·\x1b[0m");
+                        } else {
+                            row.push_str("\x1b[38;2;45;65;90m·\x1b[0m");
                         }
                     } else {
                         row.push(' ');
                     }
                 }
-                lines.push(row);
-            }
-        }
 
-        // Preset #2: Original Dot Slab (4-line gradient box)
-        2 => {
-            let box_w = 47;
-            let front_x = (box_w as f64 + 8.0) * progress;
-
-            let mut top = String::new();
-            for x in 0..box_w {
-                if front_x > x as f64 {
-                    if x == 4 { top.push('○'); }
-                    else if x == 5 { top.push(' '); }
-                    else if x % 2 == 0 { top.push_str(slab_shader(x)); top.push('·'); top.push_str(ANSI_RESET); }
-                    else { top.push(' '); }
-                } else {
-                    top.push(' ');
-                }
-            }
-            lines.push(top);
-
-            let max_txt = model.chars().count().max(profile.chars().count()).min(26);
-            let cutout_end = (((3 + max_txt + 3) / 2) * 2).min(box_w - 6);
-
-            for (text, color) in [(model, ANSI_WHITE), (profile, ANSI_MUTED)] {
-                let mut row = String::new();
-                let clean_txt: String = text.chars().take(max_txt).collect();
-
-                if front_x > 0.0 { row.push_str(&format!("{}·{}  ", slab_shader(0), ANSI_RESET)); } else { row.push_str("   "); }
-                for (idx, ch) in clean_txt.chars().enumerate() {
-                    if front_x > (idx + 3) as f64 { row.push_str(&format!("{}{}{}", color, ch, ANSI_RESET)); } else { row.push(' '); }
-                }
-                for _ in (3 + clean_txt.chars().count())..cutout_end { row.push(' '); }
-                for x in cutout_end..box_w {
-                    if x % 2 == 0 {
-                        if front_x > x as f64 { row.push_str(&format!("{}·{}", slab_shader(x), ANSI_RESET)); } else { row.push(' '); }
-                    } else { row.push(' '); }
-                }
-                lines.push(row);
-            }
-
-            let mut bot = String::new();
-            for x in 0..box_w {
-                if front_x > x as f64 {
-                    if x % 2 == 0 { bot.push_str(&format!("{}·{}", slab_shader(x), ANSI_RESET)); } else { bot.push(' '); }
-                } else { bot.push(' '); }
-            }
-            lines.push(bot);
-        }
-
-        // Preset #1: Clean Rounded (Default 4-line wireframe)
-        _ => {
-            let box_w = 46;
-            let interior_w = box_w - 4; // 42 chars inside: 3 left ("│  ") + 42 pad + 1 right ("│") = 46
-            let front_x = (box_w as f64 + 8.0) * progress;
-
-            let mut top = String::new();
-            for x in 0..box_w {
-                if front_x > x as f64 {
-                    if x == 0 { top.push('╭'); }
-                    else if x == 1 { top.push('─'); }
-                    else if x == 2 { top.push(' '); }
-                    else if x == 3 { top.push('○'); }
-                    else if x == 4 { top.push(' '); }
-                    else if x == box_w - 1 { top.push('╮'); }
-                    else { top.push('─'); }
-                } else {
-                    top.push(' ');
-                }
-            }
-            lines.push(format!("{}{}{}", ANSI_BRIGHT, top, ANSI_RESET));
-
-            for (text, color) in [(model, ANSI_WHITE), (profile, ANSI_MUTED)] {
-                let mut row = String::new();
-                let clean: String = text.chars().take(interior_w).collect();
-                let pad = interior_w.saturating_sub(clean.chars().count());
-
-                if front_x > 0.0 {
-                    row.push_str(&format!("{}│{}  ", ANSI_BRIGHT, ANSI_RESET));
-                } else {
-                    row.push_str("   ");
-                }
-
-                for (idx, ch) in clean.chars().enumerate() {
-                    if front_x > (idx + 3) as f64 {
-                        row.push_str(&format!("{}{}{}", color, ch, ANSI_RESET));
-                    } else {
-                        row.push(' ');
-                    }
-                }
-
-                for _ in 0..pad {
+                while row.chars().filter(|&c| c != '\x1b' && !c.is_ascii_control()).count() < box_w - 1 {
                     row.push(' ');
                 }
-
-                if front_x >= (box_w - 1) as f64 {
-                    row.push_str(&format!("{}│{}", ANSI_BRIGHT, ANSI_RESET));
-                } else {
-                    row.push(' ');
-                }
-
+                row.push('│');
                 lines.push(row);
             }
 
-            let mut bot = String::new();
-            for x in 0..box_w {
-                if front_x > x as f64 {
-                    if x == 0 { bot.push('╰'); }
-                    else if x == box_w - 1 { bot.push('╯'); }
-                    else { bot.push('─'); }
-                } else {
-                    bot.push(' ');
-                }
-            }
-            lines.push(format!("{}{}{}", ANSI_BRIGHT, bot, ANSI_RESET));
+            lines.push("╰────────────────────────────────────────────╯".to_string());
+            (lines, line_count)
         }
+        _ => render_frame(model, profile, 1, progress),
     }
-
-    let count = lines.len();
-    (lines, count)
 }
 
 pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Option<char> {
-    if !animate || !crossterm::tty::IsTty::is_tty(&io::stdout()) {
+    if !animate {
         let (lines, _) = render_frame(model, profile, style, 1.0);
-        for l in lines {
-            println!("{}", l);
+        for line in lines {
+            println!("{}", line);
         }
-        println!();
+        let _ = io::stdout().flush();
         return None;
     }
 
     let _ = enable_raw_mode();
-    let mut stdout = io::stdout();
-    print!("\x1b[?25l");
-    let _ = stdout.flush();
-
-    let duration = Duration::from_millis(350);
-    let start = Instant::now();
-    let mut captured_key = None;
-    let mut first = true;
-    let mut line_count = 0;
+    let duration = Duration::from_millis(500);
+    let start_time = Instant::now();
+    let mut buffered_char = None;
+    let mut last_line_count = 0;
 
     loop {
-        if event::poll(Duration::from_millis(0)).unwrap_or(false) {
-            if let Ok(Event::Key(k)) = event::read() {
-                if let KeyCode::Char(c) = k.code {
-                    captured_key = Some(c);
+        let elapsed = start_time.elapsed();
+        let progress = (elapsed.as_secs_f64() / duration.as_secs_f64()).min(1.0);
+
+        let (lines, line_count) = render_frame(model, profile, style, progress);
+        last_line_count = line_count;
+
+        print!("\r");
+        for line in &lines {
+            print!("{}\r\n", line);
+        }
+        print!("\x1b[{}A\r", line_count);
+        let _ = io::stdout().flush();
+
+        if event::poll(Duration::from_millis(25)).unwrap_or(false) {
+            if let Ok(Event::Key(key)) = event::read() {
+                if key.kind == KeyEventKind::Press {
+                    if let KeyCode::Char(c) = key.code {
+                        buffered_char = Some(c);
+                        break;
+                    }
                 }
             }
+        }
+
+        if progress >= 1.0 {
             break;
         }
-
-        let elapsed = start.elapsed();
-        if elapsed >= duration {
-            break;
-        }
-
-        let progress = (elapsed.as_secs_f64() / duration.as_secs_f64()).min(1.0);
-        let (lines, cnt) = render_frame(model, profile, style, progress);
-
-        if !first {
-            print!("\x1b[{}A\r", line_count);
-        }
-        first = false;
-        line_count = cnt;
-
-        for l in &lines {
-            print!("\r\x1b[2K{}\r\n", l);
-        }
-        let _ = stdout.flush();
-
-        std::thread::sleep(Duration::from_millis(16));
     }
 
-    let (final_lines, cnt) = render_frame(model, profile, style, 1.0);
-    if !first {
-        print!("\x1b[{}A\r", cnt);
-    }
-    for l in &final_lines {
-        print!("\r\x1b[2K{}\r\n", l);
-    }
-    print!("\r\n\x1b[?25h");
-    let _ = stdout.flush();
     let _ = disable_raw_mode();
+    print!("\x1b[{}B\r\n", last_line_count);
+    let _ = io::stdout().flush();
 
-    captured_key
+    buffered_char
 }

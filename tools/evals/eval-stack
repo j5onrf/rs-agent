@@ -497,10 +497,16 @@ def run_single_agentic_test(bench: dict, prof_name: str, is_purebash: bool, mode
         step_matches = re.findall(r"─── Step (\d+)/\d+ ───", captured_stdout)
         turns = len(step_matches) if step_matches else (1 if "Task complete" in captured_stdout else 0)
 
-        tok_matches = re.findall(r"↑([\d\.]+)k", captured_stdout)
-        if tok_matches:
+        pct_matches = re.findall(r"([\d\.]+)%/([\d\.]+)k", captured_stdout)
+        if pct_matches:
             with contextlib.suppress(Exception):
-                total_tokens = int(float(tok_matches[-1]) * 1000)
+                pct, cap_k = pct_matches[-1]
+                total_tokens = int((float(pct) / 100.0) * (float(cap_k) * 1000))
+        else:
+            tok_matches = re.findall(r"↑([\d\.]+)k", captured_stdout)
+            if tok_matches:
+                with contextlib.suppress(Exception):
+                    total_tokens = int(float(tok_matches[-1]) * 1000)
 
         passed = False
         try:
