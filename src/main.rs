@@ -229,8 +229,11 @@ async fn execute_task_loop(
     for turn in 0..max_rounds {
         println!("  \x1b[1;34m─── Step {}/{} ───\x1b[0m", turn + 1, max_rounds);
 
-        let mut renderer = StreamRenderer::new();
+        let mut renderer = StreamRenderer::new(state::get_pad());
         spinner.start("Executing autonomous step...");
+
+        print!("\x1b[?25l");
+        let _ = io::stdout().flush();
 
         let (reply, reasoning, tool_calls, stats) = client.stream_chat(
             history,
@@ -358,7 +361,10 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         let _ = c.save(target_dir);
         c
     } else {
-        WorkspaceConfig::load_or_default(target_dir)
+        let mut c = WorkspaceConfig::load_or_default(target_dir);
+        c.is_agent = false;
+        c.profile_name = "chat".to_string();
+        c
     };
 
     let mut active_profile = if cfg.is_agent {
@@ -383,7 +389,6 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         }
     };
 
-    // Update terminal window title
     print!("\x1b]0;rs-agent: {}\x07", second_line);
     let _ = io::stdout().flush();
 
@@ -404,6 +409,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     let mut last_total_tokens = 0;
 
     loop {
+        print!("\x1b[?25h");
         print!("❯ ");
         if let Some(c) = buffered_char.take() {
             print!("{}", c);
@@ -463,6 +469,11 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         }
 
         if input == "/task" || input == "/goal" || input.starts_with("/task ") || input.starts_with("/goal ") {
+            if !cfg.is_agent {
+                println!("  \x1b[1;33m[info]\x1b[0m /task is only available in workspace agents (ai init <path>).");
+                println!("         Chat mode is pure conversation without tools.\n");
+                continue;
+            }
             let direct_arg = if input.starts_with("/task ") {
                 input[6..].trim()
             } else if input.starts_with("/goal ") {
@@ -611,6 +622,16 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             continue;
         }
 
+        // --- Single /pad toggle (no aliases) ---
+        if input == "/pad" {
+            let new_pad = !state::get_pad();
+            state::set_pad(new_pad);
+            let status = if new_pad { "enabled (spaced layout)" } else { "disabled (dense layout)" };
+            println!("  \x1b[1;32m✓\x1b[0m \x1b[2mPadding:\x1b[0m \x1b[1;36m{}\x1b[0m\n", status);
+            let _ = io::stdout().flush();
+            continue;
+        }
+
         if input.starts_with("/box") {
             let parts: Vec<&str> = input.split_whitespace().collect();
             current_box_style = if parts.len() > 1 {
@@ -699,7 +720,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
         let max_rounds = get_max_rounds();
         for round in 0..max_rounds {
-            let mut renderer = StreamRenderer::new();
+            let mut renderer = StreamRenderer::new(state::get_pad());
 
             if round == 0 && history.len() <= 2 {
                 spinner.start("Prefilling...");
@@ -708,6 +729,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             } else {
                 spinner.start("Evaluating tool results...");
             }
+
+            print!("\x1b[?25l");
+            let _ = io::stdout().flush();
 
             let (reply, reasoning, tool_calls, stats) = client.stream_chat(
                 &history,

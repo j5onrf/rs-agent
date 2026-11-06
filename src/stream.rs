@@ -10,6 +10,7 @@ pub struct UsageStats {
 }
 
 pub struct StreamRenderer {
+    pub pad: bool,
     pub thinking_started: bool,
     pub answer_started: bool,
     pub at_line_start: bool,
@@ -22,13 +23,14 @@ pub struct StreamRenderer {
 }
 
 impl StreamRenderer {
-    pub fn new() -> Self {
+    pub fn new(pad: bool) -> Self {
         let term_width = crossterm::terminal::size()
             .map(|(w, _)| w as usize)
             .unwrap_or(80);
         let avail_width = term_width.saturating_sub(4).max(20);
 
         Self {
+            pad,
             thinking_started: false,
             answer_started: false,
             at_line_start: true,
@@ -67,19 +69,18 @@ impl StreamRenderer {
         self.think_word_buf.clear();
     }
 
-    /// Closes thinking gutter without dumping arbitrary blank lines
+    /// Closes thinking gutter; emits spacer line only when pad is true
     pub fn close_thinking(&mut self) {
-        self.flush_think_word();
-        if self.thinking_started {
+        if self.thinking_started && !self.answer_started {
             if !self.at_line_start {
-                let stdout = io::stdout();
-                let mut handle = stdout.lock();
-                let _ = write!(handle, "\x1b[0m\n");
-                let _ = handle.flush();
+                println!();
+                self.at_line_start = true;
             }
-            self.thinking_started = false;
-            self.at_line_start = true;
-            self.think_col = 0;
+            if self.pad {
+                println!();
+            }
+            self.answer_started = true;
+            let _ = io::stdout().flush();
         }
     }
 
@@ -131,12 +132,9 @@ impl StreamRenderer {
         } else {
             self.answer_chars += chunk.len();
 
-            // Transition from thinking to answer: exactly one clean blank line
+            // Transition from thinking to answer
             if self.thinking_started && !self.answer_started {
                 self.close_thinking();
-                println!();
-                self.answer_started = true;
-                self.at_line_start = true;
             }
 
             let stdout = io::stdout();
@@ -156,11 +154,12 @@ impl StreamRenderer {
             .unwrap_or(0.01)
             .max(0.01);
 
-        // Ensure we end the current line, then leave exactly 1 blank line before telemetry
         if !self.at_line_start {
             println!();
         }
-        println!();
+        if self.pad {
+            println!();
+        }
 
         let in_tok = if stats.prompt_tokens > 0 {
             stats.prompt_tokens
@@ -219,7 +218,11 @@ impl StreamRenderer {
         parts.push(format!("{:.1}s @ {:.1} t/s", elapsed_gen, speed));
 
         let stat_line = parts.join(" · ");
-        println!("  \x1b[2m{}\x1b[0m\n", stat_line);
+        if self.pad {
+            println!("  \x1b[2m{}\x1b[0m\n", stat_line);
+        } else {
+            println!("  \x1b[2m{}\x1b[0m", stat_line);
+        }
         let _ = io::stdout().flush();
     }
 }

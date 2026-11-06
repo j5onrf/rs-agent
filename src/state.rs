@@ -2,29 +2,34 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize)]
 pub struct AppState {
     pub box_style: usize,
+    #[serde(default)]
+    pub pad: bool,
 }
 
 impl Default for AppState {
     fn default() -> Self {
-        Self { box_style: 1 }
+        Self {
+            box_style: 1,
+            pad: false, // Default is dense (no extra padding)
+        }
     }
 }
 
-fn state_path() -> PathBuf {
+fn get_state_path() -> PathBuf {
     dirs::home_dir()
         .map(|h| h.join(".config/rs-agent/state.json"))
         .unwrap_or_else(|| PathBuf::from("state.json"))
 }
 
 pub fn get_box_style() -> usize {
-    let p = state_path();
-    if p.exists() {
-        if let Ok(c) = fs::read_to_string(&p) {
-            if let Ok(s) = serde_json::from_str::<AppState>(&c) {
-                return s.box_style.clamp(1, 5);
+    let path = get_state_path();
+    if let Ok(content) = fs::read_to_string(path) {
+        if let Ok(state) = serde_json::from_str::<AppState>(&content) {
+            if state.box_style >= 1 && state.box_style <= 5 {
+                return state.box_style;
             }
         }
     }
@@ -32,14 +37,37 @@ pub fn get_box_style() -> usize {
 }
 
 pub fn set_box_style(style: usize) {
-    let p = state_path();
-    if let Some(parent) = p.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
-    let s = AppState {
-        box_style: style.clamp(1, 5),
+    let path = get_state_path();
+    let mut state = if let Ok(content) = fs::read_to_string(&path) {
+        serde_json::from_str::<AppState>(&content).unwrap_or_default()
+    } else {
+        AppState::default()
     };
-    if let Ok(c) = serde_json::to_string_pretty(&s) {
-        let _ = fs::write(p, c);
+    state.box_style = style;
+    if let Ok(content) = serde_json::to_string_pretty(&state) {
+        let _ = fs::write(path, content);
+    }
+}
+
+pub fn get_pad() -> bool {
+    let path = get_state_path();
+    if let Ok(content) = fs::read_to_string(path) {
+        if let Ok(state) = serde_json::from_str::<AppState>(&content) {
+            return state.pad;
+        }
+    }
+    false // Dense by default
+}
+
+pub fn set_pad(pad: bool) {
+    let path = get_state_path();
+    let mut state = if let Ok(content) = fs::read_to_string(&path) {
+        serde_json::from_str::<AppState>(&content).unwrap_or_default()
+    } else {
+        AppState::default()
+    };
+    state.pad = pad;
+    if let Ok(content) = serde_json::to_string_pretty(&state) {
+        let _ = fs::write(path, content);
     }
 }

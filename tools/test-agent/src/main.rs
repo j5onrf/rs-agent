@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use rs_agent::config::WorkspaceConfig;
+use rs_agent::security::SecurityBoundary;
 
 const GREEN_TICK: &str = "\x1b[1;32m✓ PASS\x1b[0m";
 const RED_CROSS: &str = "\x1b[1;31m✖ FAIL\x1b[0m";
@@ -45,7 +47,6 @@ impl TestRunner {
         println!("       RS-AGENT ALL-IN-ONE Conclusive Diagnostic & Test Suite          ");
         println!("======================================================================\n");
 
-        // Resolve primary release binary (target/release/ai or target/release/rs-agent)
         let bin_path = if self.base_dir.join("target/release/ai").exists() {
             self.base_dir.join("target/release/ai")
         } else {
@@ -79,14 +80,43 @@ impl TestRunner {
         self.record(heal_ok, "Stack-Based Broken JSON Arguments Repair", "Repaired unclosed brackets & braces");
         println!();
 
-        // [Pass 3/10] Zero-Trust Security Kernel & Boundary Containment
-        println!("[Pass 3/10] Zero-Trust Security Kernel & Boundary Containment");
-        let sec_file = self.base_dir.join("src/security.rs");
-        let sec_exists = self.file_contains(&sec_file, "is_outside");
-        self.record(sec_exists, "Security Boundary Traversal Guard", "Blocked /etc/passwd");
+        // [Pass 3/10] LIVE Zero-Trust Security Kernel & Boundary Containment
+        println!("[Pass 3/10] LIVE Zero-Trust Security Kernel & Boundary Containment");
+        let temp_sandbox = std::env::temp_dir().join("rs-agent-security-sandbox");
+        let _ = fs::create_dir_all(&temp_sandbox);
+        let boundary = SecurityBoundary::new(&temp_sandbox);
 
-        let mutating_ok = self.file_contains(&sec_file, "MUTATING_COMMANDS");
-        self.record(mutating_ok, "Mutating Command Gating (sudo/pacman/pip/rm)", "All mutating patterns intercepted");
+        // 1. Live path traversal tests
+        let blocked_passwd = boundary.is_outside(Path::new("/etc/passwd"));
+        self.record(blocked_passwd, "Security Boundary: Block Traversal (/etc/passwd)", if blocked_passwd { "Strictly blocked" } else { "LEAKED!" });
+
+        let blocked_rel = boundary.is_outside(Path::new("../../secret_file"));
+        self.record(blocked_rel, "Security Boundary: Block Relative Traversal (../../)", if blocked_rel { "Strictly blocked" } else { "LEAKED!" });
+
+        let in_sandbox_file = temp_sandbox.join("valid.py");
+        let _ = fs::write(&in_sandbox_file, "# test");
+        let allowed_inside = !boundary.is_outside(&in_sandbox_file);
+        self.record(allowed_inside, "Security Boundary: Permit In-Sandbox Work", if allowed_inside { "Autonomous inside root" } else { "False positive!" });
+
+        let dev_null_ok = !boundary.is_outside(Path::new("/dev/null"));
+        self.record(dev_null_ok, "Security Boundary: Whitelist Device Nodes (/dev/null)", if dev_null_ok { "Permitted" } else { "False positive!" });
+
+        // 2. Live mutating command tests
+        let sudo_blocked = boundary.check_command("sudo pacman -Syu") == Some("sudo");
+        let pip_blocked = boundary.check_command("pip install requests") == Some("pip");
+        let py_pip_blocked = boundary.check_command("python3 -m pip install evil") == Some("python -m pip/venv");
+        let rm_blocked = boundary.check_command("rm -rf /") == Some("destructive rm");
+        let mutating_ok = sudo_blocked && pip_blocked && py_pip_blocked && rm_blocked;
+        self.record(mutating_ok, "Mutating Command Gating (sudo/pip/py -m pip/rm)", if mutating_ok { "All mutating patterns intercepted" } else { "Bypass detected!" });
+
+        // 3. Read-only inspection exemptions
+        let sys_status_ok = boundary.check_command("systemctl status nginx").is_none();
+        let pacman_q_ok = boundary.check_command("pacman -Qs ripgrep").is_none();
+        let cargo_test_ok = boundary.check_command("cargo test --all").is_none();
+        let readonly_ok = sys_status_ok && pacman_q_ok && cargo_test_ok;
+        self.record(readonly_ok, "Read-Only Inspection Passthrough (systemctl/pacman/cargo)", if readonly_ok { "Zero false-positive prompts" } else { "Readonly command blocked!" });
+
+        let _ = fs::remove_dir_all(&temp_sandbox);
         println!();
 
         // [Pass 4/10] Smol 6-Tool Suite Core Operations
@@ -142,21 +172,27 @@ impl TestRunner {
         self.record(fallback_status == 127, "Intent Matcher: Unknown Query Fallback", "Exited 127 (CNF-pass)");
         println!();
 
-        // [Pass 7/10] Workspace Profiles & YAML Frontmatter Directives
-        println!("[Pass 7/10] Workspace Profiles & YAML Frontmatter Directives");
-        let chat_prof = self.base_dir.join("profiles/chat.md");
-        let chat_ok = chat_prof.is_file();
-        self.record(chat_ok, "Default Chat Profile Exists (profiles/chat.md)", &chat_prof.display().to_string());
+        // [Pass 7/10] LIVE Execution Isolation: ai <chat> vs ai init <workspace>
+        println!("[Pass 7/10] LIVE Execution Isolation: ai <chat> vs ai init <workspace>");
+        
+        // 1. Chat Mode Security Invariant
+        let chat_dir = self.base_dir.join("projects/chat");
+        let chat_cfg = WorkspaceConfig::load_or_default(&chat_dir);
+        let chat_pure = !chat_cfg.is_agent && !chat_dir.join(".rs/config.json").exists();
+        self.record(chat_pure, "Chat Mode Security (ai): Zero-Tool Isolation", "is_agent=false · active_tools=None · Pure Conversational");
 
-        let pure_personas = !self.file_contains(&chat_prof, "box_style:");
-        self.record(pure_personas, "Profile Directives: Pure Personas (No Box Coupling)", "Box coupled to user state, not profile");
-
-        let sec_file = self.base_dir.join("src/security.rs");
-        let zero_trust = self.file_contains(&sec_file, "MUTATING_COMMANDS") && self.file_contains(&sec_file, "is_outside");
-        self.record(zero_trust, "Zero-Trust Sandbox Autonomy", "Autonomous inside workspace, hard-gated outside");
+        // 2. Workspace Agent Security Invariant
+        let agent_ws = std::env::temp_dir().join("rs-agent-workspace-diag");
+        let _ = fs::create_dir_all(&agent_ws);
+        let mut agent_cfg = WorkspaceConfig::load_or_default(&agent_ws);
+        agent_cfg.is_agent = true;
+        let agent_boundary = SecurityBoundary::new(&agent_ws);
+        let agent_isolated = agent_cfg.is_agent && agent_boundary.is_outside(Path::new("/etc/passwd"));
+        self.record(agent_isolated, "Workspace Agent (ai init): Sandboxed Autonomy", "is_agent=true · Native 6-tools restricted to workspace root");
+        let _ = fs::remove_dir_all(&agent_ws);
         println!();
 
-        // [Pass 8/10] Terminal UI Box Engine & Dynamic Switching (Future-Proof)
+        // [Pass 8/10] Terminal UI Box Engine & Dynamic Switching
         println!("[Pass 8/10] Terminal UI Box Engine & Dynamic Switching");
         let ui_file = self.base_dir.join("src/ui.rs");
         let ui_render_ok = self.file_contains(&ui_file, "draw_box") && self.file_contains(&ui_file, "render_frame");

@@ -1,9 +1,8 @@
 [package]
 name = "test-agent"
-version = "0.2.0"
+version = "0.5.2"
 edition = "2021"
 
 [dependencies]
 dirs = "5.0"
-
-[workspace]
+rs-agent = { path = "../../" }

@@ -482,8 +482,10 @@ impl LlmClient {
                     }
 
                     if let Some(tc_array) = delta.get("tool_calls").and_then(|v| v.as_array()) {
-                        renderer.close_thinking();
-                        spinner.update("Drafting tool action...");
+                        if tool_calls_map.is_empty() {
+                            renderer.close_thinking();
+                            spinner.start("Drafting tool action...");
+                        }
 
                         for tc in tc_array {
                             let idx = tc.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;

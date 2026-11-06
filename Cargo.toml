@@ -1,6 +1,6 @@
 [package]
 name = "rs-agent"
-version = "0.5.1"
+version = "0.5.2"
 edition = "2021"
 
 [workspace]
@@ -9,6 +9,7 @@ members = [
     "plugins/t3code",
     "tools/model-select",
     "tools/new-project",
+    "tools/test-agent",
 ]
 
 [lib]

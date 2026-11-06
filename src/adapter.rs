@@ -60,9 +60,21 @@ pub fn normalize_params(map: &mut serde_json::Map<String, serde_json::Value>) {
     }
 
     if let Some(serde_json::Value::String(p)) = map.get_mut("path") {
-        if p.starts_with('/') && !p.starts_with("/tmp") && !p.starts_with("/home") && !p.starts_with("/dev") {
-            *p = p.trim_start_matches('/').to_string();
+        let mut s = p.as_str();
+
+        // Heal common Docker / SWE-bench container hallucinations from SLMs
+        if let Some(stripped) = s.strip_prefix("/workspace/").or_else(|| s.strip_prefix("workspace/")) {
+            s = stripped;
+        } else if let Some(stripped) = s.strip_prefix("/app/").or_else(|| s.strip_prefix("app/")) {
+            s = stripped;
+        } else if let Some(stripped) = s.strip_prefix("/project/").or_else(|| s.strip_prefix("project/")) {
+            s = stripped;
         }
+
+        if s.starts_with('/') && !s.starts_with("/tmp") && !s.starts_with("/home") && !s.starts_with("/dev") {
+            s = s.trim_start_matches('/');
+        }
+        *p = s.to_string();
     }
 
     if let Some(serde_json::Value::String(s)) = map.get_mut("old_str") {
@@ -83,7 +95,6 @@ pub fn heal_json_args(raw_args: &str) -> serde_json::Value {
         return v;
     }
 
-    // Strip markdown code fences
     let mut s = trimmed;
     if s.starts_with("```") {
         if let Some(first_newline) = s.find('\n') {
@@ -100,7 +111,6 @@ pub fn heal_json_args(raw_args: &str) -> serde_json::Value {
         }
     }
 
-    // Stack balancer for unclosed strings and structures
     let mut balanced = s.to_string();
     let mut in_str = false;
     let mut escape = false;

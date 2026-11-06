@@ -3,20 +3,36 @@ use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+const SYSTEM_DEVICES: &[&str] = &[
+    "/dev/tty",
+    "/dev/null",
+    "/dev/urandom",
+    "/dev/zero",
+    "/dev/random",
+];
+
 const MUTATING_COMMANDS: &[&str] = &[
     "sudo", "doas", "su", "pkexec",
     "pip", "pip3", "pipx",
-    "pacman", "yay", "paru", "apt", "dnf",
+    "pacman", "yay", "paru", "apt", "apt-get", "dnf", "yum",
     "systemctl", "reboot", "shutdown", "poweroff",
-    "mkfs", "dd", "fdisk", "parted",
+    "useradd", "usermod", "userdel", "passwd", "chroot",
+    "mkfs", "dd", "fdisk", "parted", "wipefs",
 ];
 
 static MUTATING_RE: OnceLock<regex::Regex> = OnceLock::new();
+static PYTHON_PIP_RE: OnceLock<regex::Regex> = OnceLock::new();
 
 fn get_mutating_re() -> &'static regex::Regex {
     MUTATING_RE.get_or_init(|| {
         let pattern = format!(r"\b({})\b", MUTATING_COMMANDS.join("|"));
         regex::Regex::new(&pattern).expect("Valid mutating commands regex")
+    })
+}
+
+fn get_python_pip_re() -> &'static regex::Regex {
+    PYTHON_PIP_RE.get_or_init(|| {
+        regex::Regex::new(r"\bpython[0-9.]*\s+-m\s+(pip|pip3|pipx|ensurepip|venv)\b").expect("Valid python pip regex")
     })
 }
 
@@ -41,21 +57,74 @@ impl SecurityBoundary {
         }
     }
 
+    /// Walk up to closest existing ancestor to canonicalize.
+    /// Fails closed if target escapes the workspace root boundary.
     pub fn is_outside(&self, path: &Path) -> bool {
-        if path.exists() {
-            if let Ok(canon) = path.canonicalize() {
-                return !canon.starts_with(&self.root);
-            }
-        } else if let Some(parent) = path.parent() {
-            if let Ok(canon_parent) = parent.canonicalize() {
-                return !canon_parent.starts_with(&self.root);
+        let path_str = path.to_string_lossy();
+        for &dev in SYSTEM_DEVICES {
+            if path_str == dev {
+                return false;
             }
         }
-        true
+
+        let mut curr = path.to_path_buf();
+        while !curr.exists() {
+            if let Some(parent) = curr.parent() {
+                if parent == curr {
+                    break;
+                }
+                curr = parent.to_path_buf();
+            } else {
+                break;
+            }
+        }
+
+        if let Ok(canon) = curr.canonicalize() {
+            let canon_str = canon.to_string_lossy();
+            for &dev in SYSTEM_DEVICES {
+                if canon_str == dev {
+                    return false;
+                }
+            }
+            !canon.starts_with(&self.root)
+        } else {
+            true
+        }
     }
 
     pub fn check_command(&self, cmd: &str) -> Option<&'static str> {
         let lower = cmd.to_lowercase();
+        let trimmed = lower.trim();
+
+        // 1. Python -m pip / venv module execution bypass
+        if get_python_pip_re().is_match(trimmed) {
+            return Some("python -m pip/venv");
+        }
+
+        // 2. Read-only inspection exemptions for systemctl and pacman
+        if trimmed.starts_with("systemctl ") {
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
+            if parts.len() >= 2 {
+                let sub = parts[1];
+                let readonly = matches!(sub, "status" | "is-active" | "is-enabled" | "is-failed" | "list-units" | "list-unit-files" | "list-timers" | "list-sockets" | "show" | "cat");
+                if readonly {
+                    return None;
+                }
+            }
+        }
+
+        if trimmed.starts_with("pacman ") {
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
+            if parts.len() >= 2 {
+                let flag = parts[1];
+                let readonly = flag.starts_with("-q") || flag == "--query" || flag == "-ss" || flag == "-si";
+                if readonly {
+                    return None;
+                }
+            }
+        }
+
+        // 3. Mutating binary checks
         let re = get_mutating_re();
         if let Some(mat) = re.find(&lower) {
             let matched = mat.as_str();
@@ -65,13 +134,18 @@ impl SecurityBoundary {
                 }
             }
         }
+
+        // 4. Destructive shell patterns
         if lower.contains("rm -rf /") || lower.contains("rm -rf ~") || lower.contains("rm -rf *") {
             return Some("destructive rm");
         }
+        if lower.contains("mkfs") || lower.contains("wipefs") || lower.contains("dd if=") {
+            return Some("raw disk mutation");
+        }
+
         None
     }
 
-    /// Hard security gate: prompts only on boundary violations or mutating binaries
     pub fn authorize(&self, violation: &str) -> bool {
         print!("\n\x1b[1;31m[SECURITY-ALERT] Authorize: {}? [y/N]: \x1b[0m", violation);
         let _ = io::stdout().flush();

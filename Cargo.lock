@@ -984,7 +984,7 @@ dependencies = [
 
 [[package]]
 name = "rs-agent"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -1242,6 +1242,14 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "test-agent"
+version = "0.5.2"
+dependencies = [
+ "dirs",
+ "rs-agent",
 ]
 
 [[package]]

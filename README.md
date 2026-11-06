@@ -3,7 +3,7 @@
   <h1>Rs-Agent</h1>
  
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.5.1.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.5.2.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -147,7 +147,7 @@
 </div>
 
 <p align="center">
-  <sub><code>/p</code> profile select &nbsp;•&nbsp; <code>/task</code> goal loop &nbsp;•&nbsp; <code>/t3</code> launch IDE &nbsp;•&nbsp; <code>/s</code> toggle skills &nbsp;•&nbsp; <code>/box</code> themes &nbsp;•&nbsp; <code>/r</code> reset</sub>
+  <sub><code>/p</code> profile select &nbsp;•&nbsp; <code>/task</code> goal loop &nbsp;•&nbsp; <code>/t3</code> launch IDE &nbsp;•&nbsp; <code>/s</code> toggle skills &nbsp;•&nbsp; <code>/box</code> themes &nbsp;•&nbsp; <code>/pad</code> padding &nbsp;•&nbsp; <code>/r</code> reset</sub>
 </p>
 
 ---
