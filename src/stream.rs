@@ -47,18 +47,20 @@ impl StreamRenderer {
         }
 
         let w_len = self.think_word_buf.chars().count();
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
 
         if self.at_line_start {
             let clean = self.think_word_buf.trim_start();
-            print!("\x1b[2m│ \x1b[0m\x1b[2m{}", clean);
+            let _ = write!(handle, "\x1b[2m│ \x1b[0m\x1b[2m{}", clean);
             self.think_col = clean.chars().count();
             self.at_line_start = false;
         } else if self.think_col + w_len > self.avail_width {
             let clean = self.think_word_buf.trim_start();
-            print!("\x1b[0m\n\x1b[2m│ \x1b[0m\x1b[2m{}", clean);
+            let _ = write!(handle, "\x1b[0m\n\x1b[2m│ \x1b[0m\x1b[2m{}", clean);
             self.think_col = clean.chars().count();
         } else {
-            print!("{}", self.think_word_buf);
+            let _ = write!(handle, "{}", self.think_word_buf);
             self.think_col += w_len;
         }
 
@@ -70,12 +72,14 @@ impl StreamRenderer {
         self.flush_think_word();
         if self.thinking_started {
             if !self.at_line_start {
-                print!("\x1b[0m\n");
+                let stdout = io::stdout();
+                let mut handle = stdout.lock();
+                let _ = write!(handle, "\x1b[0m\n");
+                let _ = handle.flush();
             }
             self.thinking_started = false;
             self.at_line_start = true;
             self.think_col = 0;
-            let _ = io::stdout().flush();
         }
     }
 
@@ -101,10 +105,12 @@ impl StreamRenderer {
                     '\r' => continue,
                     '\n' => {
                         self.flush_think_word();
+                        let stdout = io::stdout();
+                        let mut handle = stdout.lock();
                         if self.at_line_start {
-                            print!("\x1b[2m│\x1b[0m\n");
+                            let _ = write!(handle, "\x1b[2m│\x1b[0m\n");
                         } else {
-                            print!("\x1b[0m\n");
+                            let _ = write!(handle, "\x1b[0m\n");
                             self.at_line_start = true;
                             self.think_col = 0;
                         }
@@ -133,9 +139,11 @@ impl StreamRenderer {
                 self.at_line_start = true;
             }
 
-            print!("\x1b[0m{}", chunk);
+            let stdout = io::stdout();
+            let mut handle = stdout.lock();
+            let _ = write!(handle, "\x1b[0m{}", chunk);
             self.at_line_start = chunk.ends_with('\n');
-            let _ = io::stdout().flush();
+            let _ = handle.flush();
         }
     }
 

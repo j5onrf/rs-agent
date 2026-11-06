@@ -586,7 +586,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                                 active_skills.push(sk.name.clone());
                                 println!("  \x1b[1;32m✓\x1b[0m \x1b[2mSkill attached:\x1b[0m \x1b[1;36m{}\x1b[0m\n", sk.name);
                             }
-                        } else if active_skills.len() >= 3 {
+                        } else if active_skills.len() >= 5 {
                             println!("  \x1b[1;31m✗\x1b[0m \x1b[2mMax 3 skills reached (detach one first)\x1b[0m\n");
                         }
                     }
@@ -614,9 +614,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         if input.starts_with("/box") {
             let parts: Vec<&str> = input.split_whitespace().collect();
             current_box_style = if parts.len() > 1 {
-                parts[1].parse::<usize>().unwrap_or((current_box_style % 4) + 1)
+                parts[1].parse::<usize>().unwrap_or((current_box_style % 5) + 1)
             } else {
-                (current_box_style % 4) + 1
+                (current_box_style % 5) + 1
             };
             state::set_box_style(current_box_style);
 
@@ -624,7 +624,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             println!();
             println!("\x1b[1;32m✓\x1b[0m \x1b[2mTheme set to box style\x1b[0m \x1b[1;36m{}\x1b[0m", current_box_style);
             let second_line = if cfg.is_agent { &cfg.profile_name } else { "chat" };
-            ui::draw_box(&provider.model, second_line, current_box_style, false);
+            ui::draw_box(&provider.model, second_line, current_box_style, true);
             let _ = io::stdout().flush();
             continue;
         }

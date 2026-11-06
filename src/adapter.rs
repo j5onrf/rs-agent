@@ -1,18 +1,24 @@
 pub fn strip_line_gutters(text: &str) -> String {
-    let mut out = Vec::new();
+    let mut out = String::with_capacity(text.len());
+    let mut first = true;
     for line in text.lines() {
+        if !first {
+            out.push('\n');
+        }
+        first = false;
+
         let trimmed_start = line.trim_start();
         if let Some(pos) = trimmed_start.find(|c: char| c == ':' || c == '|') {
-            let prefix = &trimmed_start[..pos].trim();
+            let prefix = trimmed_start[..pos].trim();
             if !prefix.is_empty() && prefix.chars().all(|c| c.is_ascii_digit()) {
                 let rest = trimmed_start[pos + 1..].strip_prefix(' ').unwrap_or(&trimmed_start[pos + 1..]);
-                out.push(rest.to_string());
+                out.push_str(rest);
                 continue;
             }
         }
-        out.push(line.to_string());
+        out.push_str(line);
     }
-    out.join("\n")
+    out
 }
 
 pub fn normalize_params(map: &mut serde_json::Map<String, serde_json::Value>) {

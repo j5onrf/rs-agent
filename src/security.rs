@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 const MUTATING_COMMANDS: &[&str] = &[
     "sudo", "doas", "su", "pkexec",
@@ -9,6 +10,15 @@ const MUTATING_COMMANDS: &[&str] = &[
     "systemctl", "reboot", "shutdown", "poweroff",
     "mkfs", "dd", "fdisk", "parted",
 ];
+
+static MUTATING_RE: OnceLock<regex::Regex> = OnceLock::new();
+
+fn get_mutating_re() -> &'static regex::Regex {
+    MUTATING_RE.get_or_init(|| {
+        let pattern = format!(r"\b({})\b", MUTATING_COMMANDS.join("|"));
+        regex::Regex::new(&pattern).expect("Valid mutating commands regex")
+    })
+}
 
 pub struct SecurityBoundary {
     pub root: PathBuf,
@@ -46,10 +56,13 @@ impl SecurityBoundary {
 
     pub fn check_command(&self, cmd: &str) -> Option<&'static str> {
         let lower = cmd.to_lowercase();
-        for &mutating in MUTATING_COMMANDS {
-            let pattern = format!(r"\b{}\b", mutating);
-            if regex::Regex::new(&pattern).map(|r| r.is_match(&lower)).unwrap_or(false) {
-                return Some(mutating);
+        let re = get_mutating_re();
+        if let Some(mat) = re.find(&lower) {
+            let matched = mat.as_str();
+            for &mutating in MUTATING_COMMANDS {
+                if mutating == matched {
+                    return Some(mutating);
+                }
             }
         }
         if lower.contains("rm -rf /") || lower.contains("rm -rf ~") || lower.contains("rm -rf *") {
