@@ -85,7 +85,7 @@
 ```
 
 <div align="center">
-  <p><sub>Switch terminal styles with <code>/box [1-5]</code> · Progressive 350ms wake-on-key reveal</sub></p>
+  <p><sub>Switch with <code>/box [1-5]</code> · Halftone skeleton dither, Nothing OS dot slabs, and snappy laser wipes · Wake-on-key input</sub></p>
 </div>
 
 ---
