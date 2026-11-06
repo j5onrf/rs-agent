@@ -452,11 +452,16 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 let _ = io::stdout().flush();
 
                 match cmd.status() {
-                    Ok(s) if s.success() => {
-                        println!("  \x1b[1;32m✓\x1b[0m \x1b[2mT3 Code session active for workspace\x1b[0m \x1b[1;36m{}\x1b[0m\n", target_dir.display());
+                    Ok(status) if status.success() => {
+                        println!("  \x1b[1;32m✓\x1b[0m \x1b[2mT3 Code session active for workspace\x1b[0m \x1b[1;36m{}\x1b[0m", target_dir.display());
+                        println!("  \x1b[1;33m▲\x1b[0m \x1b[2mTerminal window is safe to close. Exiting rs-agent...\x1b[0m\n");
+                        print!("\x1b[?25h");
+                        let _ = io::stdout().flush();
+                        let _ = fs::remove_file(&_lock_guard);
+                        std::process::exit(0);
                     }
-                    Ok(_) => {
-                        println!("  \x1b[1;33m▲\x1b[0m \x1b[2mT3 Code window closed.\x1b[0m\n");
+                    Ok(status) => {
+                        println!("  \x1b[1;31m✗\x1b[0m \x1b[2mT3 Code launcher exited with status: {}\x1b[0m\n", status);
                     }
                     Err(e) => {
                         println!("  \x1b[1;31m✗\x1b[0m \x1b[2mFailed launching T3 Code: {}\x1b[0m\n", e);
