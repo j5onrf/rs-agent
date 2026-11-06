@@ -2,12 +2,53 @@ use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use std::collections::HashMap;
 use std::io::{self, Write};
+use std::process::Command;
 use std::time::{Duration, Instant};
 
 fn cell_dither_threshold(x: usize, y: usize) -> f64 {
     let mut n = (x as u64 * 374761393) ^ (y as u64 * 668265263);
     n = (n ^ (n >> 13)).wrapping_mul(1274126177);
     ((n ^ (n >> 16)) % 1000) as f64 / 1000.0
+}
+
+fn resolve_git_status() -> String {
+    let output = Command::new("git")
+        .args(["status", "--porcelain", "-b"])
+        .output();
+
+    match output {
+        Ok(out) if out.status.success() => {
+            let text = String::from_utf8_lossy(&out.stdout);
+            let mut lines = text.lines();
+            let header = lines.next().unwrap_or("").trim_start_matches("##").trim();
+
+            let branch = header
+                .split("...")
+                .next()
+                .unwrap_or(header)
+                .split_whitespace()
+                .next()
+                .unwrap_or("detached");
+
+            let dirty = lines.filter(|l| !l.trim().is_empty()).count();
+            let status = if dirty == 0 {
+                "clean".to_string()
+            } else if dirty == 1 {
+                "1 modified".to_string()
+            } else {
+                format!("{} modified", dirty)
+            };
+
+            let res = format!("git: {} · {}", branch, status);
+            if res.chars().count() > 32 {
+                let truncated: String = res.chars().take(31).collect();
+                format!("{}…", truncated)
+            } else {
+                res
+            }
+        }
+        _ => "git: [none]".to_string(),
+    }
 }
 
 pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) -> (Vec<String>, usize) {
@@ -91,12 +132,21 @@ pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) -> 
                 if 11 + i < box_w - 2 { real_chars.insert((11 + i, 2), (c, "\x1b[38;2;0;242;254m")); }
             }
 
-            let bars: [(usize, usize, usize); 5] = [
+            // 4. Dynamic git status line (row 3, col 11..)
+            let git_info = resolve_git_status();
+            for (i, c) in git_info.chars().enumerate() {
+                if 11 + i < box_w - 2 {
+                    real_chars.insert((11 + i, 3), (c, "\x1b[38;2;90;105;125m"));
+                }
+            }
+
+            let bars: [(usize, usize, usize); 6] = [
                 (3, 1, 6),
                 (3, 2, 6),
                 (3, 3, 6),
                 (11, 1, model.len().max(16).min(box_w - 13)),
                 (11, 2, profile.len().max(12).min(box_w - 13)),
+                (11, 3, git_info.chars().count().max(12).min(box_w - 13)),
             ];
 
             let reveal = if progress < 0.35 {
