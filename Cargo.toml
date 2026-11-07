@@ -21,6 +21,7 @@ name = "ai"
 path = "src/main.rs"
 
 [dependencies]
+mimalloc = { version = "0.1", default-features = false }
 anyhow = "1.0"
 clap = { version = "4.4", features = ["derive"] }
 crossterm = "0.27"

@@ -1,3 +1,5 @@
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 use clap::{Parser, Subcommand};
 use rs_agent::adapter;
 use rs_agent::client::{ChatMessage, LlmClient};
@@ -397,6 +399,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
     let mut spinner = InlineSpinner::new();
     let mut last_total_tokens = 0;
+    let mut line_buf = String::with_capacity(512);
 
     loop {
         print!("\x1b[?25h");
