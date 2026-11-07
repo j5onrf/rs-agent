@@ -10,13 +10,15 @@ pub struct InlineSpinner {
     handle: Option<JoinHandle<()>>,
 }
 
+impl Default for InlineSpinner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl InlineSpinner {
     pub fn new() -> Self {
-        Self {
-            running: Arc::new(AtomicBool::new(false)),
-            message: Arc::new(Mutex::new(String::new())),
-            handle: None,
-        }
+        Self { running: Arc::new(AtomicBool::new(false)), message: Arc::new(Mutex::new(String::new())), handle: None }
     }
 
     pub fn start(&mut self, msg: &str) {

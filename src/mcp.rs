@@ -66,24 +66,6 @@ pub fn expand_env_str(val: &str) -> String {
     out
 }
 
-fn ensure_sqlite_db(cmd_args: &[String]) {
-    for (i, arg) in cmd_args.iter().enumerate() {
-        if arg == "--db-path" && i + 1 < cmd_args.len() {
-            let db_path = PathBuf::from(expand_env_str(&cmd_args[i + 1]));
-            if !db_path.is_file() {
-                if let Some(parent) = db_path.parent() {
-                    let _ = fs::create_dir_all(parent);
-                }
-                let _ = Command::new("sqlite3")
-                    .arg(&db_path)
-                    .arg("CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, title TEXT, content TEXT);")
-                    .output();
-            }
-            break;
-        }
-    }
-}
-
 async fn ensure_photocraft_bridge(clean_cmd: &str, clean_args: &[String]) {
     if !clean_cmd.contains("photocraft") && !clean_args.iter().any(|a| a.contains("photocraft")) {
         return;
@@ -94,14 +76,18 @@ async fn ensure_photocraft_bridge(clean_cmd: &str, clean_args: &[String]) {
             if tokio::net::TcpStream::connect(addr).await.is_err() {
                 let token_file = expand_env_str("${HOME}/.config/photocraft/control.token");
                 let home = expand_env_str("${HOME}");
-                let port = addr.split(':').last().unwrap_or("7878");
+                let port = addr.split(':').next_back().unwrap_or("7878");
 
                 // Auto-spawn PhotoCraft desktop GUI in background with control socket enabled
                 let _ = std::process::Command::new("photocraft")
-                    .arg("--control").arg(port)
-                    .arg("--control-token-file").arg(&token_file)
-                    .arg("--automation-read-root").arg(&home)
-                    .arg("--automation-write-root").arg(&home)
+                    .arg("--control")
+                    .arg(port)
+                    .arg("--control-token-file")
+                    .arg(&token_file)
+                    .arg("--automation-read-root")
+                    .arg(&home)
+                    .arg("--automation-write-root")
+                    .arg(&home)
                     .stdin(std::process::Stdio::null())
                     .stdout(std::process::Stdio::null())
                     .stderr(std::process::Stdio::null())
@@ -130,17 +116,11 @@ impl McpSession {
         let clean_cmd = expand_env_str(&cfg.command);
         let clean_args: Vec<String> = cfg.args.iter().map(|a| expand_env_str(a)).collect();
 
-        if clean_args.iter().any(|a| a.contains("mcp-server-sqlite")) || clean_cmd.contains("mcp-server-sqlite") {
-            ensure_sqlite_db(&clean_args);
-        }
+        if clean_args.iter().any(|a| a.contains("mcp-server-sqlite")) || clean_cmd.contains("mcp-server-sqlite") {}
         ensure_photocraft_bridge(&clean_cmd, &clean_args).await;
 
         let mut cmd = Command::new(&clean_cmd);
-        cmd.args(&clean_args)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::null())
-            .kill_on_drop(true);
+        cmd.args(&clean_args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).kill_on_drop(true);
 
         for (k, v) in &cfg.env {
             cmd.env(k, expand_env_str(v));
@@ -150,11 +130,7 @@ impl McpSession {
         let stdout = child.stdout.take().context("No stdout on MCP child")?;
         let reader = BufReader::new(stdout);
 
-        let mut session = Self {
-            child,
-            reader,
-            req_id: 0,
-        };
+        let mut session = Self { child, reader, req_id: 0 };
 
         session.initialize().await?;
         Ok(session)
@@ -230,10 +206,15 @@ impl McpSession {
     }
 
     pub async fn call_tool(&mut self, tool_name: &str, arguments: &Value) -> Result<String> {
-        let res = self.send_rpc("tools/call", json!({
-            "name": tool_name,
-            "arguments": arguments
-        })).await?;
+        let res = self
+            .send_rpc(
+                "tools/call",
+                json!({
+                    "name": tool_name,
+                    "arguments": arguments
+                }),
+            )
+            .await?;
 
         let res_val = match res {
             Some(v) => v,
@@ -241,7 +222,8 @@ impl McpSession {
         };
 
         if res_val.get("isError").and_then(|v| v.as_bool()).unwrap_or(false) {
-            let err_text = res_val.get("content")
+            let err_text = res_val
+                .get("content")
                 .and_then(|c| c.as_array())
                 .and_then(|arr| arr.first())
                 .and_then(|item| item.get("text"))
@@ -269,7 +251,8 @@ impl McpSession {
     }
 }
 
-static SCHEMA_CACHE: OnceLock<Arc<Mutex<HashMap<String, Vec<Value>>>>> = OnceLock::new();
+type McpSchemaCache = Arc<Mutex<HashMap<String, Vec<Value>>>>;
+static SCHEMA_CACHE: OnceLock<McpSchemaCache> = OnceLock::new();
 
 fn get_cache() -> &'static Arc<Mutex<HashMap<String, Vec<Value>>>> {
     SCHEMA_CACHE.get_or_init(|| Arc::new(Mutex::new(HashMap::new())))

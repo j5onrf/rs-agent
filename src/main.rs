@@ -142,9 +142,7 @@ fn is_task_complete(text: &str) -> bool {
 
 fn handle_new_project(name: &str, intents_arg: Option<&str>) -> anyhow::Result<()> {
     let slug = name.trim().to_lowercase().replace(' ', "-");
-    let base_cfg = dirs::home_dir()
-        .map(|h| h.join(".config/rs-agent"))
-        .unwrap_or_else(|| PathBuf::from("."));
+    let base_cfg = dirs::home_dir().map(|h| h.join(".config/rs-agent")).unwrap_or_else(|| PathBuf::from("."));
 
     let projects_dir = base_cfg.join("projects").join(&slug);
     fs::create_dir_all(&projects_dir)?;
@@ -175,17 +173,17 @@ fn handle_new_project(name: &str, intents_arg: Option<&str>) -> anyhow::Result<(
             current_ctx.push_str(&entry);
         }
         fs::write(&ctx_file, current_ctx)?;
-        println!("\x1b[1;32m✓ Added to rs-context.md:\x1b[0m \x1b[36m{}\x1b[0m \x1b[2m--->\x1b[0m \x1b[33m{}\x1b[0m", slug, clean_intents);
+        println!(
+            "\x1b[1;32m✓ Added to rs-context.md:\x1b[0m \x1b[36m{}\x1b[0m \x1b[2m--->\x1b[0m \x1b[33m{}\x1b[0m",
+            slug, clean_intents
+        );
     }
 
     println!("\n\x1b[2mLaunch workspace:\x1b[0m \x1b[1;32mtype '{}' in terminal\x1b[0m\n", slug);
     Ok(())
 }
 
-fn build_system_prompt(
-    active_profile: &Option<Profile>,
-    active_skills: &[String],
-) -> String {
+fn build_system_prompt(active_profile: &Option<Profile>, active_skills: &[String]) -> String {
     let mut prompt = if let Some(prof) = active_profile {
         prof.system_prompt.clone()
     } else {
@@ -235,12 +233,8 @@ async fn execute_task_loop(
         print!("\x1b[?25l");
         let _ = io::stdout().flush();
 
-        let (reply, reasoning, tool_calls, stats) = client.stream_chat(
-            history,
-            active_tools.clone(),
-            &mut renderer,
-            spinner,
-        ).await?;
+        let (reply, reasoning, tool_calls, stats) =
+            client.stream_chat(history, active_tools.clone(), &mut renderer, spinner).await?;
 
         spinner.stop();
         renderer.finish(&stats, last_total_tokens);
@@ -259,7 +253,8 @@ async fn execute_task_loop(
                     let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
 
                     let brief = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(fn_args) {
-                        parsed.get("path")
+                        parsed
+                            .get("path")
                             .or_else(|| parsed.get("command"))
                             .or_else(|| parsed.get("pattern"))
                             .and_then(|v| v.as_str())
@@ -273,11 +268,8 @@ async fn execute_task_loop(
                     let _ = io::stdout().flush();
 
                     let t_start = Instant::now();
-                    let final_args = if cfg.adapters {
-                        adapter::repair_tool_args(fn_name, fn_args)
-                    } else {
-                        fn_args.to_string()
-                    };
+                    let final_args =
+                        if cfg.adapters { adapter::repair_tool_args(fn_name, fn_args) } else { fn_args.to_string() };
                     let tool_res = tools::execute_tool(fn_name, &final_args, target_dir, boundary).await;
                     let elapsed = t_start.elapsed().as_secs_f64();
 
@@ -309,14 +301,20 @@ async fn execute_task_loop(
                 || lower_goal.contains("add");
 
             if total_tools_run == 0 && requires_action {
-                println!("  \x1b[1;33m▲ [Task Loop]\x1b[0m Completion declared without tool execution. Enforcing action...");
+                println!(
+                    "  \x1b[1;33m▲ [Task Loop]\x1b[0m Completion declared without tool execution. Enforcing action..."
+                );
                 history.push(ChatMessage::user(
-                    "You declared completion without running tools. Execute the required tool action now."
+                    "You declared completion without running tools. Execute the required tool action now.",
                 ));
                 continue;
             }
 
-            println!("\n  \x1b[1;32m✓ [Task Loop] Goal completed in {} step(s) ({} tool action(s) executed)!\x1b[0m\n", turn + 1, total_tools_run);
+            println!(
+                "\n  \x1b[1;32m✓ [Task Loop] Goal completed in {} step(s) ({} tool action(s) executed)!\x1b[0m\n",
+                turn + 1,
+                total_tools_run
+            );
             return Ok(true);
         }
 
@@ -344,11 +342,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         let mut c = WorkspaceConfig::load_or_default(target_dir);
         c.is_agent = true;
 
-        let dir_name = target_dir
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("agent")
-            .to_string();
+        let dir_name = target_dir.file_name().and_then(|n| n.to_str()).unwrap_or("agent").to_string();
 
         c.profile_name = Profile::resolve_for_workspace(&dir_name, &provider.model, Some(&provider.base_url));
 
@@ -367,11 +361,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         c
     };
 
-    let mut active_profile = if cfg.is_agent {
-        Profile::load(&cfg.profile_name)
-    } else {
-        Profile::load("chat")
-    };
+    let mut active_profile = if cfg.is_agent { Profile::load(&cfg.profile_name) } else { Profile::load("chat") };
     client.set_reasoning_budget(active_profile.as_ref().and_then(|p| p.reasoning_budget));
 
     let (instance_num, _lock_guard) = resolve_instance_number(&cfg.profile_name);
@@ -461,7 +451,10 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         std::process::exit(0);
                     }
                     Ok(status) => {
-                        println!("  \x1b[1;31m✗\x1b[0m \x1b[2mT3 Code launcher exited with status: {}\x1b[0m\n", status);
+                        println!(
+                            "  \x1b[1;31m✗\x1b[0m \x1b[2mT3 Code launcher exited with status: {}\x1b[0m\n",
+                            status
+                        );
                     }
                     Err(e) => {
                         println!("  \x1b[1;31m✗\x1b[0m \x1b[2mFailed launching T3 Code: {}\x1b[0m\n", e);
@@ -487,11 +480,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 ""
             };
 
-            let effective_goal = if !direct_arg.is_empty() {
-                Some(direct_arg.to_string())
-            } else {
-                read_task_spec(target_dir)
-            };
+            let effective_goal =
+                if !direct_arg.is_empty() { Some(direct_arg.to_string()) } else { read_task_spec(target_dir) };
 
             if let Some(goal) = effective_goal {
                 let _ = execute_task_loop(
@@ -503,7 +493,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     &mut history,
                     active_tools.clone(),
                     &mut spinner,
-                ).await;
+                )
+                .await;
             } else {
                 println!("  \x1b[1;33m[task]\x1b[0m No objective provided and no TASK.md found.");
                 println!("         \x1b[2m• Usage:  /task <describe goal>\x1b[0m");
@@ -527,7 +518,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 print!("  \x1b[1;33m[warn]\x1b[0m Switching profile will erase active conversation. Proceed? [y/N] ");
                 let _ = io::stdout().flush();
                 let mut conf = String::new();
-                if io::stdin().read_line(&mut conf).is_err() || !matches!(conf.trim().to_lowercase().as_str(), "y" | "yes") {
+                if io::stdin().read_line(&mut conf).is_err()
+                    || !matches!(conf.trim().to_lowercase().as_str(), "y" | "yes")
+                {
                     print!("\x1b[1A\r\x1b[2K");
                     let _ = io::stdout().flush();
                     println!("  \x1b[2mProfile switch cancelled.\x1b[0m\n");
@@ -600,7 +593,10 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         if !active_skills.contains(&skill_name) && active_skills.len() < 3 {
                             if let Some(sk) = Skill::load(&skill_name) {
                                 active_skills.push(sk.name.clone());
-                                println!("  \x1b[1;32m✓\x1b[0m \x1b[2mSkill attached:\x1b[0m \x1b[1;36m{}\x1b[0m\n", sk.name);
+                                println!(
+                                    "  \x1b[1;32m✓\x1b[0m \x1b[2mSkill attached:\x1b[0m \x1b[1;36m{}\x1b[0m\n",
+                                    sk.name
+                                );
                             }
                         } else if active_skills.len() >= 5 {
                             println!("  \x1b[1;31m✗\x1b[0m \x1b[2mMax 3 skills reached (detach one first)\x1b[0m\n");
@@ -609,7 +605,10 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     SkillAction::Detach(skill_name) => {
                         if let Some(pos) = active_skills.iter().position(|x| x == &skill_name) {
                             active_skills.remove(pos);
-                            println!("  \x1b[1;33m✗\x1b[0m \x1b[2mSkill detached:\x1b[0m \x1b[1;33m{}\x1b[0m\n", skill_name);
+                            println!(
+                                "  \x1b[1;33m✗\x1b[0m \x1b[2mSkill detached:\x1b[0m \x1b[1;33m{}\x1b[0m\n",
+                                skill_name
+                            );
                         }
                     }
                     SkillAction::DetachAll => {
@@ -692,27 +691,26 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 print!("  \x1b[1;33m[gate]\x1b[0m Execute '\x1b[1;36m{}\x1b[0m'? [y/N] ", cmd);
                 let _ = io::stdout().flush();
                 let mut conf = String::new();
-                if io::stdin().read_line(&mut conf).is_err() || !matches!(conf.trim().to_lowercase().as_str(), "y" | "yes") {
+                if io::stdin().read_line(&mut conf).is_err()
+                    || !matches!(conf.trim().to_lowercase().as_str(), "y" | "yes")
+                {
                     println!("  \x1b[2mCancelled.\x1b[0m\n");
                     continue;
                 }
                 println!();
             }
             if cmd.starts_with("ai init ") {
-                println!("  \x1b[1;33m[info]\x1b[0m Workspace teleports ('{}') are used from your terminal shell.\n", input);
+                println!(
+                    "  \x1b[1;33m[info]\x1b[0m Workspace teleports ('{}') are used from your terminal shell.\n",
+                    input
+                );
                 continue;
             }
 
-            let expanded_cmd = if let Ok(home) = std::env::var("HOME") {
-                cmd.replace("~/", &format!("{}/", home))
-            } else {
-                cmd
-            };
+            let expanded_cmd =
+                if let Ok(home) = std::env::var("HOME") { cmd.replace("~/", &format!("{}/", home)) } else { cmd };
 
-            let _ = std::process::Command::new("sh")
-                .arg("-c")
-                .arg(&expanded_cmd)
-                .status();
+            let _ = std::process::Command::new("sh").arg("-c").arg(&expanded_cmd).status();
 
             println!();
             continue;
@@ -738,12 +736,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             print!("\x1b[?25l");
             let _ = io::stdout().flush();
 
-            let (reply, reasoning, tool_calls, stats) = client.stream_chat(
-                &history,
-                active_tools.clone(),
-                &mut renderer,
-                &mut spinner,
-            ).await?;
+            let (reply, reasoning, tool_calls, stats) =
+                client.stream_chat(&history, active_tools.clone(), &mut renderer, &mut spinner).await?;
 
             spinner.stop();
 
@@ -782,7 +776,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 };
 
                 let brief = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(fn_args) {
-                    parsed.get("path")
+                    parsed
+                        .get("path")
                         .or_else(|| parsed.get("command"))
                         .or_else(|| parsed.get("pattern"))
                         .and_then(|v| v.as_str())
@@ -796,11 +791,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 let _ = io::stdout().flush();
 
                 let t_start = Instant::now();
-                let final_args = if cfg.adapters {
-                    adapter::repair_tool_args(fn_name, fn_args)
-                } else {
-                    fn_args.to_string()
-                };
+                let final_args =
+                    if cfg.adapters { adapter::repair_tool_args(fn_name, fn_args) } else { fn_args.to_string() };
                 let tool_res = tools::execute_tool(fn_name, &final_args, target_dir, &boundary).await;
                 let elapsed = t_start.elapsed().as_secs_f64();
 
@@ -888,9 +880,8 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
             McpAction::Call { server, tool, args } => {
-                let payload: serde_json::Value = args.as_deref()
-                    .and_then(|a| serde_json::from_str(a).ok())
-                    .unwrap_or_else(|| serde_json::json!({}));
+                let payload: serde_json::Value =
+                    args.as_deref().and_then(|a| serde_json::from_str(a).ok()).unwrap_or_else(|| serde_json::json!({}));
                 match rs_agent::mcp::call_tool(server, tool, &payload).await {
                     Ok(out) => println!("{}", out),
                     Err(e) => eprintln!("[mcp error] {}", e),
@@ -898,11 +889,8 @@ async fn main() -> anyhow::Result<()> {
             }
             McpAction::Schema { server } => {
                 let servers = rs_agent::mcp::load_servers_config();
-                let targets: Vec<String> = if let Some(s) = server {
-                    vec![s.clone()]
-                } else {
-                    servers.keys().cloned().collect()
-                };
+                let targets: Vec<String> =
+                    if let Some(s) = server { vec![s.clone()] } else { servers.keys().cloned().collect() };
                 let mut all_schemas = Vec::new();
                 for s in targets {
                     if let Ok(schemas) = rs_agent::mcp::get_server_tools_schema(&s).await {
@@ -924,7 +912,10 @@ async fn main() -> anyhow::Result<()> {
             let target_path = path.map(|p| expand_path(&p)).unwrap_or(current_dir);
             run_session(&target_path, true).await?;
         }
-        Some(Commands::Match { .. }) | Some(Commands::New { .. }) | Some(Commands::Handoff) | Some(Commands::Mcp { .. }) => unreachable!(),
+        Some(Commands::Match { .. })
+        | Some(Commands::New { .. })
+        | Some(Commands::Handoff)
+        | Some(Commands::Mcp { .. }) => unreachable!(),
         None => {
             let chat_dir = dirs::home_dir()
                 .map(|h| h.join(".config/rs-agent/projects/chat"))

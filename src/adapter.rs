@@ -8,7 +8,7 @@ pub fn strip_line_gutters(text: &str) -> String {
         first = false;
 
         let trimmed_start = line.trim_start();
-        if let Some(pos) = trimmed_start.find(|c: char| c == ':' || c == '|') {
+        if let Some(pos) = trimmed_start.find([':', '|']) {
             let prefix = trimmed_start[..pos].trim();
             if !prefix.is_empty() && prefix.chars().all(|c| c.is_ascii_digit()) {
                 let rest = trimmed_start[pos + 1..].strip_prefix(' ').unwrap_or(&trimmed_start[pos + 1..]);
@@ -133,15 +133,11 @@ pub fn heal_json_args(raw_args: &str) -> serde_json::Value {
             match ch {
                 '{' => stack.push('}'),
                 '[' => stack.push(']'),
-                '}' => {
-                    if stack.last() == Some(&'}') {
-                        stack.pop();
-                    }
+                '}' if stack.last() == Some(&'}') => {
+                    stack.pop();
                 }
-                ']' => {
-                    if stack.last() == Some(&']') {
-                        stack.pop();
-                    }
+                ']' if stack.last() == Some(&']') => {
+                    stack.pop();
                 }
                 _ => {}
             }

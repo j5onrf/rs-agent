@@ -3,26 +3,40 @@ use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+const FORBIDDEN_SYS_DIRS: &[&str] =
+    &["/etc", "/usr", "/var", "/bin", "/sbin", "/opt", "/root", "/boot", "/sys", "/proc"];
 
-const FORBIDDEN_SYS_DIRS: &[&str] = &[
-    "/etc", "/usr", "/var", "/bin", "/sbin", "/opt", "/root", "/boot", "/sys", "/proc",
-];
-
-const SYSTEM_DEVICES: &[&str] = &[
-    "/dev/tty",
-    "/dev/null",
-    "/dev/urandom",
-    "/dev/zero",
-    "/dev/random",
-];
+const SYSTEM_DEVICES: &[&str] = &["/dev/tty", "/dev/null", "/dev/urandom", "/dev/zero", "/dev/random"];
 
 const MUTATING_COMMANDS: &[&str] = &[
-    "sudo", "doas", "su", "pkexec",
-    "pip", "pip3", "pipx",
-    "pacman", "yay", "paru", "apt", "apt-get", "dnf", "yum",
-    "systemctl", "reboot", "shutdown", "poweroff",
-    "useradd", "usermod", "userdel", "passwd", "chroot",
-    "mkfs", "dd", "fdisk", "parted", "wipefs",
+    "sudo",
+    "doas",
+    "su",
+    "pkexec",
+    "pip",
+    "pip3",
+    "pipx",
+    "pacman",
+    "yay",
+    "paru",
+    "apt",
+    "apt-get",
+    "dnf",
+    "yum",
+    "systemctl",
+    "reboot",
+    "shutdown",
+    "poweroff",
+    "useradd",
+    "usermod",
+    "userdel",
+    "passwd",
+    "chroot",
+    "mkfs",
+    "dd",
+    "fdisk",
+    "parted",
+    "wipefs",
 ];
 
 static MUTATING_RE: OnceLock<regex::Regex> = OnceLock::new();
@@ -121,7 +135,19 @@ impl SecurityBoundary {
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
             if parts.len() >= 2 {
                 let sub = parts[1];
-                let readonly = matches!(sub, "status" | "is-active" | "is-enabled" | "is-failed" | "list-units" | "list-unit-files" | "list-timers" | "list-sockets" | "show" | "cat");
+                let readonly = matches!(
+                    sub,
+                    "status"
+                        | "is-active"
+                        | "is-enabled"
+                        | "is-failed"
+                        | "list-units"
+                        | "list-unit-files"
+                        | "list-timers"
+                        | "list-sockets"
+                        | "show"
+                        | "cat"
+                );
                 if readonly {
                     return None;
                 }

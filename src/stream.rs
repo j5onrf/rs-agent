@@ -24,9 +24,7 @@ pub struct StreamRenderer {
 
 impl StreamRenderer {
     pub fn new(pad: bool) -> Self {
-        let term_width = crossterm::terminal::size()
-            .map(|(w, _)| w as usize)
-            .unwrap_or(80);
+        let term_width = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(80);
         let avail_width = term_width.saturating_sub(4).max(20);
 
         Self {
@@ -109,9 +107,9 @@ impl StreamRenderer {
                         let stdout = io::stdout();
                         let mut handle = stdout.lock();
                         if self.at_line_start {
-                            let _ = write!(handle, "\x1b[2m│\x1b[0m\n");
+                            let _ = writeln!(handle, "\x1b[2m│\x1b[0m");
                         } else {
-                            let _ = write!(handle, "\x1b[0m\n");
+                            let _ = writeln!(handle, "\x1b[0m");
                             self.at_line_start = true;
                             self.think_col = 0;
                         }
@@ -148,11 +146,7 @@ impl StreamRenderer {
     pub fn finish(&mut self, stats: &UsageStats, prompt_chars: usize) {
         self.close_thinking();
 
-        let elapsed_gen = self
-            .first_token_time
-            .map(|t| t.elapsed().as_secs_f64())
-            .unwrap_or(0.01)
-            .max(0.01);
+        let elapsed_gen = self.first_token_time.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.01).max(0.01);
 
         if !self.at_line_start {
             println!();
@@ -161,11 +155,7 @@ impl StreamRenderer {
             println!();
         }
 
-        let in_tok = if stats.prompt_tokens > 0 {
-            stats.prompt_tokens
-        } else {
-            (prompt_chars * 10) / 36
-        };
+        let in_tok = if stats.prompt_tokens > 0 { stats.prompt_tokens } else { (prompt_chars * 10) / 36 };
 
         let out_tok = if stats.completion_tokens > 0 {
             stats.completion_tokens
@@ -173,33 +163,18 @@ impl StreamRenderer {
             ((self.thinking_chars + self.answer_chars) * 10) / 36
         };
 
-        let r_tok = if stats.reasoning_tokens > 0 {
-            stats.reasoning_tokens
-        } else {
-            (self.thinking_chars * 10) / 36
-        };
+        let r_tok = if stats.reasoning_tokens > 0 { stats.reasoning_tokens } else { (self.thinking_chars * 10) / 36 };
 
         let mut parts = Vec::new();
 
-        let in_s = if in_tok >= 1000 {
-            format!("↑{:.1}k", in_tok as f64 / 1000.0)
-        } else {
-            format!("↑{}", in_tok)
-        };
+        let in_s = if in_tok >= 1000 { format!("↑{:.1}k", in_tok as f64 / 1000.0) } else { format!("↑{}", in_tok) };
 
-        let out_s = if out_tok >= 1000 {
-            format!("↓{:.1}k", out_tok as f64 / 1000.0)
-        } else {
-            format!("↓{}", out_tok)
-        };
+        let out_s =
+            if out_tok >= 1000 { format!("↓{:.1}k", out_tok as f64 / 1000.0) } else { format!("↓{}", out_tok) };
 
         let mut tok_s = format!("{} {}", in_s, out_s);
         if r_tok > 0 {
-            let r_s = if r_tok >= 1000 {
-                format!("R{:.1}k", r_tok as f64 / 1000.0)
-            } else {
-                format!("R{}", r_tok)
-            };
+            let r_s = if r_tok >= 1000 { format!("R{:.1}k", r_tok as f64 / 1000.0) } else { format!("R{}", r_tok) };
             tok_s.push_str(&format!(" {}", r_s));
         }
         parts.push(tok_s);

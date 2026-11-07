@@ -50,9 +50,7 @@ fn get_env_path() -> PathBuf {
     if let Ok(home) = std::env::var("HOME") {
         PathBuf::from(home).join(".config/rs-agent/.env")
     } else {
-        dirs::home_dir()
-            .map(|h| h.join(".config/rs-agent/.env"))
-            .unwrap_or_else(|| PathBuf::from(".env"))
+        dirs::home_dir().map(|h| h.join(".config/rs-agent/.env")).unwrap_or_else(|| PathBuf::from(".env"))
     }
 }
 
@@ -228,11 +226,17 @@ fn main() -> std::io::Result<()> {
 
         // Context Budget
         let tok_ptr = if cursor == tok_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
-        buf.push_str(&format!("   {} 🧠  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{} tokens\x1b[0m\r\n", tok_ptr, "Context Budget", max_tokens));
+        buf.push_str(&format!(
+            "   {} 🧠  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{} tokens\x1b[0m\r\n",
+            tok_ptr, "Context Budget", max_tokens
+        ));
 
         // Task Loop Limit
         let rnd_ptr = if cursor == rnd_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
-        buf.push_str(&format!("   {} 🔄  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{} steps\x1b[0m\r\n\r\n", rnd_ptr, "Task Loop Limit", max_rounds));
+        buf.push_str(&format!(
+            "   {} 🔄  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{} steps\x1b[0m\r\n\r\n",
+            rnd_ptr, "Task Loop Limit", max_rounds
+        ));
 
         // Save & Exit
         let exit_ptr = if cursor == exit_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
@@ -272,11 +276,22 @@ fn main() -> std::io::Result<()> {
                         custom_slots[cursor].is_active = will_activate;
 
                         // Atomic write immediately to .env
-                        let _ = save_to_env(&env_path, &mut lines, &custom_slots, max_tokens, tokens_line_idx, max_rounds, rounds_line_idx);
+                        let _ = save_to_env(
+                            &env_path,
+                            &mut lines,
+                            &custom_slots,
+                            max_tokens,
+                            tokens_line_idx,
+                            max_rounds,
+                            rounds_line_idx,
+                        );
 
                         let icon = get_icon_for_slot(&custom_slots[cursor].name);
                         if will_activate {
-                            status_message = Some(format!("\x1b[1;32m✓\x1b[0m {} \x1b[1;37m{}\x1b[0m enabled ({}) \x1b[2m[saved]\x1b[0m", icon, custom_slots[cursor].name, custom_slots[cursor].model));
+                            status_message = Some(format!(
+                                "\x1b[1;32m✓\x1b[0m {} \x1b[1;37m{}\x1b[0m enabled ({}) \x1b[2m[saved]\x1b[0m",
+                                icon, custom_slots[cursor].name, custom_slots[cursor].model
+                            ));
                         } else {
                             status_message = Some(format!("\x1b[1;33m✓\x1b[0m {} \x1b[1;37m{}\x1b[0m disabled. Local :8080 active \x1b[2m[saved]\x1b[0m", icon, custom_slots[cursor].name));
                         }
@@ -288,8 +303,19 @@ fn main() -> std::io::Result<()> {
                             32768 => 65536,
                             _ => 4096,
                         };
-                        let _ = save_to_env(&env_path, &mut lines, &custom_slots, max_tokens, tokens_line_idx, max_rounds, rounds_line_idx);
-                        status_message = Some(format!("\x1b[1;32m✓\x1b[0m Context Budget: \x1b[1;33m{} tokens\x1b[0m \x1b[2m[saved]\x1b[0m", max_tokens));
+                        let _ = save_to_env(
+                            &env_path,
+                            &mut lines,
+                            &custom_slots,
+                            max_tokens,
+                            tokens_line_idx,
+                            max_rounds,
+                            rounds_line_idx,
+                        );
+                        status_message = Some(format!(
+                            "\x1b[1;32m✓\x1b[0m Context Budget: \x1b[1;33m{} tokens\x1b[0m \x1b[2m[saved]\x1b[0m",
+                            max_tokens
+                        ));
                     } else if cursor == rnd_idx {
                         max_rounds = match max_rounds {
                             5 => 10,
@@ -299,8 +325,19 @@ fn main() -> std::io::Result<()> {
                             25 => 30,
                             _ => 5,
                         };
-                        let _ = save_to_env(&env_path, &mut lines, &custom_slots, max_tokens, tokens_line_idx, max_rounds, rounds_line_idx);
-                        status_message = Some(format!("\x1b[1;32m✓\x1b[0m Task Loop Limit: \x1b[1;33m{} steps\x1b[0m \x1b[2m[saved]\x1b[0m", max_rounds));
+                        let _ = save_to_env(
+                            &env_path,
+                            &mut lines,
+                            &custom_slots,
+                            max_tokens,
+                            tokens_line_idx,
+                            max_rounds,
+                            rounds_line_idx,
+                        );
+                        status_message = Some(format!(
+                            "\x1b[1;32m✓\x1b[0m Task Loop Limit: \x1b[1;33m{} steps\x1b[0m \x1b[2m[saved]\x1b[0m",
+                            max_rounds
+                        ));
                     } else {
                         // cursor == exit_idx ("Save & Exit")
                         break;

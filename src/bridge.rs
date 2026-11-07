@@ -86,12 +86,7 @@ fn strip_xml_block(text: &str, tag: &str) -> String {
 }
 
 fn sanitize_t3_prompt(raw: &str) -> String {
-    let tags = [
-        "pull_request_linking",
-        "t3_code_instructions",
-        "runtime_info",
-        "system_information",
-    ];
+    let tags = ["pull_request_linking", "t3_code_instructions", "runtime_info", "system_information"];
     let mut cleaned = raw.to_string();
     for tag in tags {
         cleaned = strip_xml_block(&cleaned, tag);
@@ -132,7 +127,9 @@ fn get_available_commands() -> Value {
 
     for skill_name in Skill::list_available() {
         if let Some(sk) = Skill::load(&skill_name) {
-            let desc = sk.content.lines()
+            let desc = sk
+                .content
+                .lines()
                 .find(|l| !l.trim().is_empty() && !l.starts_with('#'))
                 .unwrap_or("Custom Skill Directive")
                 .trim();
@@ -152,7 +149,11 @@ fn is_permission_approved(res: &Value) -> bool {
             let outcome_type = outcome.get("outcome").and_then(|v| v.as_str()).unwrap_or("");
             if outcome_type == "selected" {
                 let opt = outcome.get("optionId").and_then(|v| v.as_str()).unwrap_or("");
-                return opt != "deny" && opt != "reject" && opt != "reject_once" && opt != "reject_always" && opt != "cancel";
+                return opt != "deny"
+                    && opt != "reject"
+                    && opt != "reject_once"
+                    && opt != "reject_always"
+                    && opt != "cancel";
             }
             if outcome_type == "cancelled" || outcome_type == "dismissed" {
                 return false;
@@ -205,7 +206,6 @@ fn generate_write_diff(workspace: &Path, path_str: &str, new_content: &str) -> (
     (old, new_content.to_string())
 }
 
-
 async fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>, bool) {
     let cfg = WorkspaceConfig::load_or_default(workspace);
     let inherited_profile = std::env::var("AI_ACTIVE_PROFILE").unwrap_or_else(|_| cfg.profile_name.clone());
@@ -256,11 +256,8 @@ async fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>, boo
     }
 
     let mcp_servers = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
-    let active_tools = if is_agent {
-        Some(tools::get_tools_schema_with_mcp(&cfg.tier, false, &mcp_servers).await)
-    } else {
-        None
-    };
+    let active_tools =
+        if is_agent { Some(tools::get_tools_schema_with_mcp(&cfg.tier, false, &mcp_servers).await) } else { None };
 
     (prompt, active_tools, is_agent)
 }
@@ -334,33 +331,38 @@ pub async fn run_bridge() -> Result<()> {
                 send_rpc(req_id, Some(json!({})), None);
             }
             "session/new" | "createSession" | "session/create" | "session/load" | "session/resume" => {
-                let sid = params.get("sessionId")
+                let sid = params
+                    .get("sessionId")
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| format!("rsagent-{}", std::process::id()));
 
                 active_session_id = sid.clone();
 
-                let cwd = params.get("cwd")
+                let cwd = params
+                    .get("cwd")
                     .and_then(|v| v.as_str())
                     .map(PathBuf::from)
                     .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
-                
                 let (sys_prompt, active_tools, is_agent) = assemble_system_prompt(&cwd).await;
                 let history = vec![ChatMessage::system(sys_prompt)];
 
-                sessions.lock().await.insert(sid.clone(), SessionState {
-                    workspace: cwd.clone(),
-                    history,
-                    active_tools,
-                    is_agent,
-                    cancel_flag: Arc::new(AtomicBool::new(false)),
-                });
+                sessions.lock().await.insert(
+                    sid.clone(),
+                    SessionState {
+                        workspace: cwd.clone(),
+                        history,
+                        active_tools,
+                        is_agent,
+                        cancel_flag: Arc::new(AtomicBool::new(false)),
+                    },
+                );
 
                 let cfg = WorkspaceConfig::load_or_default(&cwd);
                 let prof = Profile::load(&cfg.profile_name);
-                let initial_val = prof.as_ref()
+                let initial_val = prof
+                    .as_ref()
                     .and_then(|p| p.reasoning_budget)
                     .map(|b| b.to_string())
                     .unwrap_or_else(|| "-1".to_string());
@@ -369,11 +371,15 @@ pub async fn run_bridge() -> Result<()> {
 
                 let available_commands = get_available_commands();
 
-                send_rpc(req_id, Some(json!({
-                    "sessionId": sid,
-                    "configOptions": get_config_options(&initial_val),
-                    "availableCommands": available_commands
-                })), None);
+                send_rpc(
+                    req_id,
+                    Some(json!({
+                        "sessionId": sid,
+                        "configOptions": get_config_options(&initial_val),
+                        "availableCommands": available_commands
+                    })),
+                    None,
+                );
 
                 let notif = json!({
                     "jsonrpc": "2.0",
@@ -390,7 +396,8 @@ pub async fn run_bridge() -> Result<()> {
             }
             "session/set_config_option" => {
                 let config_id = params.get("configId").and_then(|v| v.as_str()).unwrap_or("");
-                let value_str = params.get("value")
+                let value_str = params
+                    .get("value")
                     .and_then(|v| {
                         if let Some(s) = v.as_str() {
                             Some(s.to_string())
@@ -409,15 +416,20 @@ pub async fn run_bridge() -> Result<()> {
                     }
                 }
 
-                send_rpc(req_id, Some(json!({
-                    "configOptions": get_config_options(&value_str)
-                })), None);
+                send_rpc(
+                    req_id,
+                    Some(json!({
+                        "configOptions": get_config_options(&value_str)
+                    })),
+                    None,
+                );
             }
             "session/list" | "listSessions" => {
                 let sess_lock = sessions.lock().await;
-                let list: Vec<Value> = sess_lock.iter().map(|(k, v)| {
-                    json!({ "sessionId": k, "cwd": v.workspace.display().to_string() })
-                }).collect();
+                let list: Vec<Value> = sess_lock
+                    .iter()
+                    .map(|(k, v)| json!({ "sessionId": k, "cwd": v.workspace.display().to_string() }))
+                    .collect();
                 send_rpc(req_id, Some(json!({ "sessions": list })), None);
             }
             "session/prompt" | "prompt" => {
@@ -441,7 +453,8 @@ pub async fn run_bridge() -> Result<()> {
                                 if let Some(res) = item.get("resource") {
                                     let uri = res.get("uri").and_then(|v| v.as_str()).unwrap_or("resource");
                                     let text = res.get("text").and_then(|v| v.as_str()).unwrap_or("");
-                                    raw_user_text.push_str(&format!("\n\n---\nContext from @{}:\n{}\n---\n", uri, text));
+                                    raw_user_text
+                                        .push_str(&format!("\n\n---\nContext from @{}:\n{}\n---\n", uri, text));
                                 }
                             }
                             Some("file") => {
@@ -483,7 +496,8 @@ pub async fn run_bridge() -> Result<()> {
 
                 for word in cleaned_user_text.split_whitespace() {
                     if let Some(skill_name) = word.strip_prefix('$') {
-                        let clean_name = skill_name.trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '-');
+                        let clean_name =
+                            skill_name.trim_matches(|c: char| !c.is_alphanumeric() && c != '_' && c != '-');
                         if let Some(sk) = Skill::load(clean_name) {
                             found_skills.push(sk);
                             continue;
@@ -511,7 +525,14 @@ pub async fn run_bridge() -> Result<()> {
 
                 if clean_query.trim().is_empty() && !found_skills.is_empty() {
                     let names: Vec<String> = found_skills.iter().map(|s| format!("${}", s.name)).collect();
-                    send_acp_chunk(&sid, &format!("✓ Skill active: {}. Directives attached to system context for subsequent turns.", names.join(", ")), false);
+                    send_acp_chunk(
+                        &sid,
+                        &format!(
+                            "✓ Skill active: {}. Directives attached to system context for subsequent turns.",
+                            names.join(", ")
+                        ),
+                        false,
+                    );
                     send_rpc(req_id, Some(json!({ "stopReason": "end_turn" })), None);
                     continue;
                 }
@@ -571,14 +592,16 @@ pub async fn run_bridge() -> Result<()> {
                         }
 
                         let sid_clone = sid.clone();
-                        let stream_res = client_ref.stream_chat_raw(
-                            &history,
-                            tools_schema.clone(),
-                            Some(cancel_flag.clone()),
-                            move |chunk, is_thinking| {
-                                send_acp_chunk(&sid_clone, chunk, is_thinking);
-                            },
-                        ).await;
+                        let stream_res = client_ref
+                            .stream_chat_raw(
+                                &history,
+                                tools_schema.clone(),
+                                Some(cancel_flag.clone()),
+                                move |chunk, is_thinking| {
+                                    send_acp_chunk(&sid_clone, chunk, is_thinking);
+                                },
+                            )
+                            .await;
 
                         match stream_res {
                             Ok((reply, reasoning, tool_calls, _stats)) => {
@@ -589,7 +612,8 @@ pub async fn run_bridge() -> Result<()> {
 
                                 if let Some(calls) = tool_calls {
                                     if !calls.is_empty() && is_agent {
-                                        let mut assistant_msg = ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone());
+                                        let mut assistant_msg =
+                                            ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone());
                                         assistant_msg.tool_calls = Some(Value::Array(calls.clone()));
                                         history.push(assistant_msg);
 
@@ -604,7 +628,9 @@ pub async fn run_bridge() -> Result<()> {
                                             let fn_name = call["function"]["name"].as_str().unwrap_or("tool");
                                             let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
 
-                                            let is_mutating = fn_name == "write_file" || fn_name == "edit_file" || fn_name == "run_command";
+                                            let is_mutating = fn_name == "write_file"
+                                                || fn_name == "edit_file"
+                                                || fn_name == "run_command";
                                             if is_mutating {
                                                 let kind = match fn_name {
                                                     "write_file" | "edit_file" => "edit",
@@ -612,8 +638,10 @@ pub async fn run_bridge() -> Result<()> {
                                                     _ => "other",
                                                 };
 
-                                                let raw_input: Value = serde_json::from_str(fn_args).unwrap_or_else(|_| json!({}));
-                                                let brief = raw_input.get("path")
+                                                let raw_input: Value =
+                                                    serde_json::from_str(fn_args).unwrap_or_else(|_| json!({}));
+                                                let brief = raw_input
+                                                    .get("path")
                                                     .or_else(|| raw_input.get("command"))
                                                     .or_else(|| raw_input.get("pattern"))
                                                     .and_then(|v| v.as_str())
@@ -632,7 +660,9 @@ pub async fn run_bridge() -> Result<()> {
                                                         raw_input.get("old_str").and_then(|v| v.as_str()),
                                                         raw_input.get("new_str").and_then(|v| v.as_str()),
                                                     ) {
-                                                        if let Some((old_text, new_text)) = generate_edit_diff(&workspace, p, old_s, new_s) {
+                                                        if let Some((old_text, new_text)) =
+                                                            generate_edit_diff(&workspace, p, old_s, new_s)
+                                                        {
                                                             content_blocks.push(json!({
                                                                 "type": "diff",
                                                                 "path": p,
@@ -646,7 +676,8 @@ pub async fn run_bridge() -> Result<()> {
                                                         raw_input.get("path").and_then(|v| v.as_str()),
                                                         raw_input.get("content").and_then(|v| v.as_str()),
                                                     ) {
-                                                        let (old_text, new_text) = generate_write_diff(&workspace, p, content_str);
+                                                        let (old_text, new_text) =
+                                                            generate_write_diff(&workspace, p, content_str);
                                                         content_blocks.push(json!({
                                                             "type": "diff",
                                                             "path": p,
@@ -655,7 +686,9 @@ pub async fn run_bridge() -> Result<()> {
                                                         }));
                                                     }
                                                 } else if fn_name == "run_command" {
-                                                    if let Some(cmd_str) = raw_input.get("command").and_then(|v| v.as_str()) {
+                                                    if let Some(cmd_str) =
+                                                        raw_input.get("command").and_then(|v| v.as_str())
+                                                    {
                                                         content_blocks.push(json!({
                                                             "type": "text",
                                                             "text": format!("$ {}", cmd_str)
@@ -692,7 +725,11 @@ pub async fn run_bridge() -> Result<()> {
 
                                                 let perm_res = rx.await.unwrap_or_else(|_| json!({}));
                                                 if !is_permission_approved(&perm_res) {
-                                                    send_acp_chunk(&sid, &format!("\n\n*Action `{}` was declined by user.*\n", fn_name), false);
+                                                    send_acp_chunk(
+                                                        &sid,
+                                                        &format!("\n\n*Action `{}` was declined by user.*\n", fn_name),
+                                                        false,
+                                                    );
                                                     history.push(ChatMessage::tool_response(call_id, "User declined permission for this tool action. Do not retry this action; ask the user what to do next.".to_string()));
                                                     any_declined = true;
                                                     continue;
@@ -707,7 +744,8 @@ pub async fn run_bridge() -> Result<()> {
                                                 fn_args.to_string()
                                             };
 
-                                            let tool_res = tools::execute_tool(fn_name, &final_args, &workspace, &boundary).await;
+                                            let tool_res =
+                                                tools::execute_tool(fn_name, &final_args, &workspace, &boundary).await;
                                             let out = match tool_res {
                                                 Ok(o) => o,
                                                 Err(e) => format!("[tool error] {}", e),
@@ -750,11 +788,7 @@ pub async fn run_bridge() -> Result<()> {
             "tools/list" => {
                 let sess_lock = sessions.lock().await;
                 let is_agent = sess_lock.get(&active_session_id).map(|s| s.is_agent).unwrap_or(true);
-                let schema = if is_agent {
-                    tools::get_tools_schema(&config::ToolTier::Smol, false)
-                } else {
-                    json!([])
-                };
+                let schema = if is_agent { tools::get_tools_schema(&config::ToolTier::Smol, false) } else { json!([]) };
                 send_rpc(req_id, Some(json!({ "tools": schema })), None);
             }
             "session/cancel" | "cancel" => {

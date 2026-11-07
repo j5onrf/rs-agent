@@ -114,8 +114,8 @@ impl LlmClient {
 
     fn build_request_body(&self, messages: &[ChatMessage], tools: Option<Value>) -> Value {
         let is_local = is_local_endpoint(&self.config.base_url);
-        let is_google = self.config.base_url.contains("googleapis.com")
-            || self.config.model.to_lowercase().contains("gemini");
+        let is_google =
+            self.config.base_url.contains("googleapis.com") || self.config.model.to_lowercase().contains("gemini");
 
         let mut sanitized_messages = serde_json::to_value(messages).unwrap_or_else(|_| serde_json::json!([]));
 
@@ -127,7 +127,8 @@ impl LlmClient {
                     if msg.get("role").and_then(|r| r.as_str()) == Some("assistant") {
                         if let Some(tcs) = msg.get_mut("tool_calls").and_then(|v| v.as_array_mut()) {
                             for tc in tcs {
-                                let has_sig = tc.get("extra_content")
+                                let has_sig = tc
+                                    .get("extra_content")
                                     .and_then(|ec| ec.get("google"))
                                     .and_then(|g| g.get("thought_signature"))
                                     .and_then(|s| s.as_str())
@@ -185,9 +186,7 @@ impl LlmClient {
     }
 
     fn prepare_request(&self, body: &Value) -> reqwest::RequestBuilder {
-        let mut req = self.http.post(&self.config.base_url)
-            .header("Content-Type", "application/json")
-            .json(body);
+        let mut req = self.http.post(&self.config.base_url).header("Content-Type", "application/json").json(body);
 
         if self.config.api_key != "not-needed" && !self.config.api_key.is_empty() {
             req = req.header("Authorization", format!("Bearer {}", self.config.api_key));
@@ -226,7 +225,8 @@ impl LlmClient {
         let mut full_reasoning = String::new();
         let mut in_thinking = false;
         let mut stats = UsageStats::default();
-        let mut tool_calls_map: std::collections::BTreeMap<usize, (String, String, String, Option<Value>)> = std::collections::BTreeMap::new();
+        let mut tool_calls_map: std::collections::BTreeMap<usize, (String, String, String, Option<Value>)> =
+            std::collections::BTreeMap::new();
 
         while let Some(event_res) = stream.next().await {
             if let Some(ref flag) = cancel_flag {
@@ -248,14 +248,16 @@ impl LlmClient {
                     if let Some(c) = usage.get("completion_tokens").and_then(|v| v.as_u64()) {
                         stats.completion_tokens = c as usize;
                     }
-                    if let Some(cached) = usage.get("prompt_tokens_details")
+                    if let Some(cached) = usage
+                        .get("prompt_tokens_details")
                         .and_then(|d| d.get("cached_tokens"))
                         .and_then(|v| v.as_u64())
                         .or_else(|| usage.get("cached_tokens").and_then(|v| v.as_u64()))
                     {
                         stats.cached_tokens = cached as usize;
                     }
-                    if let Some(reasoning) = usage.get("completion_tokens_details")
+                    if let Some(reasoning) = usage
+                        .get("completion_tokens_details")
                         .and_then(|d| d.get("reasoning_tokens"))
                         .and_then(|v| v.as_u64())
                     {
@@ -272,9 +274,8 @@ impl LlmClient {
                 }
 
                 if let Some(delta) = json["choices"].get(0).and_then(|c| c.get("delta")) {
-                    if let Some(reasoning) = delta.get("reasoning_content")
-                        .or_else(|| delta.get("thinking"))
-                        .and_then(|r| r.as_str())
+                    if let Some(reasoning) =
+                        delta.get("reasoning_content").or_else(|| delta.get("thinking")).and_then(|r| r.as_str())
                     {
                         if !reasoning.is_empty() {
                             on_chunk(reasoning, true);
@@ -287,13 +288,12 @@ impl LlmClient {
                             let mut chunk_slice = content;
                             if chunk_slice.contains("<think>") || chunk_slice.contains("<thought>") {
                                 in_thinking = true;
-                                chunk_slice = chunk_slice
-                                    .trim_start_matches("<think>")
-                                    .trim_start_matches("<thought>");
+                                chunk_slice = chunk_slice.trim_start_matches("<think>").trim_start_matches("<thought>");
                             }
 
                             if chunk_slice.contains("</think>") || chunk_slice.contains("</thought>") {
-                                let delimiter = if chunk_slice.contains("</think>") { "</think>" } else { "</thought>" };
+                                let delimiter =
+                                    if chunk_slice.contains("</think>") { "</think>" } else { "</thought>" };
                                 let parts: Vec<&str> = chunk_slice.splitn(2, delimiter).collect();
                                 on_chunk(parts[0], true);
                                 full_reasoning.push_str(parts[0]);
@@ -316,12 +316,14 @@ impl LlmClient {
                     if let Some(tc_array) = delta.get("tool_calls").and_then(|v| v.as_array()) {
                         for tc in tc_array {
                             let idx = tc.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                            let entry = tool_calls_map.entry(idx).or_insert_with(|| (
-                                tc.get("id").and_then(|v| v.as_str()).unwrap_or("call_0").to_string(),
-                                String::new(),
-                                String::new(),
-                                None,
-                            ));
+                            let entry = tool_calls_map.entry(idx).or_insert_with(|| {
+                                (
+                                    tc.get("id").and_then(|v| v.as_str()).unwrap_or("call_0").to_string(),
+                                    String::new(),
+                                    String::new(),
+                                    None,
+                                )
+                            });
 
                             if let Some(id) = tc.get("id").and_then(|v| v.as_str()) {
                                 entry.0 = id.to_string();
@@ -347,30 +349,29 @@ impl LlmClient {
         }
 
         let tool_calls = if !tool_calls_map.is_empty() {
-            let calls: Vec<Value> = tool_calls_map.into_values().map(|(id, name, args, extra_content)| {
-                let mut call = serde_json::json!({
-                    "id": id,
-                    "type": "function",
-                    "function": {
-                        "name": name,
-                        "arguments": args
+            let calls: Vec<Value> = tool_calls_map
+                .into_values()
+                .map(|(id, name, args, extra_content)| {
+                    let mut call = serde_json::json!({
+                        "id": id,
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            "arguments": args
+                        }
+                    });
+                    if let Some(ec) = extra_content {
+                        call["extra_content"] = ec;
                     }
-                });
-                if let Some(ec) = extra_content {
-                    call["extra_content"] = ec;
-                }
-                call
-            }).collect();
+                    call
+                })
+                .collect();
             Some(calls)
         } else {
             None
         };
 
-        let opt_reasoning = if !full_reasoning.is_empty() {
-            Some(full_reasoning)
-        } else {
-            None
-        };
+        let opt_reasoning = if !full_reasoning.is_empty() { Some(full_reasoning) } else { None };
 
         Ok((full_response, opt_reasoning, tool_calls, stats))
     }
@@ -398,7 +399,8 @@ impl LlmClient {
         let mut full_reasoning = String::new();
         let mut in_thinking = false;
         let mut stats = UsageStats::default();
-        let mut tool_calls_map: std::collections::BTreeMap<usize, (String, String, String, Option<Value>)> = std::collections::BTreeMap::new();
+        let mut tool_calls_map: std::collections::BTreeMap<usize, (String, String, String, Option<Value>)> =
+            std::collections::BTreeMap::new();
 
         while let Some(event_res) = stream.next().await {
             let event = event_res.context("Error reading SSE event")?;
@@ -414,14 +416,16 @@ impl LlmClient {
                     if let Some(c) = usage.get("completion_tokens").and_then(|v| v.as_u64()) {
                         stats.completion_tokens = c as usize;
                     }
-                    if let Some(cached) = usage.get("prompt_tokens_details")
+                    if let Some(cached) = usage
+                        .get("prompt_tokens_details")
                         .and_then(|d| d.get("cached_tokens"))
                         .and_then(|v| v.as_u64())
                         .or_else(|| usage.get("cached_tokens").and_then(|v| v.as_u64()))
                     {
                         stats.cached_tokens = cached as usize;
                     }
-                    if let Some(reasoning) = usage.get("completion_tokens_details")
+                    if let Some(reasoning) = usage
+                        .get("completion_tokens_details")
                         .and_then(|d| d.get("reasoning_tokens"))
                         .and_then(|v| v.as_u64())
                     {
@@ -438,9 +442,8 @@ impl LlmClient {
                 }
 
                 if let Some(delta) = json["choices"].get(0).and_then(|c| c.get("delta")) {
-                    if let Some(reasoning) = delta.get("reasoning_content")
-                        .or_else(|| delta.get("thinking"))
-                        .and_then(|r| r.as_str())
+                    if let Some(reasoning) =
+                        delta.get("reasoning_content").or_else(|| delta.get("thinking")).and_then(|r| r.as_str())
                     {
                         if !reasoning.is_empty() {
                             spinner.stop();
@@ -455,13 +458,12 @@ impl LlmClient {
                             let mut chunk_slice = content;
                             if chunk_slice.contains("<think>") || chunk_slice.contains("<thought>") {
                                 in_thinking = true;
-                                chunk_slice = chunk_slice
-                                    .trim_start_matches("<think>")
-                                    .trim_start_matches("<thought>");
+                                chunk_slice = chunk_slice.trim_start_matches("<think>").trim_start_matches("<thought>");
                             }
 
                             if chunk_slice.contains("</think>") || chunk_slice.contains("</thought>") {
-                                let delimiter = if chunk_slice.contains("</think>") { "</think>" } else { "</thought>" };
+                                let delimiter =
+                                    if chunk_slice.contains("</think>") { "</think>" } else { "</thought>" };
                                 let parts: Vec<&str> = chunk_slice.splitn(2, delimiter).collect();
                                 renderer.on_chunk(parts[0], true);
                                 full_reasoning.push_str(parts[0]);
@@ -489,12 +491,14 @@ impl LlmClient {
 
                         for tc in tc_array {
                             let idx = tc.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                            let entry = tool_calls_map.entry(idx).or_insert_with(|| (
-                                tc.get("id").and_then(|v| v.as_str()).unwrap_or("call_0").to_string(),
-                                String::new(),
-                                String::new(),
-                                None,
-                            ));
+                            let entry = tool_calls_map.entry(idx).or_insert_with(|| {
+                                (
+                                    tc.get("id").and_then(|v| v.as_str()).unwrap_or("call_0").to_string(),
+                                    String::new(),
+                                    String::new(),
+                                    None,
+                                )
+                            });
 
                             if let Some(id) = tc.get("id").and_then(|v| v.as_str()) {
                                 entry.0 = id.to_string();
@@ -523,30 +527,29 @@ impl LlmClient {
         spinner.stop();
 
         let tool_calls = if !tool_calls_map.is_empty() {
-            let calls: Vec<Value> = tool_calls_map.into_values().map(|(id, name, args, extra_content)| {
-                let mut call = serde_json::json!({
-                    "id": id,
-                    "type": "function",
-                    "function": {
-                        "name": name,
-                        "arguments": args
+            let calls: Vec<Value> = tool_calls_map
+                .into_values()
+                .map(|(id, name, args, extra_content)| {
+                    let mut call = serde_json::json!({
+                        "id": id,
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            "arguments": args
+                        }
+                    });
+                    if let Some(ec) = extra_content {
+                        call["extra_content"] = ec;
                     }
-                });
-                if let Some(ec) = extra_content {
-                    call["extra_content"] = ec;
-                }
-                call
-            }).collect();
+                    call
+                })
+                .collect();
             Some(calls)
         } else {
             None
         };
 
-        let opt_reasoning = if !full_reasoning.is_empty() {
-            Some(full_reasoning)
-        } else {
-            None
-        };
+        let opt_reasoning = if !full_reasoning.is_empty() { Some(full_reasoning) } else { None };
 
         Ok((full_response, opt_reasoning, tool_calls, stats))
     }

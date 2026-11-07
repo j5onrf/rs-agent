@@ -104,15 +104,7 @@ impl Profile {
             }
         }
 
-        Self {
-            reasoning_budget,
-            tier,
-            adapters,
-            memory,
-            delegate,
-            system_prompt: body.trim().to_string(),
-            mcp_servers,
-        }
+        Self { reasoning_budget, tier, adapters, memory, delegate, system_prompt: body.trim().to_string(), mcp_servers }
     }
 
     pub fn profile_dirs() -> Vec<PathBuf> {
@@ -126,7 +118,7 @@ impl Profile {
 
     pub fn load(profile_name: &str) -> Option<Self> {
         let norm_target = profile_name.replace(['-', '_'], "").to_lowercase();
-        let target_stem = profile_name.split('/').last().unwrap_or(profile_name);
+        let target_stem = profile_name.split('/').next_back().unwrap_or(profile_name);
         let target_stem_norm = target_stem.replace(['-', '_'], "").to_lowercase();
 
         for dir in Self::profile_dirs() {
@@ -261,7 +253,7 @@ impl Profile {
         let mut matches = Vec::new();
 
         for opt in available {
-            let bare = opt.split('/').last().unwrap_or(opt);
+            let bare = opt.split('/').next_back().unwrap_or(opt);
             let opt_clean = opt.replace(['-', '_'], "").to_lowercase();
             let bare_clean = bare.replace(['-', '_'], "").to_lowercase();
 
@@ -289,13 +281,10 @@ impl Profile {
         let m_clean = m_lower.replace(['-', '_', '.', '/'], "");
         let mut matches = Vec::new();
 
-        let tokens: Vec<&str> = model_name
-            .split(|c: char| !c.is_alphanumeric())
-            .filter(|s| s.len() >= 3)
-            .collect();
+        let tokens: Vec<&str> = model_name.split(|c: char| !c.is_alphanumeric()).filter(|s| s.len() >= 3).collect();
 
         for opt in available {
-            let bare = opt.split('/').last().unwrap_or(opt);
+            let bare = opt.split('/').next_back().unwrap_or(opt);
             let opt_lower = opt.to_lowercase();
             let bare_lower = bare.to_lowercase();
             let opt_clean = opt_lower.replace(['-', '_'], "");
@@ -382,10 +371,7 @@ impl Profile {
             return None;
         }
 
-        let ws_name = target_workspace
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("workspace");
+        let ws_name = target_workspace.file_name().and_then(|n| n.to_str()).unwrap_or("workspace");
 
         let default_idx = options
             .iter()
@@ -406,11 +392,7 @@ impl Profile {
         }
         for (cat, children) in categories {
             let is_exp = expanded.get(cat).copied().unwrap_or(false);
-            rows.push(MenuRow::Category {
-                name: cat.clone(),
-                count: children.len(),
-                expanded: is_exp,
-            });
+            rows.push(MenuRow::Category { name: cat.clone(), count: children.len(), expanded: is_exp });
             if is_exp {
                 for (i, child) in children.iter().enumerate() {
                     rows.push(MenuRow::Child {
@@ -450,10 +432,8 @@ impl Profile {
         }
 
         let mut visible_rows = Self::build_rows(&roots, &categories, &expanded);
-        let mut sel_idx = visible_rows
-            .iter()
-            .position(|r| r.profile_id().as_deref() == Some(&target_default))
-            .unwrap_or(0);
+        let mut sel_idx =
+            visible_rows.iter().position(|r| r.profile_id().as_deref() == Some(&target_default)).unwrap_or(0);
 
         let _ = enable_raw_mode();
         let mut stdout = io::stdout();
@@ -480,15 +460,9 @@ impl Profile {
                     MenuRow::Root { name } => {
                         top_idx += 1;
                         if is_sel {
-                            print!(
-                                "\r\x1b[2K\x1b[1;36m  ❯ \x1b[1;37m{:2}. \x1b[1;36m{}\x1b[0m\r\n",
-                                top_idx, name
-                            );
+                            print!("\r\x1b[2K\x1b[1;36m  ❯ \x1b[1;37m{:2}. \x1b[1;36m{}\x1b[0m\r\n", top_idx, name);
                         } else {
-                            print!(
-                                "\r\x1b[2K\x1b[2m    {:2}. {}\x1b[0m\r\n",
-                                top_idx, name
-                            );
+                            print!("\r\x1b[2K\x1b[2m    {:2}. {}\x1b[0m\r\n", top_idx, name);
                         }
                     }
                     MenuRow::Category { name, count, expanded } => {
@@ -508,10 +482,7 @@ impl Profile {
                             }
                         } else {
                             if *expanded {
-                                print!(
-                                    "\r\x1b[2K\x1b[2m    {:2}. \x1b[0;33m{} {}\x1b[0m\r\n",
-                                    top_idx, icon, name
-                                );
+                                print!("\r\x1b[2K\x1b[2m    {:2}. \x1b[0;33m{} {}\x1b[0m\r\n", top_idx, icon, name);
                             } else {
                                 print!(
                                     "\r\x1b[2K\x1b[2m    {:2}. \x1b[0;33m{} {}\x1b[0m \x1b[2m({})\x1b[0m\r\n",
@@ -528,10 +499,7 @@ impl Profile {
                                 branch, name
                             );
                         } else {
-                            print!(
-                                "\r\x1b[2K\x1b[2m          {} {}\x1b[0m\r\n",
-                                branch, name
-                            );
+                            print!("\r\x1b[2K\x1b[2m          {} {}\x1b[0m\r\n", branch, name);
                         }
                     }
                 }
@@ -558,23 +526,21 @@ impl Profile {
                     KeyCode::Down => {
                         sel_idx = (sel_idx + 1) % num_rows;
                     }
-                    KeyCode::Enter => {
-                        match &visible_rows[sel_idx] {
-                            MenuRow::Root { .. } | MenuRow::Child { .. } => {
-                                let chosen = visible_rows[sel_idx].profile_id();
-                                print!("\x1b[{}A\r\x1b[J\x1b[?25h", prev_row_count + 3);
-                                let _ = stdout.flush();
-                                let _ = disable_raw_mode();
-                                return chosen;
-                            }
-                            MenuRow::Category { name, .. } => {
-                                let cur = expanded.entry(name.clone()).or_insert(false);
-                                *cur = !*cur;
-                                visible_rows = Self::build_rows(&roots, &categories, &expanded);
-                                sel_idx = sel_idx.min(visible_rows.len() - 1);
-                            }
+                    KeyCode::Enter => match &visible_rows[sel_idx] {
+                        MenuRow::Root { .. } | MenuRow::Child { .. } => {
+                            let chosen = visible_rows[sel_idx].profile_id();
+                            print!("\x1b[{}A\r\x1b[J\x1b[?25h", prev_row_count + 3);
+                            let _ = stdout.flush();
+                            let _ = disable_raw_mode();
+                            return chosen;
                         }
-                    }
+                        MenuRow::Category { name, .. } => {
+                            let cur = expanded.entry(name.clone()).or_insert(false);
+                            *cur = !*cur;
+                            visible_rows = Self::build_rows(&roots, &categories, &expanded);
+                            sel_idx = sel_idx.min(visible_rows.len() - 1);
+                        }
+                    },
                     KeyCode::Char(' ') => {
                         if let MenuRow::Category { name, .. } = &visible_rows[sel_idx] {
                             let cur = expanded.entry(name.clone()).or_insert(false);
@@ -593,35 +559,31 @@ impl Profile {
                             }
                         }
                     }
-                    KeyCode::Left => {
-                        match &visible_rows[sel_idx] {
-                            MenuRow::Category { name, expanded: is_exp, .. } => {
-                                if *is_exp {
-                                    expanded.insert(name.clone(), false);
-                                    visible_rows = Self::build_rows(&roots, &categories, &expanded);
-                                }
-                            }
-                            MenuRow::Child { category, .. } => {
-                                let cat_name = category.clone();
-                                expanded.insert(cat_name.clone(), false);
+                    KeyCode::Left => match &visible_rows[sel_idx] {
+                        MenuRow::Category { name, expanded: is_exp, .. } => {
+                            if *is_exp {
+                                expanded.insert(name.clone(), false);
                                 visible_rows = Self::build_rows(&roots, &categories, &expanded);
-                                sel_idx = visible_rows
-                                    .iter()
-                                    .position(|r| matches!(r, MenuRow::Category { name, .. } if name == &cat_name))
-                                    .unwrap_or(0);
                             }
-                            _ => {}
                         }
-                    }
+                        MenuRow::Child { category, .. } => {
+                            let cat_name = category.clone();
+                            expanded.insert(cat_name.clone(), false);
+                            visible_rows = Self::build_rows(&roots, &categories, &expanded);
+                            sel_idx = visible_rows
+                                .iter()
+                                .position(|r| matches!(r, MenuRow::Category { name, .. } if name == &cat_name))
+                                .unwrap_or(0);
+                        }
+                        _ => {}
+                    },
                     KeyCode::Esc | KeyCode::Char('q') => {
                         print!("\x1b[{}A\r\x1b[J\x1b[?25h", prev_row_count + 3);
                         let _ = stdout.flush();
                         let _ = disable_raw_mode();
                         return None;
                     }
-                    KeyCode::Char('c')
-                        if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) =>
-                    {
+                    KeyCode::Char('c') if key_event.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                         print!("\x1b[{}A\r\x1b[J\x1b[?25h", prev_row_count + 3);
                         let _ = stdout.flush();
                         let _ = disable_raw_mode();

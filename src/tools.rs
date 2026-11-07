@@ -182,19 +182,25 @@ fn levenshtein_similarity(a: &str, b: &str) -> f64 {
     let b_chars: Vec<char> = b.chars().collect();
     let n = a_chars.len();
     let m = b_chars.len();
-    if n == 0 && m == 0 { return 1.0; }
-    if n == 0 || m == 0 { return 0.0; }
+    if n == 0 && m == 0 {
+        return 1.0;
+    }
+    if n == 0 || m == 0 {
+        return 0.0;
+    }
 
     let mut dp = vec![vec![0usize; m + 1]; n + 1];
-    for i in 0..=n { dp[i][0] = i; }
-    for j in 0..=m { dp[0][j] = j; }
+    for i in 0..=n {
+        dp[i][0] = i;
+    }
+    for j in 0..=m {
+        dp[0][j] = j;
+    }
 
     for i in 1..=n {
         for j in 1..=m {
             let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
-            dp[i][j] = (dp[i - 1][j] + 1)
-                .min(dp[i][j - 1] + 1)
-                .min(dp[i - 1][j - 1] + cost);
+            dp[i][j] = (dp[i - 1][j] + 1).min(dp[i][j - 1] + 1).min(dp[i - 1][j - 1] + cost);
         }
     }
 
@@ -207,7 +213,9 @@ fn levenshtein_similarity(a: &str, b: &str) -> f64 {
 pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result<String, String> {
     if original.contains(old_str) {
         if original.matches(old_str).count() > 1 {
-            return Err("Target 'old_str' matched multiple times. Include more surrounding lines to make it unique.".into());
+            return Err(
+                "Target 'old_str' matched multiple times. Include more surrounding lines to make it unique.".into()
+            );
         }
         return Ok(original.replacen(old_str, new_str, 1));
     }
@@ -282,7 +290,10 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
         }
         return Ok(reconstructed);
     } else if matches.len() > 1 {
-        return Err(format!("Whitespace-normalized old_str matched {} locations. Include more surrounding lines to make it unique.", matches.len()));
+        return Err(format!(
+            "Whitespace-normalized old_str matched {} locations. Include more surrounding lines to make it unique.",
+            matches.len()
+        ));
     }
 
     let old_block_str = norm_old.join("\n");
@@ -300,8 +311,7 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
         }
     }
 
-    if best_ratio >= 0.85 && best_window.is_some() {
-        let (start_idx, end_idx) = best_window.unwrap();
+    if let Some((start_idx, end_idx)) = best_window.filter(|_| best_ratio >= 0.85) {
         let orig_first_line = orig_lines[start_idx];
         let orig_indent = orig_first_line.len() - orig_first_line.trim_start().len();
         let old_first_line = old_lines[0];
@@ -498,7 +508,7 @@ pub async fn execute_tool(
                 }
             }
 
-// Direct overwrite allowed in autonomous workspace
+            // Direct overwrite allowed in autonomous workspace
 
             if let Some(parent) = safe_path.parent() {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -586,7 +596,12 @@ pub async fn execute_tool(
             if matches.is_empty() {
                 Ok(format!("No matches found for '{}'", pattern))
             } else {
-                Ok(format!("### Code Search for '{}' (first {} matches):\n{}", pattern, matches.len(), matches.join("\n")))
+                Ok(format!(
+                    "### Code Search for '{}' (first {} matches):\n{}",
+                    pattern,
+                    matches.len(),
+                    matches.join("\n")
+                ))
             }
         }
 

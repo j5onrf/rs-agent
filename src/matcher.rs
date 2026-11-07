@@ -29,11 +29,8 @@ impl ContextEntry {
         };
         let command = raw_cmd.to_string();
 
-        let aliases: Vec<String> = parts[1]
-            .split(',')
-            .map(|s| s.trim().to_lowercase())
-            .filter(|s| !s.is_empty())
-            .collect();
+        let aliases: Vec<String> =
+            parts[1].split(',').map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()).collect();
 
         if aliases.is_empty() {
             return None;

@@ -19,9 +19,7 @@ impl Default for AppState {
 }
 
 fn get_state_path() -> PathBuf {
-    dirs::home_dir()
-        .map(|h| h.join(".config/rs-agent/state.json"))
-        .unwrap_or_else(|| PathBuf::from("state.json"))
+    dirs::home_dir().map(|h| h.join(".config/rs-agent/state.json")).unwrap_or_else(|| PathBuf::from("state.json"))
 }
 
 pub fn get_box_style() -> usize {

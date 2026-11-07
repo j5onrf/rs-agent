@@ -11,6 +11,7 @@ target/
 projects/chat/
 ta_probe.txt
 plugins/mcp/*.db
+rustfmt.toml
 
 # Python execution caches
 __pycache__/

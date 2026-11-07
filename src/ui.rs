@@ -7,10 +7,10 @@ use std::time::{Duration, Instant};
 // Exact ANSI constants (inherits active terminal palette)
 const ANSI_RESET: &str = "\x1b[0m";
 const ANSI_BRIGHT: &str = "\x1b[1;36m"; // Primary theme accent
-const ANSI_ACCENT: &str = "\x1b[36m";   // Regular theme accent
-const ANSI_WHITE: &str = "\x1b[1;37m";  // Bold foreground
-const ANSI_MUTED: &str = "\x1b[90m";    // Color 8 / Muted
-const ANSI_DIM: &str = "\x1b[2m";       // Faint / Low contrast
+const ANSI_ACCENT: &str = "\x1b[36m"; // Regular theme accent
+const ANSI_WHITE: &str = "\x1b[1;37m"; // Bold foreground
+const ANSI_MUTED: &str = "\x1b[90m"; // Color 8 / Muted
+const ANSI_DIM: &str = "\x1b[2m"; // Faint / Low contrast
 
 #[inline(always)]
 fn cell_dither_threshold(x: usize, y: usize) -> f64 {
@@ -34,9 +34,7 @@ fn slab_shader(x: usize, total_w: usize) -> &'static str {
 }
 
 fn resolve_git_status() -> String {
-    let output = Command::new("git")
-        .args(["status", "--porcelain", "-b"])
-        .output();
+    let output = Command::new("git").args(["status", "--porcelain", "-b"]).output();
 
     match output {
         Ok(out) if out.status.success() => {
@@ -44,13 +42,7 @@ fn resolve_git_status() -> String {
             let mut lines = text.lines();
             let header = lines.next().unwrap_or("").trim_start_matches("##").trim();
 
-            let branch = header
-                .split("...")
-                .next()
-                .unwrap_or(header)
-                .split_whitespace()
-                .next()
-                .unwrap_or("detached");
+            let branch = header.split("...").next().unwrap_or(header).split_whitespace().next().unwrap_or("detached");
 
             let dirty = lines.filter(|l| !l.trim().is_empty()).count();
             let status = if dirty == 0 {
@@ -145,8 +137,16 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
         1 => {
             // Style 1: Clean Rounded (Snappy laser wipe)
             let top_border = format!("{ANSI_BRIGHT}╭─ ○ {:─<w$}╮{ANSI_RESET}", "", w = box_w - 6);
-            let model_line = format!("{ANSI_BRIGHT}│{ANSI_RESET}  {ANSI_WHITE}{:<w$}{ANSI_RESET}{ANSI_BRIGHT}│{ANSI_RESET}", model, w = box_w - 4);
-            let prof_line  = format!("{ANSI_BRIGHT}│{ANSI_RESET}  {ANSI_MUTED}{:<w$}{ANSI_RESET}{ANSI_BRIGHT}│{ANSI_RESET}", profile, w = box_w - 4);
+            let model_line = format!(
+                "{ANSI_BRIGHT}│{ANSI_RESET}  {ANSI_WHITE}{:<w$}{ANSI_RESET}{ANSI_BRIGHT}│{ANSI_RESET}",
+                model,
+                w = box_w - 4
+            );
+            let prof_line = format!(
+                "{ANSI_BRIGHT}│{ANSI_RESET}  {ANSI_MUTED}{:<w$}{ANSI_RESET}{ANSI_BRIGHT}│{ANSI_RESET}",
+                profile,
+                w = box_w - 4
+            );
             let bot_border = format!("{ANSI_BRIGHT}╰{:─<w$}╯{ANSI_RESET}", "", w = box_w - 2);
 
             if progress >= 1.0 {
@@ -264,22 +264,34 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
 
             // Avatar frame
             let av1 = "╭────╮";
-            for (i, c) in av1.chars().enumerate() { grid[1 * box_w + (3 + i)] = Some((c, ANSI_BRIGHT)); }
+            for (i, c) in av1.chars().enumerate() {
+                grid[box_w + (3 + i)] = Some((c, ANSI_BRIGHT));
+            }
             grid[2 * box_w + 3] = Some(('│', ANSI_BRIGHT));
-            for (i, c) in initials.chars().take(2).enumerate() { grid[2 * box_w + (5 + i)] = Some((c, ANSI_WHITE)); }
+            for (i, c) in initials.chars().take(2).enumerate() {
+                grid[2 * box_w + (5 + i)] = Some((c, ANSI_WHITE));
+            }
             grid[2 * box_w + 8] = Some(('│', ANSI_BRIGHT));
             let av3 = "╰────╯";
-            for (i, c) in av3.chars().enumerate() { grid[3 * box_w + (3 + i)] = Some((c, ANSI_BRIGHT)); }
+            for (i, c) in av3.chars().enumerate() {
+                grid[3 * box_w + (3 + i)] = Some((c, ANSI_BRIGHT));
+            }
 
             // Content lines
             for (i, c) in model.chars().enumerate() {
-                if 11 + i < box_w - 2 { grid[1 * box_w + (11 + i)] = Some((c, ANSI_WHITE)); }
+                if 11 + i < box_w - 2 {
+                    grid[box_w + (11 + i)] = Some((c, ANSI_WHITE));
+                }
             }
             for (i, c) in profile.chars().enumerate() {
-                if 11 + i < box_w - 2 { grid[2 * box_w + (11 + i)] = Some((c, ANSI_ACCENT)); }
+                if 11 + i < box_w - 2 {
+                    grid[2 * box_w + (11 + i)] = Some((c, ANSI_ACCENT));
+                }
             }
             for (i, c) in git_info.chars().enumerate() {
-                if 11 + i < box_w - 2 { grid[3 * box_w + (11 + i)] = Some((c, ANSI_MUTED)); }
+                if 11 + i < box_w - 2 {
+                    grid[3 * box_w + (11 + i)] = Some((c, ANSI_MUTED));
+                }
             }
 
             let reveal = if progress < 0.35 {
@@ -297,21 +309,19 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 let mut row = String::with_capacity(256);
 
                 for x in 0..box_w {
-                    let is_avatar = x >= 3 && x < 9 && y >= 1 && y <= 3;
+                    let is_avatar = (3..9).contains(&x) && (1..=3).contains(&y);
                     let is_border = y == 0 || y == 4 || x == 0 || x == box_w - 1;
-                    let is_text_bar = y >= 1 && y <= 3 && match y {
-                        1 => x >= 11 && x < 11 + model.len().max(16).min(box_w - 13),
-                        2 => x >= 11 && x < 11 + profile.len().max(12).min(box_w - 13),
-                        3 => x >= 11 && x < 11 + git_info.chars().count().max(12).min(box_w - 13),
-                        _ => false,
-                    };
+                    let is_text_bar = y >= 1
+                        && y <= 3
+                        && match y {
+                            1 => x >= 11 && x < 11 + model.len().max(16).min(box_w - 13),
+                            2 => x >= 11 && x < 11 + profile.len().max(12).min(box_w - 13),
+                            3 => x >= 11 && x < 11 + git_info.chars().count().max(12).min(box_w - 13),
+                            _ => false,
+                        };
                     let is_skeleton = is_border || is_avatar || is_text_bar;
 
-                    let cell_thresh = if is_avatar {
-                        cell_dither_threshold(3, 1)
-                    } else {
-                        cell_dither_threshold(x, y)
-                    };
+                    let cell_thresh = if is_avatar { cell_dither_threshold(3, 1) } else { cell_dither_threshold(x, y) };
 
                     if progress >= 1.0 || (reveal > 0.0 && cell_thresh < reveal) {
                         if let Some((ch, col)) = grid[y * box_w + x] {
@@ -366,26 +376,38 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
 
             // Row 0
             let av1 = "╭────╮";
-            for (i, c) in av1.chars().enumerate() { grid[0 * box_w + (2 + i)] = Some((c, ANSI_BRIGHT)); }
+            for (i, c) in av1.chars().enumerate() {
+                grid[2 + i] = Some((c, ANSI_BRIGHT));
+            }
             for (i, c) in model.chars().enumerate() {
-                if 10 + i < box_w { grid[0 * box_w + (10 + i)] = Some((c, ANSI_WHITE)); }
+                if 10 + i < box_w {
+                    grid[10 + i] = Some((c, ANSI_WHITE));
+                }
             }
 
             // Row 1
-            grid[1 * box_w + 2] = Some(('│', ANSI_BRIGHT));
-            grid[1 * box_w + 3] = Some((' ', ANSI_RESET));
-            for (i, c) in initials.chars().take(2).enumerate() { grid[1 * box_w + (4 + i)] = Some((c, ANSI_WHITE)); }
-            grid[1 * box_w + 6] = Some((' ', ANSI_RESET));
-            grid[1 * box_w + 7] = Some(('│', ANSI_BRIGHT));
+            grid[box_w + 2] = Some(('│', ANSI_BRIGHT));
+            grid[box_w + 3] = Some((' ', ANSI_RESET));
+            for (i, c) in initials.chars().take(2).enumerate() {
+                grid[box_w + (4 + i)] = Some((c, ANSI_WHITE));
+            }
+            grid[box_w + 6] = Some((' ', ANSI_RESET));
+            grid[box_w + 7] = Some(('│', ANSI_BRIGHT));
             for (i, c) in profile.chars().enumerate() {
-                if 10 + i < box_w { grid[1 * box_w + (10 + i)] = Some((c, ANSI_ACCENT)); }
+                if 10 + i < box_w {
+                    grid[box_w + (10 + i)] = Some((c, ANSI_ACCENT));
+                }
             }
 
             // Row 2
             let av3 = "╰────╯";
-            for (i, c) in av3.chars().enumerate() { grid[2 * box_w + (2 + i)] = Some((c, ANSI_BRIGHT)); }
+            for (i, c) in av3.chars().enumerate() {
+                grid[2 * box_w + (2 + i)] = Some((c, ANSI_BRIGHT));
+            }
             for (i, c) in git_info.chars().enumerate() {
-                if 10 + i < box_w { grid[2 * box_w + (10 + i)] = Some((c, ANSI_MUTED)); }
+                if 10 + i < box_w {
+                    grid[2 * box_w + (10 + i)] = Some((c, ANSI_MUTED));
+                }
             }
 
             let reveal = if progress < 0.35 {
@@ -419,15 +441,11 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 let mut row = String::with_capacity(128);
 
                 for x in 0..row_end {
-                    let is_avatar = x >= 2 && x < 8;
+                    let is_avatar = (2..8).contains(&x);
                     let is_text_bar = x >= 10 && x < 10 + bar_len;
                     let is_skeleton = is_avatar || is_text_bar;
 
-                    let cell_thresh = if is_avatar {
-                        cell_dither_threshold(2, 0)
-                    } else {
-                        cell_dither_threshold(x, y)
-                    };
+                    let cell_thresh = if is_avatar { cell_dither_threshold(2, 0) } else { cell_dither_threshold(x, y) };
 
                     if progress >= 1.0 || (reveal > 0.0 && cell_thresh < reveal) {
                         if let Some((ch, col)) = grid[y * box_w + x] {

@@ -56,11 +56,7 @@ fn list_profiles(root: &Path) -> Vec<String> {
 }
 
 fn create_profile_file(root: &Path, raw_name: &str) -> String {
-    let clean = raw_name
-        .trim()
-        .trim_end_matches(".md")
-        .replace(' ', "-")
-        .to_lowercase();
+    let clean = raw_name.trim().trim_end_matches(".md").replace(' ', "-").to_lowercase();
 
     let profiles_dir = root.join("profiles");
     let _ = fs::create_dir_all(&profiles_dir);
@@ -155,7 +151,10 @@ fn main() {
         found.clone()
     } else {
         // Name was entered that does not exist in profiles/
-        print!("{}Profile '{}' does not exist. Create ~/.config/rs-agent/profiles/{}.md? [Y/n]:{} ", YELLOW, input_str, input_str, RESET);
+        print!(
+            "{}Profile '{}' does not exist. Create ~/.config/rs-agent/profiles/{}.md? [Y/n]:{} ",
+            YELLOW, input_str, input_str, RESET
+        );
         io::stdout().flush().unwrap();
         let mut conf = String::new();
         io::stdin().read_line(&mut conf).unwrap();
@@ -174,10 +173,8 @@ fn main() {
         std::process::exit(1);
     }
 
-    let config_content = format!(
-        "{{\n  \"profile_name\": \"{}\",\n  \"tier\": \"Smol\",\n  \"is_agent\": true\n}}\n",
-        chosen_prof
-    );
+    let config_content =
+        format!("{{\n  \"profile_name\": \"{}\",\n  \"tier\": \"Smol\",\n  \"is_agent\": true\n}}\n", chosen_prof);
     let _ = fs::write(meta_dir.join("config.json"), config_content);
 
     let ctx_file = root.join("rs-context.md");
@@ -204,5 +201,8 @@ fn main() {
     println!("\n\x1b[1;32m✓ Created workspace:\x1b[0m {}", proj_dir.display());
     println!("\x1b[1;32m✓ Configured profile:\x1b[0m {}", chosen_prof);
     println!("\x1b[1;32m✓ Added to top of Workspaces:\x1b[0m '{}' in rs-context.md", clean_name);
-    println!("\n{}To start your workspace now, type:{} ai init ~/.config/rs-agent/projects/{}\n", CYAN, RESET, clean_name);
+    println!(
+        "\n{}To start your workspace now, type:{} ai init ~/.config/rs-agent/projects/{}\n",
+        CYAN, RESET, clean_name
+    );
 }

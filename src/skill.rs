@@ -29,10 +29,7 @@ impl Skill {
             }
         }
 
-        Self {
-            name: name.to_string(),
-            content: body,
-        }
+        Self { name: name.to_string(), content: body }
     }
 
     pub fn skill_dirs() -> Vec<PathBuf> {
@@ -98,13 +95,11 @@ impl Skill {
 
         loop {
             let q_lower = query.to_lowercase();
-            let mut filtered: Vec<String> = all_skills
-                .iter()
-                .filter(|s| s.to_lowercase().contains(&q_lower))
-                .cloned()
-                .collect();
+            let mut filtered: Vec<String> =
+                all_skills.iter().filter(|s| s.to_lowercase().contains(&q_lower)).cloned().collect();
 
-            let has_detach_all = !active_skills.is_empty() && (q_lower.is_empty() || "detach all clear".contains(&q_lower));
+            let has_detach_all =
+                !active_skills.is_empty() && (q_lower.is_empty() || "detach all clear".contains(&q_lower));
             if has_detach_all {
                 filtered.push("__DETACH_ALL__".to_string());
             }
@@ -118,11 +113,7 @@ impl Skill {
             }
 
             let visible_count = filtered.len().min(max_visible);
-            let start = if sel_idx >= visible_count {
-                sel_idx + 1 - visible_count
-            } else {
-                0
-            };
+            let start = if sel_idx >= visible_count { sel_idx + 1 - visible_count } else { 0 };
             let end = (start + visible_count).min(filtered.len());
 
             let active_count = active_skills.len();
@@ -140,20 +131,29 @@ impl Skill {
 
                     if item == "__DETACH_ALL__" {
                         if is_selected {
-                            print!("\r\x1b[2K\x1b[1;31m  ❯ \x1b[1;37m{:2}. \x1b[1;31m✕ Detach all skills ({})\x1b[0m\r\n", actual_idx + 1, active_count);
+                            print!(
+                                "\r\x1b[2K\x1b[1;31m  ❯ \x1b[1;37m{:2}. \x1b[1;31m✕ Detach all skills ({})\x1b[0m\r\n",
+                                actual_idx + 1,
+                                active_count
+                            );
                         } else {
-                            print!("\r\x1b[2K\x1b[2m    {:2}. \x1b[31m✕ Detach all skills ({})\x1b[0m\r\n", actual_idx + 1, active_count);
+                            print!(
+                                "\r\x1b[2K\x1b[2m    {:2}. \x1b[31m✕ Detach all skills ({})\x1b[0m\r\n",
+                                actual_idx + 1,
+                                active_count
+                            );
                         }
                     } else {
                         let is_active = active_skills.contains(item);
-                        let badge = if is_active {
-                            " \x1b[32m[active - enter to remove]\x1b[0m"
-                        } else {
-                            ""
-                        };
+                        let badge = if is_active { " \x1b[32m[active - enter to remove]\x1b[0m" } else { "" };
 
                         if is_selected {
-                            print!("\r\x1b[2K\x1b[1;36m  ❯ \x1b[1;37m{:2}. \x1b[1;36m{:<20}\x1b[0m{}\r\n", actual_idx + 1, item, badge);
+                            print!(
+                                "\r\x1b[2K\x1b[1;36m  ❯ \x1b[1;37m{:2}. \x1b[1;36m{:<20}\x1b[0m{}\r\n",
+                                actual_idx + 1,
+                                item,
+                                badge
+                            );
                         } else {
                             print!("\r\x1b[2K\x1b[2m    {:2}. {:<20}\x1b[0m{}\r\n", actual_idx + 1, item, badge);
                         }

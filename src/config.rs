@@ -42,13 +42,7 @@ pub struct WorkspaceConfig {
 
 impl Default for WorkspaceConfig {
     fn default() -> Self {
-        Self {
-            profile_name: "chat".into(),
-            is_agent: false,
-            tier: ToolTier::Smol,
-            adapters: false,
-            delegate: false,
-        }
+        Self { profile_name: "chat".into(), is_agent: false, tier: ToolTier::Smol, adapters: false, delegate: false }
     }
 }
 
@@ -118,9 +112,7 @@ AI_MAX_AGENT_ROUNDS="10"
 "#;
 
 pub fn get_env_path() -> PathBuf {
-    dirs::home_dir()
-        .map(|h| h.join(".config/rs-agent/.env"))
-        .unwrap_or_else(|| PathBuf::from(".env"))
+    dirs::home_dir().map(|h| h.join(".config/rs-agent/.env")).unwrap_or_else(|| PathBuf::from(".env"))
 }
 
 pub fn ensure_env_file() {
@@ -156,46 +148,19 @@ pub fn get_max_tokens() -> usize {
             }
         }
     }
-    std::env::var("AI_MAX_TOKENS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(8192)
+    std::env::var("AI_MAX_TOKENS").ok().and_then(|v| v.parse().ok()).unwrap_or(8192)
 }
 
 pub fn get_context_ceilings() -> ContextCeilings {
     let max_tokens = get_max_tokens();
     if max_tokens <= 16_384 {
-        ContextCeilings {
-            max_tokens,
-            line_ceiling: 250,
-            char_cap: 20_000,
-            preview_lines: 100,
-            search_cap: 30,
-        }
+        ContextCeilings { max_tokens, line_ceiling: 250, char_cap: 20_000, preview_lines: 100, search_cap: 30 }
     } else if max_tokens <= 32_768 {
-        ContextCeilings {
-            max_tokens,
-            line_ceiling: 1_000,
-            char_cap: 45_000,
-            preview_lines: 300,
-            search_cap: 50,
-        }
+        ContextCeilings { max_tokens, line_ceiling: 1_000, char_cap: 45_000, preview_lines: 300, search_cap: 50 }
     } else if max_tokens <= 64_000 {
-        ContextCeilings {
-            max_tokens,
-            line_ceiling: 2_000,
-            char_cap: 90_000,
-            preview_lines: 600,
-            search_cap: 75,
-        }
+        ContextCeilings { max_tokens, line_ceiling: 2_000, char_cap: 90_000, preview_lines: 600, search_cap: 75 }
     } else {
-        ContextCeilings {
-            max_tokens,
-            line_ceiling: 4_000,
-            char_cap: 180_000,
-            preview_lines: 1_200,
-            search_cap: 100,
-        }
+        ContextCeilings { max_tokens, line_ceiling: 4_000, char_cap: 180_000, preview_lines: 1_200, search_cap: 100 }
     }
 }
 
@@ -218,8 +183,8 @@ impl ProviderConfig {
             let key_var = format!("CUSTOM{}_API_KEY", i);
             let legacy_key = if i == 1 { Some("CUSTOM_API_KEY") } else { None };
 
-            let maybe_key = get_env_val(&env_content, &key_var)
-                .or_else(|| legacy_key.and_then(|k| get_env_val(&env_content, k)));
+            let maybe_key =
+                get_env_val(&env_content, &key_var).or_else(|| legacy_key.and_then(|k| get_env_val(&env_content, k)));
 
             if let Some(api_key) = maybe_key {
                 let clean_key = api_key.trim();
@@ -228,7 +193,9 @@ impl ProviderConfig {
                     let legacy_url = if i == 1 { Some("CUSTOM_URL") } else { None };
                     let base_url = get_env_val(&env_content, &url_var)
                         .or_else(|| legacy_url.and_then(|k| get_env_val(&env_content, k)))
-                        .unwrap_or_else(|| "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions".to_string());
+                        .unwrap_or_else(|| {
+                            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions".to_string()
+                        });
 
                     let model_var = format!("CUSTOM{}_MODEL", i);
                     let legacy_model = if i == 1 { Some("CUSTOM_MODEL") } else { None };
@@ -236,12 +203,7 @@ impl ProviderConfig {
                         .or_else(|| legacy_model.and_then(|k| get_env_val(&env_content, k)))
                         .unwrap_or_else(|| "default".to_string());
 
-                    return ProviderConfig {
-                        base_url,
-                        api_key: clean_key.to_string(),
-                        model,
-                        max_tokens,
-                    };
+                    return ProviderConfig { base_url, api_key: clean_key.to_string(), model, max_tokens };
                 }
             }
         }
@@ -250,8 +212,8 @@ impl ProviderConfig {
         if let Some(api_key) = get_env_val(&env_content, "OPENROUTER_API_KEY") {
             let clean_key = api_key.trim();
             if !clean_key.is_empty() && !clean_key.contains("your_key_here") {
-                let model = get_env_val(&env_content, "OPENROUTER_MODEL")
-                    .unwrap_or_else(|| "openrouter/free".to_string());
+                let model =
+                    get_env_val(&env_content, "OPENROUTER_MODEL").unwrap_or_else(|| "openrouter/free".to_string());
                 return ProviderConfig {
                     base_url: "https://openrouter.ai/api/v1/chat/completions".to_string(),
                     api_key: clean_key.to_string(),
@@ -263,10 +225,8 @@ impl ProviderConfig {
 
         // 3. Fallback: Local llama-server on :8080 (inline probe)
         let local_url = "http://127.0.0.1:8080/v1/chat/completions".to_string();
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_millis(500))
-            .build()
-            .unwrap_or_default();
+        let client =
+            reqwest::Client::builder().timeout(std::time::Duration::from_millis(500)).build().unwrap_or_default();
 
         let detected_model = if let Ok(resp) = client.get("http://127.0.0.1:8080/v1/models").send().await {
             if let Ok(json) = resp.json::<serde_json::Value>().await {
@@ -284,12 +244,7 @@ impl ProviderConfig {
             "LFM3-1.7B".to_string()
         };
 
-        ProviderConfig {
-            base_url: local_url,
-            api_key: "not-needed".to_string(),
-            model: detected_model,
-            max_tokens,
-        }
+        ProviderConfig { base_url: local_url, api_key: "not-needed".to_string(), model: detected_model, max_tokens }
     }
 }
 
@@ -302,11 +257,8 @@ pub fn load_global_instructions() -> Option<String> {
     for path in candidates.into_iter().flatten() {
         if path.is_file() {
             if let Ok(content) = fs::read_to_string(&path) {
-                let active_lines: Vec<&str> = content
-                    .lines()
-                    .map(|l| l.trim())
-                    .filter(|l| !l.is_empty() && !l.starts_with('#'))
-                    .collect();
+                let active_lines: Vec<&str> =
+                    content.lines().map(|l| l.trim()).filter(|l| !l.is_empty() && !l.starts_with('#')).collect();
 
                 if !active_lines.is_empty() {
                     return Some(active_lines.join("\n"));
