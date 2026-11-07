@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""rs-agent Full-Stack Agentic & Tool-Calling Benchmark Suite [100% Py-Agent Parity Edition]"""
+"""Rs-Agent Agentic & Tool-Calling Benchmark"""
 
 import contextlib
 import json

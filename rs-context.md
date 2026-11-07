@@ -22,7 +22,7 @@ curl -s "wttr.in/?format=3" ---> get weather
 date "+Current Date: %A, %B %-d, %Y" ---> get date
 
 # --- Developement Use ---
-~/.config/rs-agent/tools/evals/eval-stack ---> eva
+~/.config/rs-agent/tools/eval-stack/eval-stack ---> eva
 
 # --- Gated Tools ---
 [gate] date "+Current Date: %A, %B %-d, %Y" ---> test gate

@@ -1,13 +1,18 @@
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
+
 fn get_env_val(content: &str, key: &str) -> Option<String> {
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("#") {
+        if trimmed.starts_with('#') {
             continue;
         }
         if let Some(rest) = trimmed.strip_prefix(key) {
             let rest = rest.trim_start();
-            if let Some(val_part) = rest.strip_prefix("=") {
-                let val = val_part.trim().split("#").next().unwrap_or(val_part).trim();
+            if let Some(val_part) = rest.strip_prefix('=') {
+                let val = val_part.trim().split('#').next().unwrap_or(val_part).trim();
                 let clean = val.trim_matches('"').trim_matches('\'').trim();
                 if !clean.is_empty() {
                     return Some(clean.to_string());
@@ -17,11 +22,6 @@ fn get_env_val(content: &str, key: &str) -> Option<String> {
     }
     None
 }
-
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ToolTier {
@@ -54,17 +54,10 @@ impl Default for WorkspaceConfig {
 
 impl WorkspaceConfig {
     pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self {
-        let candidates = [
-            workspace.as_ref().join(".rs").join("config.json"),
-            workspace.as_ref().join(".rs-agent").join("config.json"),
-        ];
-        for cfg_path in &candidates {
-            if cfg_path.exists() {
-                if let Ok(content) = fs::read_to_string(cfg_path) {
-                    if let Ok(cfg) = serde_json::from_str::<WorkspaceConfig>(&content) {
-                        return cfg;
-                    }
-                }
+        let cfg_path = workspace.as_ref().join(".rs/config.json");
+        if let Ok(content) = fs::read_to_string(&cfg_path) {
+            if let Ok(cfg) = serde_json::from_str::<WorkspaceConfig>(&content) {
+                return cfg;
             }
         }
         Self::default()
@@ -88,66 +81,7 @@ pub struct ContextCeilings {
     pub search_cap: usize,
 }
 
-pub const DEFAULT_ENV: &str = r#"# ==============================================================================
-# Rs-Agent Provider Cascade (.env)
-# Priority: Top-down first active (uncommented) key.
-# Fallback: When all keys are commented with '#', connects to local llama-server (:8080).
-# Configure interactively with: ms (or models)
-# ==============================================================================
-
-#CUSTOM_API_KEY="hf_your_key_here"
-CUSTOM_MODEL="space"
-
-# ── 2. Custom 2 / TokenHarbor (DeepSeek / xAI) ────────────────────────────────
-#CUSTOM2_API_KEY="thk_live_your_key_here"
-CUSTOM2_URL="https://tokenharbor.ai/v1/chat/completions"
-CUSTOM2_MODEL="deepseek-v4.1-flash:free"
-
-# ── 3. Custom 3 / Google Gemini 3.8 Flash (OpenAI Endpoint) ───────────────────
-#CUSTOM3_API_KEY="AQ_your_key_here"
-CUSTOM3_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-CUSTOM3_MODEL="gemini-3.8-flash"
-
-# ── 4. Custom 4 / Google Gemini 3.5 Flash Lite ─────────────────────────────────
-#CUSTOM4_API_KEY="AQ_your_key_here"
-CUSTOM4_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-CUSTOM4_MODEL="gemini-3.5-flash-lite"
-
-# ── 5. Custom 5 / Local PyRouter / Custom Endpoint ────────────────────────────
-#CUSTOM5_API_KEY="not-needed"
-#CUSTOM5_URL="http://127.0.0.1:20128/v1/chat/completions"
-#CUSTOM5_MODEL="big-pickle"
-
-# ── Google Gemini Direct ──────────────────────────────────────────────────────
-#GEMINI_API_KEY="AQ_your_key_here"
-GEMINI_MODEL="gemini-3.5-flash-lite"
-
-# ── OpenRouter Universal Gateway ──────────────────────────────────────────────
-#OPENROUTER_API_KEY="sk-or-v1-your_key_here"
-OPENROUTER_MODEL="openrouter/free"
-
-# ── Search Grounding (/gnd) ───────────────────────────────────────────────────
-#GND_KEY="AQ_your_key_here"
-GND_MODEL="gemini-2.5-flash"
-
-# ── Context Ceilings & Execution Budget ───────────────────────────────────────
-AI_MAX_TOKENS="8192"
-AI_MAX_AGENT_ROUNDS="15"
-"#;
-
-pub fn get_env_path() -> PathBuf {
-    dirs::home_dir()
-        .map(|h| h.join(".config/rs-agent/.env"))
-        .unwrap_or_else(|| PathBuf::from(".env"))
-}
-
-pub fn ensure_env_file() {
-    let env_path = get_env_path();
-    if !env_path.exists() {
-        if let Some(parent) = env_path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        let template = r#"# Rs-Agent Provider Cascade (.env) — Priority: First active key | Switch with: ms
+pub const DEFAULT_ENV: &str = r#"# Rs-Agent Provider Cascade (.env) — Priority: First active key | Switch with: ms
 # Fallback: Local llama-server (:8080) when all cloud keys are commented with '#'.
 
 # ── 1. Google Gemini ──────────────────────────────────────────────────────────
@@ -182,11 +116,24 @@ CUSTOM4_MODEL="deepseek-chat"
 AI_MAX_TOKENS="8192"
 AI_MAX_AGENT_ROUNDS="10"
 "#;
-        let _ = std::fs::write(&env_path, template);
+
+pub fn get_env_path() -> PathBuf {
+    dirs::home_dir()
+        .map(|h| h.join(".config/rs-agent/.env"))
+        .unwrap_or_else(|| PathBuf::from(".env"))
+}
+
+pub fn ensure_env_file() {
+    let env_path = get_env_path();
+    if !env_path.exists() {
+        if let Some(parent) = env_path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        let _ = fs::write(&env_path, DEFAULT_ENV);
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let _ = std::fs::set_permissions(&env_path, std::fs::Permissions::from_mode(0o600));
+            let _ = fs::set_permissions(&env_path, fs::Permissions::from_mode(0o600));
         }
     }
 }
@@ -260,11 +207,10 @@ pub struct ProviderConfig {
     pub max_tokens: usize,
 }
 
-
 impl ProviderConfig {
     pub async fn load() -> Self {
         let env_path = get_env_path();
-        let env_content = std::fs::read_to_string(&env_path).unwrap_or_default();
+        let env_content = fs::read_to_string(&env_path).unwrap_or_default();
         let max_tokens = get_max_tokens();
 
         // 1. Check Universal Custom Providers: CUSTOM1..CUSTOM9 (and legacy CUSTOM_API_KEY)
