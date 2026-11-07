@@ -11,8 +11,11 @@ target/
 projects/chat/
 ta_probe.txt
 plugins/mcp/*.db
-*.db
-plugins/mcp/*.db
-*.db
-plugins/mcp/*.db
-*.db
+
+# Python execution caches
+__pycache__/
+*.pyc
+*.pyo
+
+# Ephemeral scratchpads
+.rs/scratchpad.log

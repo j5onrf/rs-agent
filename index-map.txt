@@ -24,23 +24,12 @@
 #   ├── plugins/t3code/t3code-bridge     - #!/usr/bin/env bash
 #   ├── profiles/artcraft/photocraft-c.md - PhotoCraft Visual Engine & Automation Specialist (Gemini Flash Lite)
 #   ├── profiles/artcraft/photocraft-l.md - LFM3 PhotoCraft Automation Engineer (Native MCP)
-#   ├── profiles/chat.md                 - Versatile, articulate, and high-signal conversational partner
+#   ├── profiles/chat.md                 - Adaptive, high-signal conversational partner
 #   ├── profiles/gem35.md                - description: "Google Gemini 3.5 Flash Lite High-Speed Conversational & Systems E
 #   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer (Native 6-Tool)
 #   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer (Native 6-Tool)
 #   ├── profiles/purebash.md             - Pure Bash LFM Minimalist Shell Agent
 #   ├── profiles/sage.md                 - InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent
-#   ├── projects/lfm3/acp:/skill/humanizer - ROLE DIRECTIVE: Direct, grounded, and intellectually honest collaborator.
-#   ├── projects/lfm3/acp:/skill/ponytail - ROLE DIRECTIVE: Ponytail Systems & Rust Architect.
-#   ├── projects/lfm3/acp:/skill/ub-mode - ROLE DIRECTIVE: Uncle Bob Clean Code & Architecture Practitioner.
-#   ├── projects/lfm3/binary_search_tree.py - class TreeNode:
-#   ├── projects/lfm3/bst.py             - class Node:
-#   ├── projects/lfm3/demo.psd           - {"name": "demo.psd", "width": 800, "height": 600}
-#   ├── projects/lfm3/test_calc.py       - def add(a, b):
-#   ├── projects/ling-tiny/test_calc.py  - def add(a, b):
-#   ├── projects/testp/acp:/skill/humanizer - ROLE DIRECTIVE: Direct, grounded, and intellectually honest collaborator.
-#   ├── projects/testp/acp:/skill/ponytail - ROLE DIRECTIVE: Ponytail Systems & Rust Architect.
-#   ├── projects/testp/acp:/skill/ub-mode - ROLE DIRECTIVE: Uncle Bob Clean Code & Architecture Practitioner.
 #   ├── projects/testp/test_calc.py      - def add(a, b):
 #   ├── rs-context.md                    - Rs-Agent Context Router
 #   ├── rs-hook.sh                       - rs-agent shell hook (ponytail minimalism: < 0.2ms, Bash & Zsh, macOS & Linux)
@@ -105,7 +94,7 @@
 ```rust
   L055: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
   L072: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff, Mcp { .. } }
-  L811: async fn main() -> anyhow :: Result<()>;
+  L824: async fn main() -> anyhow :: Result<()>;
 ```
 
 ### `tools/model-select/src/main.rs`
@@ -123,7 +112,7 @@
 
 ### `tools/test-agent/src/main.rs`
 ```rust
-  L220: fn main();
+  L261: fn main();
 ```
 
 ### `src/adapter.rs`
@@ -136,7 +125,7 @@
 
 ### `src/bridge.rs`
 ```rust
-  L279: pub async fn run_bridge() -> Result<()>;
+  L268: pub async fn run_bridge() -> Result<()>;
 ```
 
 ### `src/client.rs`
@@ -228,13 +217,13 @@
 
 ### `src/security.rs`
 ```rust
-  L023: pub struct SecurityBoundary { pub root: PathBuf }
-  L027: impl SecurityBoundary {
-    L028: pub fn new<P: AsRef<Path>>(workspace: P) -> Self;
-    L033: pub fn resolve_path(&self, target: &str) -> PathBuf;
-    L044: pub fn is_outside(&self, path: &Path) -> bool; // Walk up to the closest existing ancestor to canonicalize.
-    L065: pub fn check_command(&self, cmd: &str) -> Option<&'static str>;
-    L082: pub fn authorize(&self, violation: &str) -> bool;
+  L044: pub struct SecurityBoundary { pub root: PathBuf }
+  L048: impl SecurityBoundary {
+    L049: pub fn new<P: AsRef<Path>>(workspace: P) -> Self;
+    L054: pub fn resolve_path(&self, target: &str) -> PathBuf;
+    L065: pub fn is_outside(&self, path: &Path) -> bool; // Walk up to closest existing ancestor to canonicalize.
+    L100: pub fn check_command(&self, cmd: &str) -> Option<&'static str>;
+    L164: pub fn authorize(&self, violation: &str) -> bool;
   }
 ```
 
@@ -280,12 +269,12 @@
 ### `src/stream.rs`
 ```rust
   L004: pub struct UsageStats { pub prompt_tokens: usize, pub completion_tokens: usize, pub reasoning_tokens: usize, pub cached_tokens: usize }
-  L012: pub struct StreamRenderer { pub thinking_started: bool, pub answer_started: bool, pub at_line_start: bool, ... (10 fields) }
+  L012: pub struct StreamRenderer { pub pad: bool, pub thinking_started: bool, pub answer_started: bool, ... (10 fields) }
   L025: impl StreamRenderer {
     L026: pub fn new(pad: bool) -> Self;
-    L072: pub fn close_thinking(&mut self);
+    L072: pub fn close_thinking(&mut self); // Closes thinking gutter; emits spacer line only when pad is true
     L087: pub fn on_chunk(&mut self, chunk: &str, is_thinking: bool);
-    L173: pub fn finish(&mut self, stats: &UsageStats, prompt_chars: usize);
+    L148: pub fn finish(&mut self, stats: &UsageStats, prompt_chars: usize);
   }
 ```
 

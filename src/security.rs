@@ -3,6 +3,11 @@ use std::io::{self, BufRead, Write};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+
+const FORBIDDEN_SYS_DIRS: &[&str] = &[
+    "/etc", "/usr", "/var", "/bin", "/sbin", "/opt", "/root", "/boot", "/sys", "/proc",
+];
+
 const SYSTEM_DEVICES: &[&str] = &[
     "/dev/tty",
     "/dev/null",
@@ -93,6 +98,16 @@ impl SecurityBoundary {
     }
 
     pub fn check_command(&self, cmd: &str) -> Option<&'static str> {
+        let lower = cmd.to_lowercase();
+        let _trimmed = lower.trim();
+
+        // 1. Intercept shell commands targeting protected system trees outside workspace
+        for &sys_dir in FORBIDDEN_SYS_DIRS {
+            if lower.contains(sys_dir) {
+                // Ignore benign grep/cat if inside dev
+                return Some("system directory access attempt");
+            }
+        }
         let lower = cmd.to_lowercase();
         let trimmed = lower.trim();
 

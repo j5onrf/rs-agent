@@ -101,6 +101,11 @@ impl TestRunner {
         let dev_null_ok = !boundary.is_outside(Path::new("/dev/null"));
         self.record(dev_null_ok, "Security Boundary: Whitelist Device Nodes (/dev/null)", if dev_null_ok { "Permitted" } else { "False positive!" });
 
+        // Assert write to outside path is strictly blocked
+        let outside_write_target = Path::new("/etc/rs_agent_unauthorized.txt");
+        let write_blocked = boundary.is_outside(outside_write_target);
+        self.record(write_blocked, "Security Boundary: Block Write Outside Workspace", if write_blocked { "Strictly blocked from mutating host" } else { "SECURITY LEAK!" });
+
         // 2. Live mutating command tests
         let sudo_blocked = boundary.check_command("sudo pacman -Syu") == Some("sudo");
         let pip_blocked = boundary.check_command("pip install requests") == Some("pip");

@@ -205,17 +205,6 @@ fn generate_write_diff(workspace: &Path, path_str: &str, new_content: &str) -> (
     (old, new_content.to_string())
 }
 
-fn sync_acp_skill_stubs(workspace: &Path) {
-    let skill_dir = workspace.join("acp:").join("skill");
-    if fs::create_dir_all(&skill_dir).is_ok() {
-        for sk_name in Skill::list_available() {
-            if let Some(sk) = Skill::load(&sk_name) {
-                let stub = skill_dir.join(&sk.name);
-                let _ = fs::write(stub, &sk.content);
-            }
-        }
-    }
-}
 
 async fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>, bool) {
     let cfg = WorkspaceConfig::load_or_default(workspace);
@@ -357,7 +346,7 @@ pub async fn run_bridge() -> Result<()> {
                     .map(PathBuf::from)
                     .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
-                sync_acp_skill_stubs(&cwd);
+                
                 let (sys_prompt, active_tools, is_agent) = assemble_system_prompt(&cwd).await;
                 let history = vec![ChatMessage::system(sys_prompt)];
 

@@ -21,7 +21,7 @@ ai init ~/.config/rs-agent/projects/qwen38d ---> qwen38d, qwen
 curl -s "wttr.in/?format=3" ---> get weather
 date "+Current Date: %A, %B %-d, %Y" ---> get date
 
-# --- Developement use ---
+# --- Developement Use ---
 ~/.config/rs-agent/tools/evals/eval-stack ---> eva
 
 # --- Gated Tools ---

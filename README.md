@@ -175,7 +175,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 `rs-agent` discards heavy agent frameworks in favor of simple, predictable primitives:
 
 * **Sub-Millisecond Shell Intercept (`matcher.rs`):** `rs-hook.sh` intercepts terminal input and matches against `rs-context.md` in `< 0.2ms`. Typing `lfm` jumps into the target directory and launches the workspace instantly.
-* **Native 6-Tool Suite (`tools.rs`):** Minimal tool surface ready for SLM and LLM: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
+* **Native 6-Tool Suite (`tools.rs`):** Full tools ready for SLM and LLM: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
 * **Embedded ACP Bridge (`bridge.rs`):** Stdio JSON-RPC 2.0 server inside the core binary. Dispatches live file diffs for T3 Code review, handles multimodal image attachments, and streams token cancellation mid-turn.
 * **Autonomous Task Loop (`/task`):** Multi-step goal loop with failure decomposition (reminds models to inspect lines after tool errors) and anti-hallucination verification.
 * **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and heals broken JSON frames on the fly.
@@ -189,11 +189,11 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 | Operational Tier | Token Budget | Runtime Footprint | Target Workload |
 | :--- | :---: | :---: | :--- |
-| **Pure Chat** (`ai`) | **~180 tokens** | < 1ms startup · 0 MB idle | Conversational queries and fast reasoning |
+| **Chat** (`ai`) | **~180 tokens** | < 1ms startup · 0 MB idle | Conversational queries and fast reasoning |
 | **Pure Bash** (`purebash: true`) | **~95 tokens** | Single-tool dispatch loop | Low-parameter shell commands |
 | **Core 4-Tool** (`core4: true`) | **~480 tokens** | Minimal | 27B+ LLMs and Cloud endpoints relying on shell tools |
 | **Native 6-Tool** *(Default)* | **~680 tokens** | Full | Code refactoring, test execution, and file search |
-| **Native 7-Tool** (`delegate: true`) | **~780 tokens** | Sub-agent recursion barrier | Complex code research & isolated sub-tasks |
+| **+ Delegate** (`delegate: true`) | **+ ~100 tokens** | Sub-agent | Attaches `delegate_task` (+1 tool) to any active tier for sub-agents |
 | **Context Router** (`matcher.rs`) | **0 tokens** | < 0.2ms shell lookup | Instant shortcut teleportation via `rs-context.md` |
 
 </div>

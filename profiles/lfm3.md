@@ -2,7 +2,7 @@
 name: lfm3
 description: "Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer (Native 6-Tool)"
 adapters: true
-reasoning_budget: 250
+reasoning_budget: 500
 ---
 ROLE: Liquid AI LFM3-1.7B Autonomous Edge Systems & Software Engineer.
 
