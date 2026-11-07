@@ -13,10 +13,9 @@
   <p>
     <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>t3code</code> &nbsp;•&nbsp; <code>omarchy</code> &nbsp;•&nbsp; <code>local-first</code>
   </p>
-  </p>
 
   <p>
-    <b>A Rust AI harness built for low-latency local <code>llama-server</code> C++ backends, slm/llm gguf, and cloud endpoints.</b><br>
+    <b>A native Rust AI harness built for low-latency local <code>llama-server</code> C++ backends, SLM/LLM GGUF, and cloud endpoints.</b><br>
     <sub>Sub-millisecond boot, autonomous 6-tool execution loop, zero-trust security kernel, and edge-model JSON repair.</sub>
   </p>
 
@@ -138,10 +137,10 @@
 | Invocation | Interface | Description |
 | :--- | :---: | :--- |
 | `[shortcut]` | **Shell Teleport** | Sub-millisecond router via `rs-context.md` (e.g. `lfm`, `ling`) |
-| 👤 `ai` | **Interactive Chat** | Conversational REPL with thinking gutters and live token stats |
+| 👤 `ai` | **Interactive Chat** | Conversational REPL with thinking gutters, responsive `/pad`, and ~180t ceiling |
 | 👤 `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security kernel |
 | `/task [goal]` | **Task Loop** | Autonomous goal loop; auto-discovers `TASK.md` when prompt is omitted |
-| `/t3` / `/t3 web` | **T3 Code IDE** | Handover active workspace to official T3 Code GUI with diffs & security gates |
+| `/t3` / `/t3 web` | **T3 Code IDE** | Quiet compositor handover to official T3 Code GUI with diffs & security gates |
 | `ai --bridge` | **Headless ACP** | Embedded stdio JSON-RPC 2.0 interface for IDEs and desktop surfaces |
 
 </div>
@@ -163,7 +162,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 | 👤 `ms` | **Model Selector** | Dynamic TUI for toggling universal providers, context budget, and loop limit |
 | `newp` | **Project Creator** | Scaffolds workspace, `.rs/config.json`, and auto-links router aliases |
 | `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) |
-| `ta` | **System Diagnostics** | 10-pass native verification suite testing binary integrity, safety, and UI |
+| `ta` | **System Diagnostics** | Conclusive 10-pass native verification suite testing kernel, safety, and UI |
 | `eva` | **Agentic Benchmark** | Full-stack `eval-stack` measuring par efficiency and token economy |
 
 </div>
@@ -175,11 +174,11 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 `rs-agent` discards heavy agent frameworks in favor of simple, predictable primitives:
 
 * **Sub-Millisecond Shell Intercept (`matcher.rs`):** `rs-hook.sh` intercepts terminal input and matches against `rs-context.md` in `< 0.2ms`. Typing `lfm` jumps into the target directory and launches the workspace instantly.
-* **Native 6-Tool Suite (`tools.rs`):** Full tools ready for SLM and LLM: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
+* **Native 6-Tool Suite (`tools.rs`):** Full tools ready for SLMs and LLMs: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
 * **Embedded ACP Bridge (`bridge.rs`):** Stdio JSON-RPC 2.0 server inside the core binary. Dispatches live file diffs for T3 Code review, handles multimodal image attachments, and streams token cancellation mid-turn.
 * **Autonomous Task Loop (`/task`):** Multi-step goal loop with failure decomposition (reminds models to inspect lines after tool errors) and anti-hallucination verification.
 * **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and heals broken JSON frames on the fly.
-* **Zero-Trust Security Boundary (`security.rs`):** Canonicalizes all paths inside workspace root. Traversal attempts (`../`) and mutating system calls (`sudo`, `pacman`, `pip`, `systemctl`, destructive `rm`) fail closed and require explicit approval.
+* **Zero-Trust Security Boundary (`security.rs`):** Canonicalizes all paths inside workspace root. Traversal attempts (`../`), protected system trees (`/etc`, `/usr`, `/root`), and mutating binaries (`sudo`, `pacman`, `pip`, `rm -rf`, `mkfs`) fail closed and require explicit approval.
 
 ---
 
@@ -189,11 +188,11 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 | Operational Tier | Token Budget | Runtime Footprint | Target Workload |
 | :--- | :---: | :---: | :--- |
-| **Chat** (`ai`) | **~180 tokens** | < 1ms startup · 0 MB idle | Conversational queries and fast reasoning |
-| **Pure Bash** (`purebash: true`) | **~95 tokens** | Single-tool dispatch loop | Low-parameter shell commands |
-| **Core 4-Tool** (`core4: true`) | **~480 tokens** | Minimal | 27B+ LLMs and Cloud endpoints relying on shell tools |
-| **Native 6-Tool** *(Default)* | **~680 tokens** | Full | Code refactoring, test execution, and file search |
-| **+ Delegate** (`delegate: true`) | **+ ~100 tokens** | Sub-agent | Attaches `delegate_task` (+1 tool) to any active tier for sub-agents |
+| **Pure Chat** (`ai`) | **~180 tokens** | < 1ms startup · 0 MB idle | Conversational queries and fast reasoning (0 tools) |
+| **Pure Bash** (`purebash: true`) | **~95 tokens** | Single-tool dispatch loop | Low-parameter shell commands (1 tool) |
+| **Core 4-Tool** (`core4: true`) | **~480 tokens** | Minimal | 27B+ LLMs and Cloud endpoints relying on shell tools (4 tools) |
+| **Native 6-Tool** *(Default)* | **~680 tokens** | Full | Code refactoring, test execution, and file search (6 tools) |
+| **+ Delegate** (`delegate: true`) | **+ ~100 tokens** | Additive modifier | Attaches `delegate_task` (+1 tool) to any active tier for sub-agents |
 | **Context Router** (`matcher.rs`) | **0 tokens** | < 0.2ms shell lookup | Instant shortcut teleportation via `rs-context.md` |
 
 </div>
@@ -352,6 +351,3 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <sub>Built for speed, clarity, and terminal minimalism. Licensed under the <b><a href="LICENSE">MIT License</a></b>.</sub>
 </div>
-
-
-
