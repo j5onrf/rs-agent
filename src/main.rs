@@ -1,5 +1,6 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 use clap::{Parser, Subcommand};
 use rs_agent::adapter;
 use rs_agent::client::{ChatMessage, LlmClient};
@@ -212,6 +213,7 @@ async fn execute_task_loop(
     spinner: &mut InlineSpinner,
 ) -> anyhow::Result<bool> {
     let max_rounds = get_max_rounds();
+    // UTF-8 character-safe display truncation (avoids char boundary panics)
     let display_goal: String = if goal.chars().count() > 80 {
         format!("{}...", goal.chars().take(80).collect::<String>())
     } else {
@@ -254,7 +256,15 @@ async fn execute_task_loop(
                     let fn_name = call["function"]["name"].as_str().unwrap_or("tool");
                     let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
 
-                    let brief = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(fn_args) {
+                    // 1. Delegate healing & normalization exclusively to adapter.rs
+                    let final_args = if cfg.adapters {
+                        adapter::repair_tool_args(fn_name, fn_args)
+                    } else {
+                        fn_args.to_string()
+                    };
+
+                    // 2. Read canonical summary from the repaired arguments
+                    let brief = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&final_args) {
                         parsed
                             .get("path")
                             .or_else(|| parsed.get("command"))
@@ -270,8 +280,6 @@ async fn execute_task_loop(
                     let _ = io::stdout().flush();
 
                     let t_start = Instant::now();
-                    let final_args =
-                        if cfg.adapters { adapter::repair_tool_args(fn_name, fn_args) } else { fn_args.to_string() };
                     let tool_res = tools::execute_tool(fn_name, &final_args, target_dir, boundary).await;
                     let elapsed = t_start.elapsed().as_secs_f64();
 
@@ -294,24 +302,6 @@ async fn execute_task_loop(
         }
 
         if is_task_complete(&reply) {
-            let lower_goal = goal.to_lowercase();
-            let requires_action = lower_goal.contains("create")
-                || lower_goal.contains("write")
-                || lower_goal.contains("edit")
-                || lower_goal.contains("test")
-                || lower_goal.contains("fix")
-                || lower_goal.contains("add");
-
-            if total_tools_run == 0 && requires_action {
-                println!(
-                    "  \x1b[1;33m▲ [Task Loop]\x1b[0m Completion declared without tool execution. Enforcing action..."
-                );
-                history.push(ChatMessage::user(
-                    "You declared completion without running tools. Execute the required tool action now.",
-                ));
-                continue;
-            }
-
             println!(
                 "\n  \x1b[1;32m✓ [Task Loop] Goal completed in {} step(s) ({} tool action(s) executed)!\x1b[0m\n",
                 turn + 1,
@@ -344,9 +334,10 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         let mut c = WorkspaceConfig::load_or_default(target_dir);
         c.is_agent = true;
 
-        let dir_name = target_dir.file_name().and_then(|n| n.to_str()).unwrap_or("agent").to_string();
-
-        c.profile_name = Profile::resolve_for_workspace(&dir_name, &provider.model, Some(&provider.base_url));
+        if Profile::load(&c.profile_name).is_none() {
+            let dir_name = target_dir.file_name().and_then(|n| n.to_str()).unwrap_or("agent").to_string();
+            c.profile_name = Profile::resolve_for_workspace(&dir_name, &provider.model, Some(&provider.base_url));
+        }
 
         if let Some(p) = Profile::load(&c.profile_name) {
             c.tier = p.tier.clone();
@@ -399,7 +390,6 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
     let mut spinner = InlineSpinner::new();
     let mut last_total_tokens = 0;
-    let mut line_buf = String::with_capacity(512);
 
     loop {
         print!("\x1b[?25h");
@@ -629,7 +619,6 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             continue;
         }
 
-        // --- Single /pad toggle (no aliases) ---
         if input == "/pad" {
             let new_pad = !state::get_pad();
             state::set_pad(new_pad);
@@ -768,6 +757,13 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 let fn_name = call["function"]["name"].as_str().unwrap_or("tool");
                 let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
 
+                // 1. Delegate healing & normalization exclusively to adapter.rs
+                let final_args = if cfg.adapters {
+                    adapter::repair_tool_args(fn_name, fn_args)
+                } else {
+                    fn_args.to_string()
+                };
+
                 let verb = match fn_name {
                     "write_file" => "updating",
                     "edit_file" => "surgically editing",
@@ -778,7 +774,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     _ => "working",
                 };
 
-                let brief = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(fn_args) {
+                // 2. Read canonical summary from the repaired arguments
+                let brief = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&final_args) {
                     parsed
                         .get("path")
                         .or_else(|| parsed.get("command"))
@@ -794,8 +791,6 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 let _ = io::stdout().flush();
 
                 let t_start = Instant::now();
-                let final_args =
-                    if cfg.adapters { adapter::repair_tool_args(fn_name, fn_args) } else { fn_args.to_string() };
                 let tool_res = tools::execute_tool(fn_name, &final_args, target_dir, &boundary).await;
                 let elapsed = t_start.elapsed().as_secs_f64();
 

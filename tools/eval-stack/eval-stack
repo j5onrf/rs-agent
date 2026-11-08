@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Rs-Agent Agentic & Tool-Calling Benchmark"""
+"""Rs-Agent Agentic & Tool-Calling Benchmark with First-Class Nested Profile Support"""
 
 import contextlib
 import json
@@ -17,7 +17,7 @@ import tty
 from typing import Any
 
 CFG_DIR = os.path.expanduser("~/.config/rs-agent")
-EVALS_DIR = os.path.join(CFG_DIR, "tools", "evals")
+EVALS_DIR = os.path.join(CFG_DIR, "tools", "eval-stack")
 AI_BIN = os.path.join(CFG_DIR, "bin", "ai")
 FAILURES_LOG = os.path.join(EVALS_DIR, "last_failure_trace.log")
 RUN_TRACES: list[dict[str, Any]] = []
@@ -79,7 +79,6 @@ class MinimalSpinner:
             self.thread.start()
 
     def _spin(self):
-        i = 0
         if sys.stderr.isatty():
             sys.stderr.write("\033[?25l")
             sys.stderr.flush()
@@ -178,7 +177,6 @@ def _verify_ag06(ws: str, out: str) -> bool:
     return "Welcome, {name}!" in code and "def greet(name):" in code
 
 
-# Canonical 7 Agentic Benchmarks from Py-Agent
 AGENTIC_BENCHMARKS = [
     {
         "id": "AG-02",
@@ -236,7 +234,6 @@ AGENTIC_BENCHMARKS = [
     },
 ]
 
-# Canonical 5 Pure Bash Benchmarks from Py-Agent
 PUREBASH_BENCHMARKS = [
     {
         "id": "PB-01",
@@ -307,12 +304,68 @@ def list_available_profiles() -> list[str]:
                         found.append(f"{entry}/{sub[:-3]}")
             elif entry.endswith(".md") and entry != "chat.md":
                 found.append(entry[:-3])
+    # Sort top-level first, then nested alphabetically
     found.sort(key=lambda x: (1 if "/" in x else 0, x))
     return found
 
 
-def select_profile_interactive(profiles: list[str], default_key: str = "lingtiny") -> str:
-    current_idx = next((i for i, p in enumerate(profiles) if p == default_key or p.endswith(f"/{default_key}")), 0)
+def resolve_cli_profile(query: str, profiles: list[str]) -> str | None:
+    """Smart resolver allowing 'eva groot' or 'eva groot2' to resolve to 'groot/groot'."""
+    q = query.strip().lower()
+    # 1. Exact match
+    for p in profiles:
+        if p.lower() == q:
+            return p
+    # 2. Match sub-name (e.g. 'groot2' matches 'groot/groot2', 'photocraft-c' matches 'artcraft/photocraft-c')
+    matches = [p for p in profiles if p.lower().endswith(f"/{q}")]
+    if matches:
+        return matches[0]
+    # 3. Match folder name (e.g. 'groot' matches 'groot/groot')
+    matches = [p for p in profiles if p.lower().startswith(f"{q}/")]
+    if matches:
+        # Prefer matching subfile with same name (groot/groot)
+        self_match = [p for p in matches if p.lower() == f"{q}/{q}"]
+        return self_match[0] if self_match else matches[0]
+    # 4. Partial substring
+    matches = [p for p in profiles if q in p.lower()]
+    return matches[0] if matches else None
+
+
+def detect_default_profile(model_name: str, profiles: list[str]) -> str:
+    """Dynamically matches active model against both flat and nested profiles."""
+    m_clean = re.sub(r"[^a-zA-Z0-9]", "", model_name.lower())
+    tokens = [t for t in re.split(r"[-_\s\.]+", model_name.lower()) if len(t) >= 3 and not t.isdigit()]
+
+    best_score = -1
+    best_prof = profiles[0] if profiles else "chat"
+
+    for p in profiles:
+        score = 0
+        p_parts = p.lower().split("/")
+        folder = p_parts[0] if len(p_parts) > 1 else ""
+        stem = p_parts[-1]
+
+        if stem in model_name.lower():
+            score += 10
+        if folder and folder in model_name.lower():
+            score += 8
+        if p.lower().replace("/", "") in m_clean:
+            score += 15
+        for t in tokens:
+            if t in stem:
+                score += 5
+            if folder and t in folder:
+                score += 4
+
+        if score > best_score:
+            best_score = score
+            best_prof = p
+
+    return best_prof
+
+
+def select_profile_interactive(profiles: list[str], default_key: str) -> str:
+    current_idx = next((i for i, p in enumerate(profiles) if p == default_key), 0)
     num_opts = len(profiles)
     last_lines = 0
 
@@ -354,10 +407,17 @@ def select_profile_interactive(profiles: list[str], default_key: str = "lingtiny
             )
 
             for idx, p in enumerate(profiles):
+                # Clean nested label display (e.g. 📁 groot / groot)
+                if "/" in p:
+                    folder, stem = p.split("/", 1)
+                    display_p = f"{folder} / {stem}"
+                else:
+                    display_p = p
+
                 prefix = (
-                    f"\033[1;36m  ❯ \033[1;37m{idx+1:2d}. \033[1;36m{p:<28}\033[0m\n"
+                    f"\033[1;36m  ❯ \033[1;37m{idx+1:2d}. \033[1;36m{display_p:<32}\033[0m\n"
                     if idx == current_idx
-                    else f"\033[2m    {idx+1:2d}. {p:<28}\033[0m\n"
+                    else f"\033[2m    {idx+1:2d}. {display_p:<32}\033[0m\n"
                 )
                 sys.stderr.write(prefix)
                 lines_count += 1
@@ -412,7 +472,6 @@ def get_current_model_info() -> tuple[str, str]:
                 url = next((l.split("=")[1].strip().strip('"\'') for l in lines if l.strip().startswith(u_key)), "cloud")
                 return model, url
 
-    # Live query local llama-server
     try:
         import urllib.request
         req = urllib.request.Request("http://127.0.0.1:8080/v1/models", headers={"User-Agent": "rs-agent-eval"})
@@ -431,8 +490,7 @@ def get_current_model_info() -> tuple[str, str]:
 def _log_failure_trace(bench: dict, model_name: str, prof: str, output: str, ws: str):
     try:
         os.makedirs(EVALS_DIR, exist_ok=True)
-        fd = os.open(FAILURES_LOG, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
-        with open(fd, "a", encoding="utf-8", errors="replace") as f:
+        with open(FAILURES_LOG, "a", encoding="utf-8", errors="replace") as f:
             f.write(f"\n{'='*80}\n")
             f.write(f"FAILED TEST: {bench['id']} - {bench['name']}\n")
             f.write(f"MODEL: {model_name} | PROFILE: {prof}\n")
@@ -446,12 +504,12 @@ def _log_failure_trace(bench: dict, model_name: str, prof: str, output: str, ws:
                     fp = os.path.join(root, file)
                     rel = os.path.relpath(fp, ws)
                     f.write(f"[{rel}]:\n{_safe_read(fp)[:1000]}\n\n")
-    except Exception:
-        pass
+    except Exception as e:
+        sys.stderr.write(f"Warning: Failed to log failure trace: {e}\n")
 
 
 def run_single_agentic_test(bench: dict, prof_name: str, is_purebash: bool, model_name: str) -> tuple[bool, float, int, int, str]:
-    bare_name = prof_name.split("/")[-1]
+    bare_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", prof_name)
     sandbox_parent = os.path.join(tempfile.gettempdir(), "rs_evals")
     os.makedirs(sandbox_parent, exist_ok=True)
     sandbox_dir = tempfile.mkdtemp(prefix=f"{bare_name}_", dir=sandbox_parent)
@@ -491,6 +549,11 @@ def run_single_agentic_test(bench: dict, prof_name: str, is_purebash: bool, mode
         except subprocess.TimeoutExpired:
             proc.kill()
             captured_stdout, _ = proc.communicate()
+        except KeyboardInterrupt:
+            proc.kill()
+            with contextlib.suppress(Exception):
+                proc.communicate(timeout=1)
+            raise
 
         elapsed = time.time() - t0
 
@@ -520,7 +583,6 @@ def run_single_agentic_test(bench: dict, prof_name: str, is_purebash: bool, mode
         par_val = bench.get("par_turns", 1)
         detail = f"{elapsed:.2f}s ({turns}/{par_val}t)" if passed else "State verification failed"
 
-        # Record sanitized line-by-line trace array
         RUN_TRACES.append({
             "id": bench["id"],
             "name": bench["name"],
@@ -548,15 +610,24 @@ def main():
         sys.exit(1)
 
     model_name, endpoint = get_current_model_info()
-    m_low = model_name.lower()
-    default_p = "lingtiny" if "ling" in m_low else ("lfm3" if "lfm" in m_low else ("sage" if "sage" in m_low else "lingtiny"))
+    default_p = detect_default_profile(model_name, profiles)
 
-    cli_prof = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else None
-    chosen_prof = cli_prof if cli_prof and cli_prof in profiles else select_profile_interactive(profiles, default_key=default_p)
+    # Check CLI argument: e.g. 'eva groot' or 'eva groot2' or 'eva groot/groot'
+    chosen_prof = None
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
+        cli_arg = sys.argv[1]
+        resolved = resolve_cli_profile(cli_arg, profiles)
+        if resolved:
+            chosen_prof = resolved
+        else:
+            sys.stderr.write(f"Warning: Profile '{cli_arg}' not found. Opening selection menu...\n")
+
+    if not chosen_prof:
+        chosen_prof = select_profile_interactive(profiles, default_key=default_p)
 
     prof_file = os.path.join(CFG_DIR, "profiles", f"{chosen_prof}.md")
     is_purebash = False
-    is_py_enabled = False
+    has_delegate = False
     if os.path.isfile(prof_file):
         content = _safe_read(prof_file)
         is_purebash = "purebash: true" in content.lower()
@@ -595,8 +666,6 @@ def main():
 
     try:
         for idx, bench in enumerate(active_benches, start=1):
-
-
             evaluated_count += 1
             par = bench.get("par_turns", 1)
             total_par_turns += par
@@ -637,6 +706,13 @@ def main():
                 )
             else:
                 print(f"  {status_str} : {bench['id']} {bench['name']:<33} {detail}")
+    except KeyboardInterrupt:
+        spinner.stop()
+        if HAS_RICH:
+            console.print("\n[bold yellow]Benchmark aborted by user (Ctrl+C).[/bold yellow]\n")
+        else:
+            print("\nBenchmark aborted by user (Ctrl+C).\n")
+        sys.exit(130)
     finally:
         spinner.stop()
 
@@ -672,7 +748,6 @@ def main():
     else:
         print(f"\n{'='*60}\nPass Rate:        {passed_count}/{evaluated_count} ({accuracy:.1f}%)\nPar Efficiency:   {par_eff:.1f}%\nAgent Index:      {agent_index:.1f}/100 [Grade: {grade}]\n{'='*60}\n")
 
-    # Save dedicated lightweight JSON run trace file per run
     try:
         os.makedirs(EVALS_DIR, exist_ok=True)
         safe_model = re.sub(r"[^a-zA-Z0-9_\-]", "_", model_name).strip("_")
@@ -702,9 +777,15 @@ def main():
         os.replace(tmp_trace, trace_file)
 
         if HAS_RICH:
-            console.print(f"[dim]Run trace saved: [cyan]{trace_file}[/cyan][/dim]\n")
+            console.print(f"[dim]Run trace saved: [cyan]{trace_file}[/cyan][/dim]")
+            if passed_count < evaluated_count and os.path.isfile(FAILURES_LOG):
+                console.print(f"[bold red]Failure log saved:[/bold red] [yellow]{FAILURES_LOG}[/yellow]\n")
+            else:
+                console.print()
         else:
-            print(f"Run trace saved: {trace_file}\n")
+            print(f"Run trace saved: {trace_file}")
+            if passed_count < evaluated_count and os.path.isfile(FAILURES_LOG):
+                print(f"Failure log saved: {FAILURES_LOG}\n")
     except Exception as e:
         sys.stderr.write(f"Warning: Failed to save trace log: {e}\n")
 

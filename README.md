@@ -3,7 +3,7 @@
   <h1>Rs-Agent</h1>
  
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.5.2.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.5.3.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -31,7 +31,8 @@
       <td align="center" width="28%" valign="top">
         <h3>👤 27B+ (LLM)</h3>
         <p><sub>Deep reasoning, complex logic, and multi-turn loops</sub></p>
-        <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br>
+        <code>Groot-19B-A3B*</code> &nbsp;•&nbsp; <code>Clover-35B-A3B</code><br>
+        <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B</code><br>
         <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br>
         <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br>
         <code>Qwen3.8-27B</code> &nbsp;•&nbsp; <code>Qwen4.0-27B</code><br>
@@ -226,9 +227,10 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 
 | Rank | Model | Par Eff | Agent Index |
 | :---: | :--- | :---: | :---: |
-| **1** | **Flint-40B-A2.5B** | **120.0%** | **100.0 (A+)** |
-| **2** | **Sage-A1.5-35B** | **111.1%** | **100.0 (A+)** |
-| **3** | **Qwen3.8-35B-Distill** *(MTP)* | **136.4%** | **92.2 (A)** |
+| **1** | **Groot-19B-A3B** *(MTP)* | **162.5%** | **100.0 (A+)** |
+| **2** | **Flint-40B-A2.5B** | **120.0%** | **100.0 (A+)** |
+| **3** | **Sage-A1.5-35B** | **111.1%** | **100.0 (A+)** |
+| **4** | **Qwen3.8-35B-Distill** *(MTP)* | **136.4%** | **92.2 (A)** |
 | **—** | **LFM3-1.7B** *(SLM)* | **162.5%** | **100.0 (A+)** |
 | **—** | **Ling-3.0-tiny** *(SLM)* | **130.0%** | **97.3 (A+)** |
 
