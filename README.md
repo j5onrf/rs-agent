@@ -15,7 +15,7 @@
   </p>
 
   <p>
-    <b>A native Rust AI harness built for low-latency local <code>llama-server</code> C++ backends, SLM/LLM GGUF, and cloud endpoints.</b><br>
+    <b>A native Rust AI harness built for low-latency local <code>llama-server</code> C++ backends, GGUF, and cloud endpoints.</b><br>
     <sub>Sub-millisecond boot, autonomous 6-tool execution loop, zero-trust security kernel, and edge-model JSON repair.</sub>
   </p>
 
