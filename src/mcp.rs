@@ -116,7 +116,6 @@ impl McpSession {
         let clean_cmd = expand_env_str(&cfg.command);
         let clean_args: Vec<String> = cfg.args.iter().map(|a| expand_env_str(a)).collect();
 
-        if clean_args.iter().any(|a| a.contains("mcp-server-sqlite")) || clean_cmd.contains("mcp-server-sqlite") {}
         ensure_photocraft_bridge(&clean_cmd, &clean_args).await;
 
         let mut cmd = Command::new(&clean_cmd);

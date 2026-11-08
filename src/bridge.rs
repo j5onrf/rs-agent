@@ -165,8 +165,18 @@ fn is_permission_approved(res: &Value) -> bool {
     false
 }
 
-fn generate_edit_diff(workspace: &Path, path_str: &str, old_str: &str, new_str: &str) -> Option<(String, String)> {
-    let full_path = workspace.join(path_str);
+/// Safely generates edit diff previews verified against the zero-trust SecurityBoundary.
+fn generate_edit_diff(
+    boundary: &SecurityBoundary,
+    path_str: &str,
+    old_str: &str,
+    new_str: &str,
+) -> Option<(String, String)> {
+    let full_path = boundary.resolve_path(path_str);
+    if boundary.is_outside(&full_path) {
+        return None;
+    }
+
     let original = fs::read_to_string(&full_path).ok()?;
     if original.contains(old_str) {
         let updated = original.replacen(old_str, new_str, 1);
@@ -200,8 +210,12 @@ fn generate_edit_diff(workspace: &Path, path_str: &str, old_str: &str, new_str: 
     }
 }
 
-fn generate_write_diff(workspace: &Path, path_str: &str, new_content: &str) -> (String, String) {
-    let full_path = workspace.join(path_str);
+/// Safely generates write diff previews verified against the zero-trust SecurityBoundary.
+fn generate_write_diff(boundary: &SecurityBoundary, path_str: &str, new_content: &str) -> (String, String) {
+    let full_path = boundary.resolve_path(path_str);
+    if boundary.is_outside(&full_path) {
+        return (String::new(), new_content.to_string());
+    }
     let old = fs::read_to_string(&full_path).unwrap_or_default();
     (old, new_content.to_string())
 }
@@ -399,13 +413,9 @@ pub async fn run_bridge() -> Result<()> {
                 let value_str = params
                     .get("value")
                     .and_then(|v| {
-                        if let Some(s) = v.as_str() {
-                            Some(s.to_string())
-                        } else if let Some(val_str) = v.get("value").and_then(|v2| v2.as_str()) {
-                            Some(val_str.to_string())
-                        } else {
-                            None
-                        }
+                        v.as_str()
+                            .map(|s| s.to_string())
+                            .or_else(|| v.get("value").and_then(|v2| v2.as_str()).map(|s| s.to_string()))
                     })
                     .unwrap_or_else(|| "0".to_string());
 
@@ -480,12 +490,21 @@ pub async fn run_bridge() -> Result<()> {
 
                 let mut cleaned_user_text = sanitize_t3_prompt(&raw_user_text);
 
+                // Safe /reset handling: drop lock before calling async assemble_system_prompt
                 if cleaned_user_text == "/reset" || cleaned_user_text == "/c" || cleaned_user_text == "/clear" {
-                    let mut lock = sessions.lock().await;
-                    if let Some(sess) = lock.get_mut(&sid) {
-                        let (sys_prompt, _, _) = assemble_system_prompt(&sess.workspace).await;
-                        sess.history = vec![ChatMessage::system(sys_prompt)];
+                    let ws_opt = {
+                        let lock = sessions.lock().await;
+                        lock.get(&sid).map(|s| s.workspace.clone())
+                    };
+
+                    if let Some(ws) = ws_opt {
+                        let (sys_prompt, _, _) = assemble_system_prompt(&ws).await;
+                        let mut lock = sessions.lock().await;
+                        if let Some(sess) = lock.get_mut(&sid) {
+                            sess.history = vec![ChatMessage::system(sys_prompt)];
+                        }
                     }
+
                     send_acp_chunk(&sid, "✓ Session history reset.", false);
                     send_rpc(req_id, Some(json!({ "stopReason": "end_turn" })), None);
                     continue;
@@ -619,8 +638,17 @@ pub async fn run_bridge() -> Result<()> {
 
                                         let mut any_declined = false;
 
-                                        for call in calls {
+                                        for (idx, call) in calls.iter().enumerate() {
+                                            // Handle cancellation mid-turn: synthesize responses for remaining tool calls to maintain pairing
                                             if cancel_flag.load(Ordering::SeqCst) {
+                                                for remaining_call in &calls[idx..] {
+                                                    let rem_id =
+                                                        remaining_call["id"].as_str().unwrap_or("call_0").to_string();
+                                                    history.push(ChatMessage::tool_response(
+                                                        rem_id,
+                                                        "[Tool action cancelled by user]".to_string(),
+                                                    ));
+                                                }
                                                 break;
                                             }
 
@@ -661,7 +689,7 @@ pub async fn run_bridge() -> Result<()> {
                                                         raw_input.get("new_str").and_then(|v| v.as_str()),
                                                     ) {
                                                         if let Some((old_text, new_text)) =
-                                                            generate_edit_diff(&workspace, p, old_s, new_s)
+                                                            generate_edit_diff(&boundary, p, old_s, new_s)
                                                         {
                                                             content_blocks.push(json!({
                                                                 "type": "diff",
@@ -677,7 +705,7 @@ pub async fn run_bridge() -> Result<()> {
                                                         raw_input.get("content").and_then(|v| v.as_str()),
                                                     ) {
                                                         let (old_text, new_text) =
-                                                            generate_write_diff(&workspace, p, content_str);
+                                                            generate_write_diff(&boundary, p, content_str);
                                                         content_blocks.push(json!({
                                                             "type": "diff",
                                                             "path": p,
@@ -723,7 +751,23 @@ pub async fn run_bridge() -> Result<()> {
                                                 });
                                                 send_raw_rpc(&perm_req);
 
-                                                let perm_res = rx.await.unwrap_or_else(|_| json!({}));
+                                                // Human diff review: no artificial wall-clock timeout, but immediate cancellation & cleanup
+                                                let perm_res = tokio::select! {
+                                                    biased;
+                                                    _ = async {
+                                                        while !cancel_flag.load(Ordering::Relaxed) {
+                                                            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                                                        }
+                                                    } => {
+                                                        pending_perms.lock().await.remove(&req_id);
+                                                        json!({ "result": { "outcome": { "outcome": "cancelled" } } })
+                                                    }
+                                                    res = rx => {
+                                                        pending_perms.lock().await.remove(&req_id);
+                                                        res.unwrap_or_else(|_| json!({}))
+                                                    }
+                                                };
+
                                                 if !is_permission_approved(&perm_res) {
                                                     send_acp_chunk(
                                                         &sid,
@@ -732,7 +776,20 @@ pub async fn run_bridge() -> Result<()> {
                                                     );
                                                     history.push(ChatMessage::tool_response(call_id, "User declined permission for this tool action. Do not retry this action; ask the user what to do next.".to_string()));
                                                     any_declined = true;
-                                                    continue;
+
+                                                    // Avoid orphaned tool calls: mark all subsequent tool calls in this turn as skipped
+                                                    for remaining_call in &calls[idx + 1..] {
+                                                        let rem_id = remaining_call["id"]
+                                                            .as_str()
+                                                            .unwrap_or("call_0")
+                                                            .to_string();
+                                                        history.push(ChatMessage::tool_response(
+                                                            rem_id,
+                                                            "[Tool action skipped: preceding action declined by user]"
+                                                                .to_string(),
+                                                        ));
+                                                    }
+                                                    break;
                                                 }
                                             }
 
@@ -753,7 +810,6 @@ pub async fn run_bridge() -> Result<()> {
                                             history.push(ChatMessage::tool_response(call_id, out));
                                         }
 
-                                        // If user explicitly denied permission, break loop cleanly instead of letting agent loop indefinitely
                                         if any_declined {
                                             break;
                                         }
@@ -767,7 +823,6 @@ pub async fn run_bridge() -> Result<()> {
                                 }
                             }
                             Err(e) => {
-                                // Graceful non-crashing error output to T3 stream
                                 send_acp_chunk(&sid, &format!("\n\n*(Notice: {})*\n", e), false);
                                 break;
                             }
@@ -781,14 +836,13 @@ pub async fn run_bridge() -> Result<()> {
                         }
                     }
 
-                    // Turn terminates cleanly with end_turn stopReason
                     send_rpc(req_id_owned.as_ref(), Some(json!({ "stopReason": "end_turn" })), None);
                 });
             }
             "tools/list" => {
+                let sid = params.get("sessionId").and_then(|v| v.as_str()).unwrap_or(&active_session_id);
                 let sess_lock = sessions.lock().await;
-                let is_agent = sess_lock.get(&active_session_id).map(|s| s.is_agent).unwrap_or(true);
-                let schema = if is_agent { tools::get_tools_schema(&config::ToolTier::Smol, false) } else { json!([]) };
+                let schema = sess_lock.get(sid).and_then(|s| s.active_tools.clone()).unwrap_or_else(|| json!([]));
                 send_rpc(req_id, Some(json!({ "tools": schema })), None);
             }
             "session/cancel" | "cancel" => {

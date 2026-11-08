@@ -20,3 +20,7 @@ __pycache__/
 
 # Ephemeral scratchpads
 .rs/scratchpad.log
+
+# T3 Code ACP URI artifacts
+**/acp:*
+acp:*

@@ -252,7 +252,7 @@ impl TestRunner {
         // [Pass 9/10] Provider Cascade & Local llama-server Probe
         println!("[Pass 9/10] Provider Cascade & Local llama-server Probe");
         let cfg_file = self.base_dir.join("src/config.rs");
-        let env_ok = self.file_contains(&cfg_file, "CUSTOM2_API_KEY");
+        let env_ok = self.file_contains(&cfg_file, "CUSTOM") && self.file_contains(&cfg_file, "get_env_path");
         self.record(env_ok, "Provider Cascade: rs-agent .env Priority", "Configured as top priority");
 
         let local_probe = self.file_contains(&cfg_file, "http://127.0.0.1:8080/v1/models");

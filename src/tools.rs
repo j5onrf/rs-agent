@@ -1,3 +1,23 @@
+// Zero-allocation character-safe string slicing for UTF-8 boundaries
+fn char_slice_head(s: &str, max_chars: usize) -> &str {
+    match s.char_indices().nth(max_chars) {
+        Some((idx, _)) => &s[..idx],
+        None => s,
+    }
+}
+
+fn char_slice_tail(s: &str, max_chars: usize) -> &str {
+    let total = s.chars().count();
+    if total <= max_chars {
+        return s;
+    }
+    let skip = total.saturating_sub(max_chars);
+    match s.char_indices().nth(skip) {
+        Some((idx, _)) => &s[idx..],
+        None => s,
+    }
+}
+
 use crate::adapter::heal_json_args;
 use crate::config::{get_context_ceilings, ToolTier};
 use crate::security::SecurityBoundary;
@@ -190,9 +210,11 @@ fn levenshtein_similarity(a: &str, b: &str) -> f64 {
     }
 
     let mut dp = vec![vec![0usize; m + 1]; n + 1];
+    #[allow(clippy::needless_range_loop)]
     for i in 0..=n {
         dp[i][0] = i;
     }
+    #[allow(clippy::needless_range_loop)]
     for j in 0..=m {
         dp[0][j] = j;
     }
@@ -432,10 +454,8 @@ pub async fn execute_tool(
         "read_file" => {
             let path_str = args["path"].as_str().ok_or("Missing 'path' parameter")?;
             let safe_path = boundary.resolve_path(path_str);
-            if boundary.is_outside(&safe_path) {
-                if !boundary.authorize(&format!("OUT-OF-BOUNDS READ: '{}'", path_str)) {
-                    return Err("[denied] Out-of-bounds read cancelled by user.".into());
-                }
+            if boundary.is_outside(&safe_path) && !boundary.authorize(&format!("OUT-OF-BOUNDS READ: '{}'", path_str)) {
+                return Err("[denied] Out-of-bounds read cancelled by user.".into());
             }
 
             if !safe_path.is_file() {
@@ -466,7 +486,7 @@ pub async fn execute_tool(
                 let _ = fs::write(scratchpad_dir.join("scratchpad.log"), &content);
 
                 Ok(format!(
-                    "### File Preview: {} (Showing 1-{} of {} lines)\n{}\n\n... [File truncated: {} lines exceeds {}-line ceiling]\nFull content saved to .rs/scratchpad.log. Use read_file with line_start/line_end to inspect.",
+                    "### File Preview: {} (Showing 1-{} of {} lines)\n{}\n\n... [File truncated: {} lines exceeds {}-line ceiling]\nFull content saved to .rs/scratchpad.log.",
                     path_str, preview_count, total, preview, total, ceilings.line_ceiling
                 ))
             } else {
@@ -480,10 +500,8 @@ pub async fn execute_tool(
             let new_str = args["new_str"].as_str().ok_or("Missing 'new_str' parameter")?;
 
             let safe_path = boundary.resolve_path(path_str);
-            if boundary.is_outside(&safe_path) {
-                if !boundary.authorize(&format!("OUT-OF-BOUNDS EDIT: '{}'", path_str)) {
-                    return Err("[denied] Out-of-bounds edit cancelled by user.".into());
-                }
+            if boundary.is_outside(&safe_path) && !boundary.authorize(&format!("OUT-OF-BOUNDS EDIT: '{}'", path_str)) {
+                return Err("[denied] Out-of-bounds edit cancelled by user.".into());
             }
 
             if !safe_path.is_file() {
@@ -502,16 +520,19 @@ pub async fn execute_tool(
             let _overwrite = args.get("overwrite").and_then(|v| v.as_bool()).unwrap_or(false);
 
             let safe_path = boundary.resolve_path(path_str);
-            if boundary.is_outside(&safe_path) {
-                if !boundary.authorize(&format!("OUT-OF-BOUNDS WRITE: '{}'", path_str)) {
-                    return Err("[denied] Out-of-bounds write cancelled by user.".into());
-                }
+            if boundary.is_outside(&safe_path) && !boundary.authorize(&format!("OUT-OF-BOUNDS WRITE: '{}'", path_str)) {
+                return Err("[denied] Out-of-bounds write cancelled by user.".into());
             }
 
             // Direct overwrite allowed in autonomous workspace
 
             if let Some(parent) = safe_path.parent() {
                 fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+
+            // TOCTOU re-validation before commit
+            if boundary.is_outside(&safe_path) {
+                return Err("[denied] Path escaped boundary after directory resolution.".into());
             }
 
             fs::write(&safe_path, content).map_err(|e| e.to_string())?;
@@ -521,10 +542,8 @@ pub async fn execute_tool(
         "list_dir" => {
             let sub = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
             let safe_path = boundary.resolve_path(sub);
-            if boundary.is_outside(&safe_path) {
-                if !boundary.authorize(&format!("OUT-OF-BOUNDS LIST DIR: '{}'", sub)) {
-                    return Err("[denied] Out-of-bounds list_dir cancelled by user.".into());
-                }
+            if boundary.is_outside(&safe_path) && !boundary.authorize(&format!("OUT-OF-BOUNDS LIST DIR: '{}'", sub)) {
+                return Err("[denied] Out-of-bounds list_dir cancelled by user.".into());
             }
 
             if !safe_path.is_dir() {
@@ -550,10 +569,8 @@ pub async fn execute_tool(
             let pattern = args["pattern"].as_str().ok_or("Missing 'pattern' parameter")?;
             let sub = args.get("path").and_then(|v| v.as_str()).unwrap_or(".");
             let safe_path = boundary.resolve_path(sub);
-            if boundary.is_outside(&safe_path) {
-                if !boundary.authorize(&format!("OUT-OF-BOUNDS SEARCH: '{}'", sub)) {
-                    return Err("[denied] Out-of-bounds search cancelled by user.".into());
-                }
+            if boundary.is_outside(&safe_path) && !boundary.authorize(&format!("OUT-OF-BOUNDS SEARCH: '{}'", sub)) {
+                return Err("[denied] Out-of-bounds search cancelled by user.".into());
             }
 
             let re = regex::RegexBuilder::new(pattern)
@@ -619,6 +636,7 @@ pub async fn execute_tool(
                 .arg(cmd)
                 .current_dir(workspace)
                 .process_group(0)
+                .kill_on_drop(true)
                 .stdout(std::process::Stdio::piped())
                 .stderr(std::process::Stdio::piped())
                 .spawn()
@@ -649,16 +667,15 @@ pub async fn execute_tool(
             let combined = format!("{}{}", stdout, stderr);
             let trimmed = combined.trim();
 
-            let result = if trimmed.len() > ceilings.char_cap {
+            let result = if trimmed.chars().count() > ceilings.char_cap {
                 let scratchpad_dir = workspace.join(".rs");
                 let _ = fs::create_dir_all(&scratchpad_dir);
                 let _ = fs::write(scratchpad_dir.join("scratchpad.log"), trimmed);
 
-                let head_size = (ceilings.char_cap / 3).min(trimmed.len());
-                let tail_size = ((ceilings.char_cap * 2) / 3).min(trimmed.len());
-                let head = &trimmed[..head_size];
-                let tail_start = trimmed.len().saturating_sub(tail_size);
-                let tail = &trimmed[tail_start..];
+                let head_max = ceilings.char_cap / 3;
+                let tail_max = (ceilings.char_cap * 2) / 3;
+                let head = char_slice_head(trimmed, head_max);
+                let tail = char_slice_tail(trimmed, tail_max);
 
                 format!(
                     "{}\n\n... [Output truncated: {} chars exceeds {} cap. Full raw output saved to .rs/scratchpad.log] ...\n\n{}",

@@ -23,6 +23,12 @@ fn get_env_val(content: &str, key: &str) -> Option<String> {
     None
 }
 
+#[inline]
+fn is_valid_key(key: &str) -> bool {
+    let k = key.trim();
+    !k.is_empty() && !k.contains("your_key_here") && !k.contains("your-key-here")
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ToolTier {
     PureBash,
@@ -79,31 +85,30 @@ pub const DEFAULT_ENV: &str = r#"# Rs-Agent Provider Cascade (.env) — Priority
 # Fallback: Local llama-server (:8080) when all cloud keys are commented with '#'.
 
 # ── 1. Google Gemini ──────────────────────────────────────────────────────────
-CUSTOM1_NAME="Google Gemini"
-# CUSTOM1_API_KEY="AQ-your-key-here"
-CUSTOM1_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-CUSTOM1_MODEL="gemini-3.5-flash-lite"
+#GEMINI_API_KEY="AQ.your-key-here"
+GEMINI_MODEL="gemini-3.5-flash-lite"
 
 # ── 2. OpenRouter ─────────────────────────────────────────────────────────────
-# CUSTOM2_NAME="OpenRouter"
-# CUSTOM2_API_KEY="sk-or-v1-your-key-here"
-CUSTOM2_URL="https://openrouter.ai/api/v1/chat/completions"
-CUSTOM2_MODEL="openrouter/free"
+#OPENROUTER_API_KEY="sk-or-v1-your-key-here"
+OPENROUTER_MODEL="openrouter/free"
 
 # ── 3. TokenHarbor ────────────────────────────────────────────────────────────
-# CUSTOM3_NAME="TokenHarbor"
-# CUSTOM3_API_KEY="thk_live_your-key-here"
-CUSTOM3_URL="https://tokenharbor.ai/v1/chat/completions"
-CUSTOM3_MODEL="deepseek-v4.1-flash:free"
+#TOKENHARBOR_API_KEY="thk_live_your-key-here"
+TOKENHARBOR_MODEL="deepseek-v4.1-flash:free"
+
+# ── More Direct Providers e.g. ────────────────────────────────────────────────
+# OPENAI_API_KEY="sk-your-key-here"
+# ANTHROPIC_API_KEY="sk-ant-your-key-here"
 
 # ── 4. Custom Direct Endpoint ─────────────────────────────────────────────────
-# Add More: Define CUSTOM5_*, CUSTOM6_*, up to CUSTOM9_*
-# CUSTOM4_NAME="Custom Provider"
-# CUSTOM4_API_KEY="sk-your-key-here"
-CUSTOM4_URL="https://api.deepseek.com/chat/completions"
-CUSTOM4_MODEL="deepseek-chat"
+# Add: Define CUSTOM1_*, CUSTOM2_*, up to CUSTOM9_*
+# CUSTOM1_NAME="Custom Provider"
+# CUSTOM1_API_KEY="sk-your-key-here"
+CUSTOM1_URL="https://api.deepseek.com/chat/completions"
+CUSTOM1_MODEL="deepseek-flash"
 
 # ── MCP Server Keys (Optional) ────────────────────────────────────────────────
+# API keys for tools configured in plugins/mcp/servers.json
 # FIRECRAWL_API_KEY="fc-your-actual-api-key"
 
 # ── Runtime Governors ─────────────────────────────────────────────────────────
@@ -172,13 +177,61 @@ pub struct ProviderConfig {
     pub max_tokens: usize,
 }
 
+async fn probe_local_model() -> String {
+    let client = reqwest::Client::builder().timeout(std::time::Duration::from_millis(500)).build().unwrap_or_default();
+
+    if let Ok(resp) = client.get("http://127.0.0.1:8080/v1/models").send().await {
+        if let Ok(json) = resp.json::<serde_json::Value>().await {
+            if let Some(id) = json.pointer("/data/0/id").and_then(|v| v.as_str()) {
+                return id.to_string();
+            }
+        }
+    }
+    "local-model".to_string()
+}
+
 impl ProviderConfig {
     pub async fn load() -> Self {
+        ensure_env_file();
         let env_path = get_env_path();
         let env_content = fs::read_to_string(&env_path).unwrap_or_default();
         let max_tokens = get_max_tokens();
 
-        // 1. Check Universal Custom Providers: CUSTOM1..CUSTOM9 (and legacy CUSTOM_API_KEY)
+        // 1. Direct Providers (Top Priority)
+        const DIRECT_PROVIDERS: &[(&str, &str, &str)] = &[
+            (
+                "GEMINI",
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                "gemini-3.5-flash-lite",
+            ),
+            (
+                "GOOGLE",
+                "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+                "gemini-3.5-flash-lite",
+            ),
+            ("OPENROUTER", "https://openrouter.ai/api/v1/chat/completions", "openrouter/free"),
+            ("TOKENHARBOR", "https://tokenharbor.ai/v1/chat/completions", "deepseek-v4.1-flash:free"),
+            ("OPENAI", "https://api.openai.com/v1/chat/completions", "gpt-4o"),
+            ("ANTHROPIC", "https://api.anthropic.com/v1/messages", "claude-3-5-sonnet-20241022"),
+            ("DEEPSEEK", "https://api.deepseek.com/chat/completions", "deepseek-chat"),
+            ("GROQ", "https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile"),
+        ];
+
+        for &(pfx, def_url, def_model) in DIRECT_PROVIDERS {
+            let key_var = format!("{}_API_KEY", pfx);
+            if let Some(api_key) = get_env_val(&env_content, &key_var) {
+                if is_valid_key(&api_key) {
+                    let model =
+                        get_env_val(&env_content, &format!("{}_MODEL", pfx)).unwrap_or_else(|| def_model.to_string());
+                    let base_url =
+                        get_env_val(&env_content, &format!("{}_URL", pfx)).unwrap_or_else(|| def_url.to_string());
+
+                    return ProviderConfig { base_url, api_key: api_key.trim().to_string(), model, max_tokens };
+                }
+            }
+        }
+
+        // 2. Custom Slots: CUSTOM1..CUSTOM9
         for i in 1..=9 {
             let key_var = format!("CUSTOM{}_API_KEY", i);
             let legacy_key = if i == 1 { Some("CUSTOM_API_KEY") } else { None };
@@ -187,15 +240,12 @@ impl ProviderConfig {
                 get_env_val(&env_content, &key_var).or_else(|| legacy_key.and_then(|k| get_env_val(&env_content, k)));
 
             if let Some(api_key) = maybe_key {
-                let clean_key = api_key.trim();
-                if !clean_key.is_empty() && !clean_key.contains("your_key_here") {
+                if is_valid_key(&api_key) {
                     let url_var = format!("CUSTOM{}_URL", i);
                     let legacy_url = if i == 1 { Some("CUSTOM_URL") } else { None };
                     let base_url = get_env_val(&env_content, &url_var)
                         .or_else(|| legacy_url.and_then(|k| get_env_val(&env_content, k)))
-                        .unwrap_or_else(|| {
-                            "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions".to_string()
-                        });
+                        .unwrap_or_else(|| "https://api.deepseek.com/chat/completions".to_string());
 
                     let model_var = format!("CUSTOM{}_MODEL", i);
                     let legacy_model = if i == 1 { Some("CUSTOM_MODEL") } else { None };
@@ -203,48 +253,16 @@ impl ProviderConfig {
                         .or_else(|| legacy_model.and_then(|k| get_env_val(&env_content, k)))
                         .unwrap_or_else(|| "default".to_string());
 
-                    return ProviderConfig { base_url, api_key: clean_key.to_string(), model, max_tokens };
+                    return ProviderConfig { base_url, api_key: api_key.trim().to_string(), model, max_tokens };
                 }
             }
         }
 
-        // 2. Check OpenRouter
-        if let Some(api_key) = get_env_val(&env_content, "OPENROUTER_API_KEY") {
-            let clean_key = api_key.trim();
-            if !clean_key.is_empty() && !clean_key.contains("your_key_here") {
-                let model =
-                    get_env_val(&env_content, "OPENROUTER_MODEL").unwrap_or_else(|| "openrouter/free".to_string());
-                return ProviderConfig {
-                    base_url: "https://openrouter.ai/api/v1/chat/completions".to_string(),
-                    api_key: clean_key.to_string(),
-                    model,
-                    max_tokens,
-                };
-            }
-        }
+        // 3. Fallback: Local llama-server on :8080
+        let base_url = "http://127.0.0.1:8080/v1/chat/completions".to_string();
+        let model = probe_local_model().await;
 
-        // 3. Fallback: Local llama-server on :8080 (inline probe)
-        let local_url = "http://127.0.0.1:8080/v1/chat/completions".to_string();
-        let client =
-            reqwest::Client::builder().timeout(std::time::Duration::from_millis(500)).build().unwrap_or_default();
-
-        let detected_model = if let Ok(resp) = client.get("http://127.0.0.1:8080/v1/models").send().await {
-            if let Ok(json) = resp.json::<serde_json::Value>().await {
-                json.get("data")
-                    .and_then(|d| d.as_array())
-                    .and_then(|arr| arr.first())
-                    .and_then(|m| m.get("id"))
-                    .and_then(|id| id.as_str())
-                    .map(|s| s.to_string())
-                    .unwrap_or_else(|| "LFM3-1.7B".to_string())
-            } else {
-                "LFM3-1.7B".to_string()
-            }
-        } else {
-            "LFM3-1.7B".to_string()
-        };
-
-        ProviderConfig { base_url: local_url, api_key: "not-needed".to_string(), model: detected_model, max_tokens }
+        ProviderConfig { base_url, api_key: "not-needed".to_string(), model, max_tokens }
     }
 }
 

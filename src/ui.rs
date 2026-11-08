@@ -66,6 +66,7 @@ fn resolve_git_status() -> String {
 }
 
 // Shared inner rows for Style 2 (Dot Slab) and Style 3 (Minimal Dot Trail)
+#[allow(clippy::manual_is_multiple_of)]
 fn render_dot_slab_inner(model: &str, profile: &str) -> (String, String) {
     let slab_w: usize = 47;
     let max_txt = model.chars().count().max(profile.chars().count());
@@ -244,6 +245,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
 
             // Row 0
             grid[0] = Some(('╭', ANSI_BRIGHT));
+            #[allow(clippy::needless_range_loop)]
             for x in 1..box_w - 1 {
                 grid[x] = Some(('─', ANSI_BRIGHT));
             }
@@ -311,8 +313,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 for x in 0..box_w {
                     let is_avatar = (3..9).contains(&x) && (1..=3).contains(&y);
                     let is_border = y == 0 || y == 4 || x == 0 || x == box_w - 1;
-                    let is_text_bar = y >= 1
-                        && y <= 3
+                    let is_text_bar = (1..=3).contains(&y)
                         && match y {
                             1 => x >= 11 && x < 11 + model.len().max(16).min(box_w - 13),
                             2 => x >= 11 && x < 11 + profile.len().max(12).min(box_w - 13),

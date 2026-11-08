@@ -1,3 +1,4 @@
+/// Strips copied line gutters (e.g. "12: ", " 42 | ") while preserving timestamps (12:30:00) and code literals.
 pub fn strip_line_gutters(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     let mut first = true;
@@ -10,8 +11,15 @@ pub fn strip_line_gutters(text: &str) -> String {
         let trimmed_start = line.trim_start();
         if let Some(pos) = trimmed_start.find([':', '|']) {
             let prefix = trimmed_start[..pos].trim();
-            if !prefix.is_empty() && prefix.chars().all(|c| c.is_ascii_digit()) {
-                let rest = trimmed_start[pos + 1..].strip_prefix(' ').unwrap_or(&trimmed_start[pos + 1..]);
+            let is_line_num = !prefix.is_empty() && prefix.len() <= 6 && prefix.chars().all(|c| c.is_ascii_digit());
+
+            // Real file gutters are strictly followed by a space or tab ('12: ', '12 | ')
+            // This protects timestamps (12:30:00), port numbers (:8080), and bash pipelines.
+            let rest_slice = &trimmed_start[pos + 1..];
+            let has_gutter_spacing = rest_slice.starts_with([' ', '\t']);
+
+            if is_line_num && has_gutter_spacing {
+                let rest = rest_slice.strip_prefix([' ', '\t']).unwrap_or(rest_slice);
                 out.push_str(rest);
                 continue;
             }
@@ -19,6 +27,15 @@ pub fn strip_line_gutters(text: &str) -> String {
         out.push_str(line);
     }
     out
+}
+
+#[inline]
+fn trim_trailing_comma(s: &mut String) {
+    let trimmed_len = s.trim_end().len();
+    s.truncate(trimmed_len);
+    if s.ends_with(',') {
+        s.pop();
+    }
 }
 
 pub fn normalize_params(map: &mut serde_json::Map<String, serde_json::Value>) {
@@ -51,9 +68,17 @@ pub fn normalize_params(map: &mut serde_json::Map<String, serde_json::Value>) {
         ("force", "overwrite"),
     ];
 
+    // Always remove the alias to avoid stale duplicate keys in downstream tools.
+    // If the canonical key is missing, null, or empty string, populate it from the alias.
     for (alias, canonical) in aliases {
-        if alias != canonical && !map.contains_key(canonical) {
-            if let Some(val) = map.remove(alias) {
+        if let Some(val) = map.remove(alias) {
+            let needs_canonical = match map.get(canonical) {
+                None => true,
+                Some(serde_json::Value::Null) => true,
+                Some(serde_json::Value::String(s)) => s.is_empty(),
+                _ => false,
+            };
+            if needs_canonical {
                 map.insert(canonical.to_string(), val);
             }
         }
@@ -102,8 +127,11 @@ pub fn heal_json_args(raw_args: &str) -> serde_json::Value {
         } else {
             s = s.trim_start_matches('`');
         }
+        // Only strip the closing fence if it is at the very end of the input (not inside an inner string)
         if let Some(last_fence) = s.rfind("```") {
-            s = &s[..last_fence];
+            if s[last_fence + 3..].trim().is_empty() {
+                s = &s[..last_fence];
+            }
         }
         s = s.trim();
         if let Ok(v) = serde_json::from_str::<serde_json::Value>(s) {
@@ -111,53 +139,74 @@ pub fn heal_json_args(raw_args: &str) -> serde_json::Value {
         }
     }
 
-    let mut balanced = s.to_string();
+    let mut balanced = String::with_capacity(s.len() + 16);
     let mut in_str = false;
     let mut escape = false;
     let mut stack = Vec::new();
 
-    for ch in balanced.chars() {
+    for ch in s.chars() {
         if escape {
             escape = false;
+            balanced.push(ch);
             continue;
         }
         if ch == '\\' {
             escape = true;
+            balanced.push(ch);
             continue;
         }
         if ch == '"' {
             in_str = !in_str;
+            balanced.push(ch);
             continue;
         }
         if !in_str {
             match ch {
-                '{' => stack.push('}'),
-                '[' => stack.push(']'),
-                '}' if stack.last() == Some(&'}') => {
-                    stack.pop();
+                '{' => {
+                    stack.push('}');
+                    balanced.push(ch);
                 }
-                ']' if stack.last() == Some(&']') => {
-                    stack.pop();
+                '[' => {
+                    stack.push(']');
+                    balanced.push(ch);
                 }
-                _ => {}
+                '}' => {
+                    if stack.last() == Some(&'}') {
+                        stack.pop();
+                    }
+                    trim_trailing_comma(&mut balanced);
+                    balanced.push(ch);
+                }
+                ']' => {
+                    if stack.last() == Some(&']') {
+                        stack.pop();
+                    }
+                    trim_trailing_comma(&mut balanced);
+                    balanced.push(ch);
+                }
+                _ => {
+                    balanced.push(ch);
+                }
             }
+        } else {
+            balanced.push(ch);
         }
     }
 
     if in_str {
+        if escape {
+            balanced.push('\\');
+        }
         balanced.push('"');
     }
 
-    let mut trimmed_b = balanced.trim_end().to_string();
-    if trimmed_b.ends_with(',') {
-        trimmed_b.pop();
-    }
+    trim_trailing_comma(&mut balanced);
 
     while let Some(close_delim) = stack.pop() {
-        trimmed_b.push(close_delim);
+        balanced.push(close_delim);
     }
 
-    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&trimmed_b) {
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&balanced) {
         return v;
     }
 
@@ -170,4 +219,42 @@ pub fn repair_tool_args(_fn_name: &str, raw_args: &str) -> String {
         normalize_params(map);
     }
     serde_json::to_string(&val).unwrap_or_else(|_| raw_args.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_strip_line_gutters_preserves_timestamps_and_strips_gutters() {
+        let input = "12: fn test() {\n13:     let time = \"12:30:00\";\n14: }";
+        let cleaned = strip_line_gutters(input);
+        assert_eq!(cleaned, "fn test() {\n    let time = \"12:30:00\";\n}");
+    }
+
+    #[test]
+    fn test_normalize_params_cleans_aliases_and_handles_empty_canonical() {
+        let mut map = serde_json::Map::new();
+        map.insert("path".to_string(), serde_json::Value::String("".to_string()));
+        map.insert("filepath".to_string(), serde_json::Value::String("/workspace/src/lib.rs".to_string()));
+
+        normalize_params(&mut map);
+        assert!(!map.contains_key("filepath"));
+        assert_eq!(map.get("path").unwrap().as_str().unwrap(), "src/lib.rs");
+    }
+
+    #[test]
+    fn test_heal_json_args_handles_nested_trailing_commas_and_fences() {
+        let malformed = "```json\n{\"command\": \"cargo test\", \"options\": [1, 2, ], }\n```";
+        let healed = heal_json_args(malformed);
+        assert_eq!(healed["command"], "cargo test");
+        assert_eq!(healed["options"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn test_heal_json_args_handles_dangling_escape_in_unterminated_string() {
+        let malformed = "{\"path\": \"src\\";
+        let healed = heal_json_args(malformed);
+        assert_eq!(healed["path"], "src\\");
+    }
 }

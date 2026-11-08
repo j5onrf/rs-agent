@@ -202,6 +202,7 @@ fn build_system_prompt(active_profile: &Option<Profile>, active_skills: &[String
     prompt
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn execute_task_loop(
     target_dir: &Path,
     goal: &str,
@@ -237,8 +238,13 @@ async fn execute_task_loop(
         print!("\x1b[?25l");
         let _ = io::stdout().flush();
 
-        let (reply, reasoning, tool_calls, stats) =
-            client.stream_chat(history, active_tools.clone(), &mut renderer, spinner).await?;
+        let stream_res = client.stream_chat(history, active_tools.clone(), &mut renderer, spinner).await;
+        if stream_res.is_err() {
+            spinner.stop();
+            print!("\x1b[?25h");
+            let _ = io::stdout().flush();
+        }
+        let (reply, reasoning, tool_calls, stats) = stream_res?;
 
         spinner.stop();
         renderer.finish(&stats, last_total_tokens);
@@ -257,11 +263,8 @@ async fn execute_task_loop(
                     let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
 
                     // 1. Delegate healing & normalization exclusively to adapter.rs
-                    let final_args = if cfg.adapters {
-                        adapter::repair_tool_args(fn_name, fn_args)
-                    } else {
-                        fn_args.to_string()
-                    };
+                    let final_args =
+                        if cfg.adapters { adapter::repair_tool_args(fn_name, fn_args) } else { fn_args.to_string() };
 
                     // 2. Read canonical summary from the repaired arguments
                     let brief = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&final_args) {
@@ -390,6 +393,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
     let mut spinner = InlineSpinner::new();
     let mut last_total_tokens = 0;
+    let mut line_buf = String::with_capacity(512);
+    let mut router = matcher::ContextRouter::load();
+    let max_rounds = get_max_rounds();
 
     loop {
         print!("\x1b[?25h");
@@ -399,11 +405,11 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         }
         io::stdout().flush()?;
 
-        let mut input = String::new();
-        if io::stdin().read_line(&mut input)? == 0 {
+        line_buf.clear();
+        if io::stdin().read_line(&mut line_buf)? == 0 {
             break;
         }
-        let input = input.trim();
+        let input = line_buf.trim();
         if input.is_empty() {
             continue;
         }
@@ -465,10 +471,10 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 println!("         Chat mode is pure conversation without tools.\n");
                 continue;
             }
-            let direct_arg = if input.starts_with("/task ") {
-                input[6..].trim()
-            } else if input.starts_with("/goal ") {
-                input[6..].trim()
+            let direct_arg = if let Some(stripped) = input.strip_prefix("/task ") {
+                stripped.trim()
+            } else if let Some(stripped) = input.strip_prefix("/goal ") {
+                stripped.trim()
             } else {
                 ""
             };
@@ -477,7 +483,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 if !direct_arg.is_empty() { Some(direct_arg.to_string()) } else { read_task_spec(target_dir) };
 
             if let Some(goal) = effective_goal {
-                let _ = execute_task_loop(
+                if let Err(e) = execute_task_loop(
                     target_dir,
                     &goal,
                     &client,
@@ -487,7 +493,10 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     active_tools.clone(),
                     &mut spinner,
                 )
-                .await;
+                .await
+                {
+                    println!("  \x1b[1;31m✗ [task error]\x1b[0m {}\n", e);
+                }
             } else {
                 println!("  \x1b[1;33m[task]\x1b[0m No objective provided and no TASK.md found.");
                 println!("         \x1b[2m• Usage:  /task <describe goal>\x1b[0m");
@@ -536,6 +545,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
                 system_prompt = build_system_prompt(&active_profile, &active_skills);
                 let _ = cfg.save(target_dir);
+                router = matcher::ContextRouter::load();
 
                 history.clear();
                 last_total_tokens = 0;
@@ -557,10 +567,10 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         }
 
         if input == "/s" || input == "/skill" || input.starts_with("/s ") || input.starts_with("/skill ") {
-            let direct_arg = if input.starts_with("/s ") {
-                input[3..].trim().to_lowercase()
-            } else if input.starts_with("/skill ") {
-                input[7..].trim().to_lowercase()
+            let direct_arg = if let Some(stripped) = input.strip_prefix("/s ") {
+                stripped.trim().to_lowercase()
+            } else if let Some(stripped) = input.strip_prefix("/skill ") {
+                stripped.trim().to_lowercase()
             } else {
                 String::new()
             };
@@ -591,7 +601,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                                     sk.name
                                 );
                             }
-                        } else if active_skills.len() >= 5 {
+                        } else if active_skills.len() >= 3 {
                             println!("  \x1b[1;31m✗\x1b[0m \x1b[2mMax 3 skills reached (detach one first)\x1b[0m\n");
                         }
                     }
@@ -674,11 +684,11 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             continue;
         }
 
-        let router = matcher::ContextRouter::load();
         if let Some(entry) = router.resolve_entry(input) {
             let cmd = entry.command;
 
-            let is_destructive = cmd.contains("rm ") || cmd.contains("sudo ") || cmd.contains("reset --hard");
+            let is_destructive =
+                cmd.split_whitespace().any(|w| w == "rm" || w == "sudo") || cmd.contains("reset --hard");
             if entry.gated || is_destructive {
                 print!("  \x1b[1;33m[gate]\x1b[0m Execute '\x1b[1;36m{}\x1b[0m'? [y/N] ", cmd);
                 let _ = io::stdout().flush();
@@ -713,7 +723,6 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
         history.push(ChatMessage::user(input));
 
-        let max_rounds = get_max_rounds();
         for round in 0..max_rounds {
             let mut renderer = StreamRenderer::new(state::get_pad());
 
@@ -728,8 +737,13 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             print!("\x1b[?25l");
             let _ = io::stdout().flush();
 
-            let (reply, reasoning, tool_calls, stats) =
-                client.stream_chat(&history, active_tools.clone(), &mut renderer, &mut spinner).await?;
+            let stream_res = client.stream_chat(&history, active_tools.clone(), &mut renderer, &mut spinner).await;
+            if stream_res.is_err() {
+                spinner.stop();
+                print!("\x1b[?25h");
+                let _ = io::stdout().flush();
+            }
+            let (reply, reasoning, tool_calls, stats) = stream_res?;
 
             spinner.stop();
 
@@ -758,11 +772,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
 
                 // 1. Delegate healing & normalization exclusively to adapter.rs
-                let final_args = if cfg.adapters {
-                    adapter::repair_tool_args(fn_name, fn_args)
-                } else {
-                    fn_args.to_string()
-                };
+                let final_args =
+                    if cfg.adapters { adapter::repair_tool_args(fn_name, fn_args) } else { fn_args.to_string() };
 
                 let verb = match fn_name {
                     "write_file" => "updating",

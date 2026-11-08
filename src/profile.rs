@@ -67,15 +67,11 @@ impl Profile {
                         "reasoning_budget" => {
                             reasoning_budget = val.parse().ok();
                         }
-                        "tier" => {
-                            if val.eq_ignore_ascii_case("purebash") {
-                                tier = ToolTier::PureBash;
-                            }
+                        "tier" if val.eq_ignore_ascii_case("purebash") => {
+                            tier = ToolTier::PureBash;
                         }
-                        "purebash" => {
-                            if val.eq_ignore_ascii_case("true") {
-                                tier = ToolTier::PureBash;
-                            }
+                        "purebash" if val.eq_ignore_ascii_case("true") => {
+                            tier = ToolTier::PureBash;
                         }
                         "adapters" => {
                             adapters = val.eq_ignore_ascii_case("true");
@@ -290,33 +286,29 @@ impl Profile {
             let opt_clean = opt_lower.replace(['-', '_'], "");
             let bare_clean = bare_lower.replace(['-', '_'], "");
 
-            if m_clean.contains(&bare_clean)
+            if (m_clean.contains(&bare_clean)
                 || bare_clean.contains(&m_clean)
                 || m_clean.contains(&opt_clean)
-                || opt_clean.contains(&m_clean)
+                || opt_clean.contains(&m_clean))
+                && !matches.contains(opt)
             {
-                if !matches.contains(opt) {
-                    matches.push(opt.clone());
-                    continue;
-                }
+                matches.push(opt.clone());
+                continue;
             }
 
             for token in &tokens {
                 let tok_lower = token.to_lowercase();
-                if bare_lower.contains(&tok_lower) || tok_lower.contains(&bare_lower) {
-                    if !matches.contains(opt) {
-                        matches.push(opt.clone());
-                        break;
-                    }
+                if (bare_lower.contains(&tok_lower) || tok_lower.contains(&bare_lower)) && !matches.contains(opt) {
+                    matches.push(opt.clone());
+                    break;
                 }
             }
 
             if (tokens.iter().any(|t| t.starts_with("gem")) || m_lower.contains("gem"))
                 && (opt_lower.contains("gem") || bare_lower.contains("gem"))
+                && !matches.contains(opt)
             {
-                if !matches.contains(opt) {
-                    matches.push(opt.clone());
-                }
+                matches.push(opt.clone());
             }
         }
         matches
@@ -560,11 +552,9 @@ impl Profile {
                         }
                     }
                     KeyCode::Left => match &visible_rows[sel_idx] {
-                        MenuRow::Category { name, expanded: is_exp, .. } => {
-                            if *is_exp {
-                                expanded.insert(name.clone(), false);
-                                visible_rows = Self::build_rows(&roots, &categories, &expanded);
-                            }
+                        MenuRow::Category { name, expanded: is_exp, .. } if *is_exp => {
+                            expanded.insert(name.clone(), false);
+                            visible_rows = Self::build_rows(&roots, &categories, &expanded);
                         }
                         MenuRow::Child { category, .. } => {
                             let cat_name = category.clone();

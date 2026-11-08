@@ -52,10 +52,12 @@ impl Skill {
                     if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("md") {
                         if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
                             let lower = stem.to_lowercase();
-                            if lower != "readme" && lower != "system_instructions" && lower != "instructions" {
-                                if seen.insert(stem.to_string()) {
-                                    list.push(stem.to_string());
-                                }
+                            if lower != "readme"
+                                && lower != "system_instructions"
+                                && lower != "instructions"
+                                && seen.insert(stem.to_string())
+                            {
+                                list.push(stem.to_string());
                             }
                         }
                     }
@@ -174,15 +176,11 @@ impl Skill {
                 }
 
                 match key_event.code {
-                    KeyCode::Up => {
-                        if !filtered.is_empty() {
-                            sel_idx = (sel_idx + filtered.len() - 1) % filtered.len();
-                        }
+                    KeyCode::Up if !filtered.is_empty() => {
+                        sel_idx = (sel_idx + filtered.len() - 1) % filtered.len();
                     }
-                    KeyCode::Down => {
-                        if !filtered.is_empty() {
-                            sel_idx = (sel_idx + 1) % filtered.len();
-                        }
+                    KeyCode::Down if !filtered.is_empty() => {
+                        sel_idx = (sel_idx + 1) % filtered.len();
                     }
                     KeyCode::Enter => {
                         print!("\x1b[{}A\r\x1b[J\x1b[?25h", last_rendered_lines);

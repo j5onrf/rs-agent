@@ -43,6 +43,7 @@ done
 
 RAW_WORKSPACE="${WORKSPACE_ARG:-${AI_WORKSPACE_PATH:-$PWD}}"
 if ! TARGET_WORKSPACE=$(cd "$RAW_WORKSPACE" 2>/dev/null && pwd -P); then
+    echo -e "\033[1;33m[t3code]\033[0m Warning: Directory '$RAW_WORKSPACE' not found. Falling back to '$PWD'." >&2
     TARGET_WORKSPACE="$PWD"
 fi
 
@@ -60,14 +61,18 @@ cd "$TARGET_WORKSPACE"
 if [[ "$MODE" == "web" ]]; then
     if [[ -x "$T3_CLI" ]]; then
         exec "$T3_CLI" "$TARGET_WORKSPACE"
+    elif [[ -d "$T3_BIN" && "$(uname -s)" == "Darwin" ]]; then
+        open -a "$T3_BIN" --args --web "$TARGET_WORKSPACE"
+        exit 0
     else
         exec "$T3_BIN" --web "$TARGET_WORKSPACE"
     fi
 fi
 
 # 1. If T3 Code is already open, quietly hand over via IPC
+# Filter out $$ and $PPID to prevent self-match on .../plugins/t3code/launch.sh
 if [[ -x "$T3_CLI" ]]; then
-    if pgrep -f "t3code|T3 Code" &>/dev/null; then
+    if pgrep -f "(^|/)(t3code|T3 Code)(\s|$)" 2>/dev/null | grep -vw -e "$$" -e "$PPID" &>/dev/null; then
         if "$T3_CLI" app "$TARGET_WORKSPACE" &>/dev/null; then
             echo -e "\033[1;32m[t3code]\033[0m Handed workspace '$TARGET_WORKSPACE' to active T3 Code window."
             exit 0
@@ -82,10 +87,8 @@ launch_detached() {
 
     if [[ "$(uname -s)" == "Darwin" ]]; then
         # macOS: native launchd via open
-        if [[ -d "$bin" && "$bin" == *".app" ]]; then
+        if [[ -d "$bin" ]]; then
             open -a "$bin" --args "$ws" >/dev/null 2>&1 || true
-        elif [[ -d "/Applications/T3 Code.app" ]]; then
-            open -a "/Applications/T3 Code.app" --args "$ws" >/dev/null 2>&1 || true
         elif command -v open >/dev/null 2>&1; then
             open -a "$bin" --args "$ws" >/dev/null 2>&1 || ( "$bin" "$ws" >/dev/null 2>&1 & )
         else
@@ -108,14 +111,20 @@ launch_detached() {
 launch_detached "$T3_BIN" "$TARGET_WORKSPACE"
 
 # 3. Wait briefly for IPC handshake readiness, then confirm cleanly
+handshake_ok=false
 if [[ -x "$T3_CLI" ]]; then
     for _ in {1..30}; do
         sleep 0.15
         if "$T3_CLI" app "$TARGET_WORKSPACE" &>/dev/null; then
+            handshake_ok=true
             break
         fi
     done
 fi
 
-echo -e "\033[1;32m[t3code]\033[0m Handed workspace '$TARGET_WORKSPACE' to active T3 Code window."
+if [[ "$handshake_ok" == true ]]; then
+    echo -e "\033[1;32m[t3code]\033[0m Handed workspace '$TARGET_WORKSPACE' to active T3 Code window."
+else
+    echo -e "\033[1;32m[t3code]\033[0m Launched T3 Code in background for '$TARGET_WORKSPACE'."
+fi
 exit 0

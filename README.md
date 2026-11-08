@@ -3,7 +3,7 @@
   <h1>Rs-Agent</h1>
  
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.5.3.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.5.4.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -314,31 +314,30 @@ source ~/.config/rs-agent/rs-hook.sh
 # Fallback: Local llama-server (:8080) when all cloud keys are commented with '#'.
 
 # ── 1. Google Gemini ──────────────────────────────────────────────────────────
-CUSTOM1_NAME="Google Gemini"
-# CUSTOM1_API_KEY="AQ-your-key-here"
-CUSTOM1_URL="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-CUSTOM1_MODEL="gemini-3.5-flash-lite"
+#GEMINI_API_KEY="AQ.your-key-here"
+GEMINI_MODEL="gemini-3.5-flash-lite"
 
 # ── 2. OpenRouter ─────────────────────────────────────────────────────────────
-# CUSTOM2_NAME="OpenRouter"
-# CUSTOM2_API_KEY="sk-or-v1-your-key-here"
-CUSTOM2_URL="https://openrouter.ai/api/v1/chat/completions"
-CUSTOM2_MODEL="openrouter/free"
+#OPENROUTER_API_KEY="sk-or-v1-your-key-here"
+OPENROUTER_MODEL="openrouter/free"
 
 # ── 3. TokenHarbor ────────────────────────────────────────────────────────────
-# CUSTOM3_NAME="TokenHarbor"
-# CUSTOM3_API_KEY="thk_live_your-key-here"
-CUSTOM3_URL="https://tokenharbor.ai/v1/chat/completions"
-CUSTOM3_MODEL="deepseek-v4.1-flash:free"
+#TOKENHARBOR_API_KEY="thk_live_your-key-here"
+TOKENHARBOR_MODEL="deepseek-v4.1-flash:free"
+
+# ── More Direct Providers e.g. ────────────────────────────────────────────────
+# OPENAI_API_KEY="sk-your-key-here"
+# ANTHROPIC_API_KEY="sk-ant-your-key-here"
 
 # ── 4. Custom Direct Endpoint ─────────────────────────────────────────────────
-# Add More: Define CUSTOM5_*, CUSTOM6_*, up to CUSTOM9_*
-# CUSTOM4_NAME="Custom Provider"
-# CUSTOM4_API_KEY="sk-your-key-here"
-CUSTOM4_URL="https://api.deepseek.com/chat/completions"
-CUSTOM4_MODEL="deepseek-chat"
+# Add: Define CUSTOM1_*, CUSTOM2_*, up to CUSTOM9_*
+# CUSTOM1_NAME="Custom Provider"
+# CUSTOM1_API_KEY="sk-your-key-here"
+CUSTOM1_URL="https://api.deepseek.com/chat/completions"
+CUSTOM1_MODEL="deepseek-flash"
 
 # ── MCP Server Keys (Optional) ────────────────────────────────────────────────
+# API keys for tools configured in plugins/mcp/servers.json
 # FIRECRAWL_API_KEY="fc-your-actual-api-key"
 
 # ── Runtime Governors ─────────────────────────────────────────────────────────

@@ -51,8 +51,50 @@ fn get_mutating_re() -> &'static regex::Regex {
 
 fn get_python_pip_re() -> &'static regex::Regex {
     PYTHON_PIP_RE.get_or_init(|| {
-        regex::Regex::new(r"\bpython[0-9.]*\s+-m\s+(pip|pip3|pipx|ensurepip|venv)\b").expect("Valid python pip regex")
+        regex::Regex::new(r"\bpython[0-9.]*\s+-m\s*(pip|pip3|pipx|ensurepip|venv)\b").expect("Valid python pip regex")
     })
+}
+
+/// Zero-allocation detection of destructive rm commands (rm -rf, rm -fr, rm --recursive --force, rm -r -f)
+fn is_destructive_rm(cmd: &str) -> bool {
+    let tokens: Vec<&str> = cmd.split_whitespace().collect();
+    for (i, &t) in tokens.iter().enumerate() {
+        if t == "rm" {
+            let rest = &tokens[i + 1..];
+            let mut has_r = false;
+            let mut has_f = false;
+            let mut has_dangerous_target = false;
+
+            for &arg in rest {
+                if arg == "--recursive" || arg == "-r" || arg == "-R" {
+                    has_r = true;
+                } else if arg == "--force" || arg == "-f" || arg == "-F" {
+                    has_f = true;
+                } else if arg.starts_with('-') && !arg.starts_with("--") {
+                    let flags = &arg[1..];
+                    if flags.contains('r') || flags.contains('R') {
+                        has_r = true;
+                    }
+                    if flags.contains('f') || flags.contains('F') {
+                        has_f = true;
+                    }
+                } else if arg == "/"
+                    || arg == "~"
+                    || arg == "*"
+                    || arg.starts_with("/etc")
+                    || arg.starts_with("/home")
+                    || arg.contains("..")
+                {
+                    has_dangerous_target = true;
+                }
+            }
+
+            if has_dangerous_target || (has_r && has_f) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 pub struct SecurityBoundary {
@@ -77,7 +119,7 @@ impl SecurityBoundary {
     }
 
     /// Walk up to closest existing ancestor to canonicalize.
-    /// Fails closed if target escapes the workspace root boundary.
+    /// Strictly inspects symlinks to ensure targets cannot escape workspace root.
     pub fn is_outside(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy();
         for &dev in SYSTEM_DEVICES {
@@ -87,7 +129,9 @@ impl SecurityBoundary {
         }
 
         let mut curr = path.to_path_buf();
-        while !curr.exists() {
+
+        // Walk ancestors until an entry with metadata is found (symlink_metadata does NOT follow symlinks)
+        while fs::symlink_metadata(&curr).is_err() {
             if let Some(parent) = curr.parent() {
                 if parent == curr {
                     break;
@@ -95,6 +139,43 @@ impl SecurityBoundary {
                 curr = parent.to_path_buf();
             } else {
                 break;
+            }
+        }
+
+        // If curr is a symlink, verify its target directly to block dangling symlink escapes
+        if let Ok(meta) = fs::symlink_metadata(&curr) {
+            if meta.is_symlink() {
+                if let Ok(target) = curr.canonicalize() {
+                    if !target.starts_with(&self.root) {
+                        return true; // Resolved symlink target escapes boundary
+                    }
+                } else if let Ok(link_target) = fs::read_link(&curr) {
+                    let resolved = if link_target.is_absolute() {
+                        link_target
+                    } else {
+                        curr.parent().unwrap_or(&self.root).join(link_target)
+                    };
+                    let mut target_ancestor = resolved;
+                    while fs::symlink_metadata(&target_ancestor).is_err() {
+                        if let Some(p) = target_ancestor.parent() {
+                            if p == target_ancestor {
+                                break;
+                            }
+                            target_ancestor = p.to_path_buf();
+                        } else {
+                            break;
+                        }
+                    }
+                    if let Ok(canon) = target_ancestor.canonicalize() {
+                        if !canon.starts_with(&self.root) {
+                            return true; // Target ancestor escapes boundary
+                        }
+                    } else {
+                        return true; // Fail closed
+                    }
+                } else {
+                    return true; // Fail closed
+                }
             }
         }
 
@@ -113,25 +194,24 @@ impl SecurityBoundary {
 
     pub fn check_command(&self, cmd: &str) -> Option<&'static str> {
         let lower = cmd.to_lowercase();
-        let _trimmed = lower.trim();
+        let trimmed = lower.trim();
 
         // 1. Intercept shell commands targeting protected system trees outside workspace
         for &sys_dir in FORBIDDEN_SYS_DIRS {
             if lower.contains(sys_dir) {
-                // Ignore benign grep/cat if inside dev
                 return Some("system directory access attempt");
             }
         }
-        let lower = cmd.to_lowercase();
-        let trimmed = lower.trim();
 
-        // 1. Python -m pip / venv module execution bypass
+        // 2. Python -m pip / venv module execution bypass (catches -mpip and -m pip)
         if get_python_pip_re().is_match(trimmed) {
             return Some("python -m pip/venv");
         }
 
-        // 2. Read-only inspection exemptions for systemctl and pacman
-        if trimmed.starts_with("systemctl ") {
+        // 3. Read-only inspection exemptions (ONLY permitted if NO shell chaining or redirection exists)
+        let has_chaining = trimmed.contains([';', '|', '&', '`', '$', '\n', '>', '<']);
+
+        if !has_chaining && trimmed.starts_with("systemctl ") {
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
             if parts.len() >= 2 {
                 let sub = parts[1];
@@ -154,7 +234,7 @@ impl SecurityBoundary {
             }
         }
 
-        if trimmed.starts_with("pacman ") {
+        if !has_chaining && trimmed.starts_with("pacman ") {
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
             if parts.len() >= 2 {
                 let flag = parts[1];
@@ -165,7 +245,7 @@ impl SecurityBoundary {
             }
         }
 
-        // 3. Mutating binary checks
+        // 4. Mutating binary checks
         let re = get_mutating_re();
         if let Some(mat) = re.find(&lower) {
             let matched = mat.as_str();
@@ -176,10 +256,12 @@ impl SecurityBoundary {
             }
         }
 
-        // 4. Destructive shell patterns
-        if lower.contains("rm -rf /") || lower.contains("rm -rf ~") || lower.contains("rm -rf *") {
+        // 5. Destructive rm detection (tokenized flag-cluster analysis)
+        if is_destructive_rm(&lower) {
             return Some("destructive rm");
         }
+
+        // 6. Raw disk mutation
         if lower.contains("mkfs") || lower.contains("wipefs") || lower.contains("dd if=") {
             return Some("raw disk mutation");
         }
