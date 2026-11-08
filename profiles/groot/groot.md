@@ -1,5 +1,5 @@
 ---
-description: "Groot-19B-A3B APEX-I-MiniPlus-V2.1 Autonomous Systems Engineer"
+description: "Groot-19B-A3B Autonomous Systems Engineer"
 adapters: true
 reasoning_budget: 500
 ---

@@ -94,7 +94,7 @@
 
 <p align="center">
   <b><a href="https://t3.codes">T3 Code</a> is the official graphical surface for rs-agent.</b><br>
-  <sub>A zero-overhead pairing connecting rs-agent's native Rust execution kernel directly to T3 Code via stdio ACP (Agent Client Protocol).</sub>
+  <sub>A direct pairing connecting rs-agent's native Rust execution kernel to T3 Code via stdio ACP (Agent Client Protocol).</sub>
 </p>
 
 <div align="center">
@@ -154,7 +154,7 @@
 
 <h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Developer Tools</h2>
 
-Standalone native Rust binaries deployed in `tools/` for zero-overhead project maintenance:
+Standalone native Rust binaries in `tools/` for project maintenance:
 
 <div align="center">
 
@@ -163,7 +163,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 | 👤 `ms` | **Model Selector** | Dynamic TUI for toggling universal providers, context budget, and loop limit |
 | `newp` | **Project Creator** | Scaffolds workspace, `.rs/config.json`, and auto-links router aliases |
 | `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) |
-| `ta` | **System Diagnostics** | Conclusive 10-pass native verification suite testing kernel, safety, and UI |
+| `ta` | **System Diagnostics** | 10-pass native test harness checking kernel, safety, and UI |
 | `eva` | **Agentic Benchmark** | Full-stack `eval-stack` measuring par efficiency and token economy |
 
 </div>
@@ -175,7 +175,7 @@ Standalone native Rust binaries deployed in `tools/` for zero-overhead project m
 `rs-agent` discards heavy agent frameworks in favor of simple, predictable primitives:
 
 * **Sub-Millisecond Shell Intercept (`matcher.rs`):** `rs-hook.sh` intercepts terminal input and matches against `rs-context.md` in `< 0.2ms`. Typing `lfm` jumps into the target directory and launches the workspace instantly.
-* **Native 6-Tool Suite (`tools.rs`):** Full tools ready for SLMs and LLMs: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
+* **Native 6 Tools (`tools.rs`):** Full tool set ready for SLMs and LLMs: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
 * **Embedded ACP Bridge (`bridge.rs`):** Stdio JSON-RPC 2.0 server inside the core binary. Dispatches live file diffs for T3 Code review, handles multimodal image attachments, and streams token cancellation mid-turn.
 * **Autonomous Task Loop (`/task`):** Multi-step goal loop with failure decomposition (reminds models to inspect lines after tool errors) and anti-hallucination verification.
 * **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and heals broken JSON frames on the fly.
