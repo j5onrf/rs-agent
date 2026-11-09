@@ -1,3 +1,4 @@
+use crossterm::cursor::{Hide, Show};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use std::io::{self, Write};
@@ -11,6 +12,17 @@ const ANSI_ACCENT: &str = "\x1b[36m"; // Regular theme accent
 const ANSI_WHITE: &str = "\x1b[1;37m"; // Bold foreground
 const ANSI_MUTED: &str = "\x1b[90m"; // Color 8 / Muted
 const ANSI_DIM: &str = "\x1b[2m"; // Faint / Low contrast
+
+struct RawModeGuard;
+
+impl Drop for RawModeGuard {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
+        let mut stdout = io::stdout();
+        let _ = crossterm::execute!(stdout, Show);
+        let _ = stdout.flush();
+    }
+}
 
 #[inline(always)]
 fn cell_dither_threshold(x: usize, y: usize) -> f64 {
@@ -69,9 +81,20 @@ fn resolve_git_status() -> String {
 #[allow(clippy::manual_is_multiple_of)]
 fn render_dot_slab_inner(model: &str, profile: &str) -> (String, String) {
     let slab_w: usize = 47;
-    let max_txt = model.chars().count().max(profile.chars().count());
-    let mut cutout_end = 3 + max_txt + 2;
-    if cutout_end % 2 != 0 {
+    let max_avail = slab_w.saturating_sub(6);
+
+    let model_clamped: String =
+        if model.chars().count() > max_avail { model.chars().take(max_avail).collect() } else { model.to_string() };
+
+    let profile_clamped: String = if profile.chars().count() > max_avail {
+        profile.chars().take(max_avail).collect()
+    } else {
+        profile.to_string()
+    };
+
+    let max_txt = model_clamped.chars().count().max(profile_clamped.chars().count());
+    let mut cutout_end = (3 + max_txt + 2).min(slab_w);
+    if cutout_end % 2 != 0 && cutout_end < slab_w {
         cutout_end += 1;
     }
 
@@ -81,9 +104,9 @@ fn render_dot_slab_inner(model: &str, profile: &str) -> (String, String) {
     l1.push_str(ANSI_RESET);
     l1.push_str("  ");
     l1.push_str(ANSI_WHITE);
-    l1.push_str(model);
+    l1.push_str(&model_clamped);
     l1.push_str(ANSI_RESET);
-    let curr_vis1 = 3 + model.chars().count();
+    let curr_vis1 = 3 + model_clamped.chars().count();
     if curr_vis1 < cutout_end {
         for _ in 0..(cutout_end - curr_vis1) {
             l1.push(' ');
@@ -105,9 +128,9 @@ fn render_dot_slab_inner(model: &str, profile: &str) -> (String, String) {
     l2.push_str(ANSI_RESET);
     l2.push_str("  ");
     l2.push_str(ANSI_MUTED);
-    l2.push_str(profile);
+    l2.push_str(&profile_clamped);
     l2.push_str(ANSI_RESET);
-    let curr_vis2 = 3 + profile.chars().count();
+    let curr_vis2 = 3 + profile_clamped.chars().count();
     if curr_vis2 < cutout_end {
         for _ in 0..(cutout_end - curr_vis2) {
             l2.push(' ');
@@ -238,7 +261,9 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
         4 => {
             // Style 4: Themed Boxed Badge (Zero-allocation fixed stack grid)
             let line_count: usize = 5;
-            let initials = if model.len() >= 2 { &model[..2] } else { "RA" };
+            let model_chars = model.chars().count();
+            let profile_chars = profile.chars().count();
+            let git_chars = git_info.chars().count();
 
             // Stack grid: 46 * 5 = 230 cells (no heap allocation, zero hash lookups)
             let mut grid: [Option<(char, &'static str)>; 230] = [None; 230];
@@ -253,6 +278,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
 
             // Row 4
             grid[4 * box_w] = Some(('╰', ANSI_BRIGHT));
+            #[allow(clippy::needless_range_loop)]
             for x in 1..box_w - 1 {
                 grid[4 * box_w + x] = Some(('─', ANSI_BRIGHT));
             }
@@ -270,9 +296,14 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 grid[box_w + (3 + i)] = Some((c, ANSI_BRIGHT));
             }
             grid[2 * box_w + 3] = Some(('│', ANSI_BRIGHT));
-            for (i, c) in initials.chars().take(2).enumerate() {
-                grid[2 * box_w + (5 + i)] = Some((c, ANSI_WHITE));
-            }
+            let mut chars = model.chars();
+            let (ch0, ch1) = match (chars.next(), chars.next()) {
+                (Some(a), Some(b)) => (a, b),
+                (Some(a), None) => (a, ' '),
+                _ => ('R', 'A'),
+            };
+            grid[2 * box_w + 5] = Some((ch0, ANSI_WHITE));
+            grid[2 * box_w + 6] = Some((ch1, ANSI_WHITE));
             grid[2 * box_w + 8] = Some(('│', ANSI_BRIGHT));
             let av3 = "╰────╯";
             for (i, c) in av3.chars().enumerate() {
@@ -308,16 +339,16 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             let mut lines = Vec::with_capacity(line_count);
 
             for y in 0..line_count {
-                let mut row = String::with_capacity(256);
+                let mut row = String::with_capacity(512);
 
                 for x in 0..box_w {
                     let is_avatar = (3..9).contains(&x) && (1..=3).contains(&y);
                     let is_border = y == 0 || y == 4 || x == 0 || x == box_w - 1;
                     let is_text_bar = (1..=3).contains(&y)
                         && match y {
-                            1 => x >= 11 && x < 11 + model.len().max(16).min(box_w - 13),
-                            2 => x >= 11 && x < 11 + profile.len().max(12).min(box_w - 13),
-                            3 => x >= 11 && x < 11 + git_info.chars().count().max(12).min(box_w - 13),
+                            1 => x >= 11 && x < 11 + model_chars.max(16).min(box_w - 13),
+                            2 => x >= 11 && x < 11 + profile_chars.max(12).min(box_w - 13),
+                            3 => x >= 11 && x < 11 + git_chars.max(12).min(box_w - 13),
                             _ => false,
                         };
                     let is_skeleton = is_border || is_avatar || is_text_bar;
@@ -366,11 +397,9 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
         5 => {
             // Style 5: Borderless Floating Badge (Zero-allocation fixed stack grid)
             let line_count: usize = 3;
-            let initials = if model.len() >= 2 { &model[..2] } else { "RA" };
-
-            let model_len = model.chars().count();
-            let profile_len = profile.chars().count();
-            let git_len = git_info.chars().count();
+            let model_chars = model.chars().count();
+            let profile_chars = profile.chars().count();
+            let git_chars = git_info.chars().count();
 
             // Stack grid: 46 * 3 = 138 cells
             let mut grid: [Option<(char, &'static str)>; 138] = [None; 138];
@@ -389,9 +418,14 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             // Row 1
             grid[box_w + 2] = Some(('│', ANSI_BRIGHT));
             grid[box_w + 3] = Some((' ', ANSI_RESET));
-            for (i, c) in initials.chars().take(2).enumerate() {
-                grid[box_w + (4 + i)] = Some((c, ANSI_WHITE));
-            }
+            let mut chars = model.chars();
+            let (ch0, ch1) = match (chars.next(), chars.next()) {
+                (Some(a), Some(b)) => (a, b),
+                (Some(a), None) => (a, ' '),
+                _ => ('R', 'A'),
+            };
+            grid[box_w + 4] = Some((ch0, ANSI_WHITE));
+            grid[box_w + 5] = Some((ch1, ANSI_WHITE));
             grid[box_w + 6] = Some((' ', ANSI_RESET));
             grid[box_w + 7] = Some(('│', ANSI_BRIGHT));
             for (i, c) in profile.chars().enumerate() {
@@ -424,22 +458,23 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
 
             for y in 0..line_count {
                 let bar_len = match y {
-                    0 => model_len.max(16).min(box_w - 13),
-                    1 => profile_len.max(12).min(box_w - 13),
-                    _ => git_len.max(12).min(box_w - 13),
+                    0 => model_chars.max(16).min(box_w - 13),
+                    1 => profile_chars.max(12).min(box_w - 13),
+                    _ => git_chars.max(12).min(box_w - 13),
                 };
 
+                // Defend against out-of-bounds indexing: clamp row_end strictly to box_w (46)
                 let row_end = if progress >= 1.0 {
                     match y {
-                        0 => 10 + model_len,
-                        1 => 10 + profile_len,
-                        _ => 10 + git_len,
+                        0 => (10 + model_chars).min(box_w),
+                        1 => (10 + profile_chars).min(box_w),
+                        _ => (10 + git_chars).min(box_w),
                     }
                 } else {
-                    10 + bar_len
+                    (10 + bar_len).min(box_w)
                 };
 
-                let mut row = String::with_capacity(128);
+                let mut row = String::with_capacity(512);
 
                 for x in 0..row_end {
                     let is_avatar = (2..8).contains(&x);
@@ -506,9 +541,23 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
         return None;
     }
 
-    let _ = enable_raw_mode();
-    print!("\x1b[?25l");
-    let _ = io::stdout().flush();
+    if enable_raw_mode().is_err() {
+        let (lines, _) = render_frame_inner(model, profile, &git_info, style, 1.0);
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        for line in lines {
+            let _ = writeln!(handle, "{}", line);
+        }
+        let _ = writeln!(handle);
+        let _ = handle.flush();
+        return None;
+    }
+
+    // RAII guard restores terminal mode and cursor on any return or panic
+    let _guard = RawModeGuard;
+    let mut stdout = io::stdout();
+    let _ = crossterm::execute!(stdout, Hide);
+    let _ = stdout.flush();
 
     let duration = match style {
         1 => Duration::from_millis(160),
@@ -566,10 +615,6 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
     }
     let _ = write!(handle, "\r\n");
     let _ = handle.flush();
-
-    let _ = disable_raw_mode();
-    print!("\x1b[?25h");
-    let _ = io::stdout().flush();
 
     buffered_char
 }
