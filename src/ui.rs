@@ -160,7 +160,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 } else if col >= box_w {
                     top_border
                 } else if col <= 5 {
-                    format!("{ANSI_BRIGHT}{}{ANSI_RESET}", &"╭─ ○ "[..col.min(5)])
+                    format!("{ANSI_BRIGHT}{}{ANSI_RESET}", "╭─ ○ ".chars().take(col.min(5)).collect::<String>())
                 } else {
                     let fill = col - 5;
                     format!("{ANSI_BRIGHT}╭─ ○ {:─<w$}{ANSI_RESET}", "", w = fill)
