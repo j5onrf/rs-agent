@@ -141,13 +141,13 @@
 | 👤 `ai` | **Interactive Chat** | Conversational REPL with thinking gutters, responsive `/pad`, and ~180t ceiling |
 | 👤 `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security kernel |
 | `/task [goal]` | **Task Loop** | Autonomous goal loop; auto-discovers `TASK.md` when prompt is omitted |
-| `/t3` / `/t3 web` | **T3 Code IDE** | Quiet compositor handover to official T3 Code GUI with diffs & security gates |
-| `ai --bridge` | **Headless ACP** | Embedded stdio JSON-RPC 2.0 interface for IDEs and desktop surfaces |
+| `/t3` / `/t3 web` | **T3 Code ADE** | Quiet compositor handover to official T3 Code GUI with diffs & security gates |
+| `ai --bridge` | **Headless ACP** | Embedded stdio JSON-RPC 2.0 interface for ADEs and desktop surfaces |
 
 </div>
 
 <p align="center">
-  <sub><code>/p</code> profile select &nbsp;•&nbsp; <code>/task</code> goal loop &nbsp;•&nbsp; <code>/t3</code> launch IDE &nbsp;•&nbsp; <code>/s</code> toggle skills &nbsp;•&nbsp; <code>/box</code> themes &nbsp;•&nbsp; <code>/pad</code> padding &nbsp;•&nbsp; <code>/r</code> reset</sub>
+  <sub><code>/p</code> profile select &nbsp;•&nbsp; <code>/task</code> goal loop &nbsp;•&nbsp; <code>/t3</code> launch ADE &nbsp;•&nbsp; <code>/s</code> toggle skills &nbsp;•&nbsp; <code>/box</code> themes &nbsp;•&nbsp; <code>/pad</code> padding &nbsp;•&nbsp; <code>/r</code> reset</sub>
 </p>
 
 ---
