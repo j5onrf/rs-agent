@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+export T3CODE_TELEMETRY_ENABLED=false
+export DO_NOT_TRACK=1
 set -uo pipefail
 
 PLUGIN_DIR="$HOME/.config/rs-agent/plugins/t3code"
