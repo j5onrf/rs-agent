@@ -631,9 +631,11 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             // Stack grid: 47 * 5 = 235 cells (zero heap allocation)
             let mut grid: [Option<(char, &'static str)>; 235] = [None; 235];
 
-            // Row 0: Top dot border
+            // Row 0: Top dot border with signature glyph at col 4
             for x in 0..slab_w {
-                if x % 2 == 0 {
+                if x == 4 {
+                    grid[x] = Some(('○', ANSI_BRIGHT));
+                } else if x % 2 == 0 {
                     grid[x] = Some(('·', slab_shader(x, slab_w)));
                 }
             }
