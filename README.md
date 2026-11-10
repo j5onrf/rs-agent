@@ -99,7 +99,7 @@
 <h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Client Surfaces</h2>
 
 <p align="center">
-  <b><a href="https://t3.codes">T3 Code</a> is the official agent developer environment for rs-agent.</b><br>
+  <b><a href="https://t3.codes">T3 Code</a> is the official agent developer environment (ADE) for rs-agent.</b><br>
   <sub>A direct pairing connecting rs-agent's native Rust execution kernel to T3 Code via stdio ACP (Agent Client Protocol).</sub>
 </p>
 
@@ -131,7 +131,7 @@
   </table>
 
   <p>
-    <sub><b>Unified Binary Bridge:</b> Embedded JSON-RPC 2.0 ACP server runs natively from <code>ai --bridge</code> without duplicate compilation units or binary drift.</sub>
+    <sub><b>Unified Binary Bridge:</b> Embedded JSON-RPC 2.0 ACP server runs natively from <code>ai --bridge</code> .</sub>
   </p>
 </div>
 
@@ -144,7 +144,7 @@
 | Invocation | Interface | Description |
 | :--- | :---: | :--- |
 | `[shortcut]` | **Shell Teleport** | Sub-millisecond router via `rs-context.md` (e.g. `lfm`, `ling`) |
-| 👤 `ai` | **Interactive Chat** | Conversational REPL with thinking gutters, context padding `/pad`, and ~180t chat profile |
+| 👤 `ai` | **Interactive Chat** | Conversational REPL with thinking gutters, line padding `/pad`, and ~180t chat profile |
 | 👤 `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security kernel |
 | `/task [goal]` | **Task Loop** | Autonomous goal loop; auto-discovers `TASK.md` when prompt is omitted |
 | `/t3` / `/t3 web` | **T3 Code ADE** | Quiet compositor handover to official T3 Code GUI with diffs & security gates |
