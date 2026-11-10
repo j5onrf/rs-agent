@@ -2,16 +2,17 @@ use crossterm::cursor::{Hide, Show};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use std::io::{self, Write};
+use std::path::Path;
 use std::process::Command;
 use std::time::{Duration, Instant};
 
 // Exact ANSI constants (inherits active terminal palette)
 const ANSI_RESET: &str = "\x1b[0m";
 const ANSI_BRIGHT: &str = "\x1b[1;36m"; // Primary theme accent
-const ANSI_ACCENT: &str = "\x1b[36m"; // Regular theme accent
-const ANSI_WHITE: &str = "\x1b[1;37m"; // Bold foreground
-const ANSI_MUTED: &str = "\x1b[90m"; // Color 8 / Muted
-const ANSI_DIM: &str = "\x1b[2m"; // Faint / Low contrast
+const ANSI_ACCENT: &str = "\x1b[36m";   // Regular theme accent
+const ANSI_WHITE: &str = "\x1b[1;37m";  // Bold foreground
+const ANSI_MUTED: &str = "\x1b[90m";    // Color 8 / Muted
+const ANSI_DIM: &str = "\x1b[2m";       // Faint / Low contrast
 
 struct RawModeGuard;
 
@@ -45,111 +46,106 @@ fn slab_shader(x: usize, total_w: usize) -> &'static str {
     }
 }
 
-fn resolve_git_status() -> String {
-    let output = Command::new("git").args(["status", "--porcelain", "-b"]).output();
-
-    match output {
-        Ok(out) if out.status.success() => {
-            let text = String::from_utf8_lossy(&out.stdout);
-            let mut lines = text.lines();
-            let header = lines.next().unwrap_or("").trim_start_matches("##").trim();
-
-            let branch = header.split("...").next().unwrap_or(header).split_whitespace().next().unwrap_or("detached");
-
-            let dirty = lines.filter(|l| !l.trim().is_empty()).count();
-            let status = if dirty == 0 {
-                "clean".to_string()
-            } else if dirty == 1 {
-                "1 modified".to_string()
-            } else {
-                format!("{} modified", dirty)
-            };
-
-            let res = format!("git: {} · {}", branch, status);
-            if res.chars().count() > 32 {
-                let truncated: String = res.chars().take(31).collect();
-                format!("{}…", truncated)
-            } else {
-                res
-            }
-        }
-        _ => "git: [none]".to_string(),
+#[inline(always)]
+fn model_initials(model: &str) -> (char, char) {
+    let mut chars = model.chars();
+    match (chars.next(), chars.next()) {
+        (Some(a), Some(b)) => (a, b),
+        (Some(a), None) => (a, ' '),
+        _ => ('R', 'A'),
     }
 }
 
-// Shared inner rows for Style 2 (Dot Slab) and Style 3 (Minimal Dot Trail)
-#[allow(clippy::manual_is_multiple_of)]
-fn render_dot_slab_inner(model: &str, profile: &str) -> (String, String) {
-    let slab_w: usize = 47;
-    let max_avail = slab_w.saturating_sub(6);
-
-    let model_clamped: String =
-        if model.chars().count() > max_avail { model.chars().take(max_avail).collect() } else { model.to_string() };
-
-    let profile_clamped: String = if profile.chars().count() > max_avail {
-        profile.chars().take(max_avail).collect()
+#[inline(always)]
+fn calculate_reveal(progress: f64) -> f64 {
+    if progress < 0.35 {
+        0.0
+    } else if progress >= 1.0 {
+        1.0
     } else {
-        profile.to_string()
+        ((progress - 0.35) / 0.65).min(1.0)
+    }
+}
+
+#[inline(always)]
+fn push_skeleton_dot(row: &mut String, x: usize, y: usize, t: f64) {
+    let band = ((x as f64 * 0.16 - y as f64 * 0.32 - t * 2.8) * 1.3).cos();
+    let intensity = if band > 0.0 { band.powi(6) } else { 0.0 };
+
+    let color = if intensity > 0.6 {
+        ANSI_WHITE
+    } else if intensity > 0.25 {
+        ANSI_BRIGHT
+    } else if intensity > 0.05 {
+        ANSI_ACCENT
+    } else {
+        ANSI_MUTED
     };
 
-    let max_txt = model_clamped.chars().count().max(profile_clamped.chars().count());
-    let mut cutout_end = (3 + max_txt + 2).min(slab_w);
-    if cutout_end % 2 != 0 && cutout_end < slab_w {
-        cutout_end += 1;
-    }
+    let ch = if intensity > 0.6 {
+        '●'
+    } else if intensity > 0.25 {
+        '•'
+    } else {
+        '·'
+    };
 
-    let mut l1 = String::with_capacity(128);
-    l1.push_str(slab_shader(0, slab_w));
-    l1.push('·');
-    l1.push_str(ANSI_RESET);
-    l1.push_str("  ");
-    l1.push_str(ANSI_WHITE);
-    l1.push_str(&model_clamped);
-    l1.push_str(ANSI_RESET);
-    let curr_vis1 = 3 + model_clamped.chars().count();
-    if curr_vis1 < cutout_end {
-        for _ in 0..(cutout_end - curr_vis1) {
-            l1.push(' ');
-        }
-    }
-    for x in cutout_end..slab_w {
-        if x % 2 == 0 {
-            l1.push_str(slab_shader(x, slab_w));
-            l1.push('·');
-            l1.push_str(ANSI_RESET);
-        } else {
-            l1.push(' ');
-        }
-    }
-
-    let mut l2 = String::with_capacity(128);
-    l2.push_str(slab_shader(0, slab_w));
-    l2.push('·');
-    l2.push_str(ANSI_RESET);
-    l2.push_str("  ");
-    l2.push_str(ANSI_MUTED);
-    l2.push_str(&profile_clamped);
-    l2.push_str(ANSI_RESET);
-    let curr_vis2 = 3 + profile_clamped.chars().count();
-    if curr_vis2 < cutout_end {
-        for _ in 0..(cutout_end - curr_vis2) {
-            l2.push(' ');
-        }
-    }
-    for x in cutout_end..slab_w {
-        if x % 2 == 0 {
-            l2.push_str(slab_shader(x, slab_w));
-            l2.push('·');
-            l2.push_str(ANSI_RESET);
-        } else {
-            l2.push(' ');
-        }
-    }
-
-    (l1, l2)
+    row.push_str(color);
+    row.push(ch);
+    row.push_str(ANSI_RESET);
 }
 
-// Progressive column-sliced laser wipe for Style 2 & 3
+// 0.003ms filesystem ancestor probe avoiding unnecessary child process spawning
+fn in_git_repo() -> bool {
+    let mut cur = std::env::current_dir().ok();
+    while let Some(dir) = cur {
+        if dir.join(".git").exists() {
+            return true;
+        }
+        cur = dir.parent().map(Path::to_path_buf);
+    }
+    false
+}
+
+fn resolve_git_status() -> String {
+    if !in_git_repo() {
+        return "git: [none]".to_string();
+    }
+
+    // --no-optional-locks guarantees no lock contention; --no-renames speeds up status
+    let Ok(out) = Command::new("git")
+        .args(["--no-optional-locks", "status", "--porcelain", "-b", "--no-renames"])
+        .output()
+    else {
+        return "git: [none]".to_string();
+    };
+
+    if !out.status.success() {
+        return "git: [none]".to_string();
+    }
+
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut lines = text.lines();
+    let header = lines.next().unwrap_or("").trim_start_matches("##").trim();
+    let branch = header.split("...").next().unwrap_or(header).split_whitespace().next().unwrap_or("detached");
+
+    let dirty = lines.filter(|l| !l.trim().is_empty()).count();
+    let status = match dirty {
+        0 => "clean".to_string(),
+        1 => "1 modified".to_string(),
+        _ => format!("{} modified", dirty),
+    };
+
+    let res = format!("git: {} · {}", branch, status);
+    if res.chars().count() > 32 {
+        let truncated: String = res.chars().take(31).collect();
+        format!("{}…", truncated)
+    } else {
+        res
+    }
+}
+
+// Progressive column-sliced laser wipe for Style 2 & 3 (col == slab_w renders full frame)
 fn render_dot_slab_inner_wipe(model: &str, profile: &str, col: usize) -> (String, String) {
     let slab_w: usize = 47;
     let max_avail = slab_w.saturating_sub(6);
@@ -232,7 +228,7 @@ fn render_dot_slab_inner_wipe(model: &str, profile: &str, col: usize) -> (String
 }
 
 pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) -> (Vec<String>, usize) {
-    let git_info = resolve_git_status();
+    let git_info = if style >= 4 { resolve_git_status() } else { String::new() };
     render_frame_inner(model, profile, &git_info, style, progress)
 }
 
@@ -306,11 +302,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             // Style 2: Dot Slab (Nothing OS) - 4 lines with snappy laser wipe
             let slab_w: usize = 47;
             let col = if progress >= 1.0 { slab_w } else { ((slab_w as f64) * progress).round() as usize };
-            let (l1, l2) = if progress >= 1.0 {
-                render_dot_slab_inner(model, profile)
-            } else {
-                render_dot_slab_inner_wipe(model, profile, col)
-            };
+            let (l1, l2) = render_dot_slab_inner_wipe(model, profile, col);
 
             let mut top = String::with_capacity(128);
             for x in 0..col.min(slab_w) {
@@ -344,11 +336,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             // Style 3: Minimal Dot Trail with snappy laser wipe
             let slab_w: usize = 47;
             let col = if progress >= 1.0 { slab_w } else { ((slab_w as f64) * progress).round() as usize };
-            let (l1, l2) = if progress >= 1.0 {
-                render_dot_slab_inner(model, profile)
-            } else {
-                render_dot_slab_inner_wipe(model, profile, col)
-            };
+            let (l1, l2) = render_dot_slab_inner_wipe(model, profile, col);
             (vec![l1, l2], 2)
         }
         4 => {
@@ -358,7 +346,6 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             let profile_chars = profile.chars().count();
             let git_chars = git_info.chars().count();
 
-            // Stack grid: 46 * 5 = 230 cells (no heap allocation, zero hash lookups)
             let mut grid: [Option<(char, &'static str)>; 230] = [None; 230];
 
             // Row 0
@@ -367,6 +354,9 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             for x in 1..box_w - 1 {
                 grid[x] = Some(('─', ANSI_BRIGHT));
             }
+            grid[2] = Some((' ', ANSI_RESET));
+            grid[3] = Some(('○', ANSI_BRIGHT));
+            grid[4] = Some((' ', ANSI_RESET));
             grid[box_w - 1] = Some(('╮', ANSI_BRIGHT));
 
             // Row 4
@@ -389,12 +379,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 grid[box_w + (3 + i)] = Some((c, ANSI_BRIGHT));
             }
             grid[2 * box_w + 3] = Some(('│', ANSI_BRIGHT));
-            let mut chars = model.chars();
-            let (ch0, ch1) = match (chars.next(), chars.next()) {
-                (Some(a), Some(b)) => (a, b),
-                (Some(a), None) => (a, ' '),
-                _ => ('R', 'A'),
-            };
+            let (ch0, ch1) = model_initials(model);
             grid[2 * box_w + 5] = Some((ch0, ANSI_WHITE));
             grid[2 * box_w + 6] = Some((ch1, ANSI_WHITE));
             grid[2 * box_w + 8] = Some(('│', ANSI_BRIGHT));
@@ -420,14 +405,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 }
             }
 
-            let reveal = if progress < 0.35 {
-                0.0
-            } else if progress >= 1.0 {
-                1.0
-            } else {
-                ((progress - 0.35) / 0.65).min(1.0)
-            };
-
+            let reveal = calculate_reveal(progress);
             let t = progress * 2.0;
             let mut lines = Vec::with_capacity(line_count);
 
@@ -445,7 +423,6 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                             _ => false,
                         };
                     let is_skeleton = is_border || is_avatar || is_text_bar;
-
                     let cell_thresh = if is_avatar { cell_dither_threshold(3, 1) } else { cell_dither_threshold(x, y) };
 
                     if progress >= 1.0 || (reveal > 0.0 && cell_thresh < reveal) {
@@ -457,26 +434,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                             row.push(' ');
                         }
                     } else if is_skeleton {
-                        let band = ((x as f64 * 0.16 - y as f64 * 0.32 - t * 2.8) * 1.3).cos();
-                        let intensity = if band > 0.0 { band.powi(6) } else { 0.0 };
-
-                        if intensity > 0.6 {
-                            row.push_str(ANSI_WHITE);
-                            row.push('●');
-                            row.push_str(ANSI_RESET);
-                        } else if intensity > 0.25 {
-                            row.push_str(ANSI_BRIGHT);
-                            row.push('•');
-                            row.push_str(ANSI_RESET);
-                        } else if intensity > 0.05 {
-                            row.push_str(ANSI_ACCENT);
-                            row.push('·');
-                            row.push_str(ANSI_RESET);
-                        } else {
-                            row.push_str(ANSI_MUTED);
-                            row.push('·');
-                            row.push_str(ANSI_RESET);
-                        }
+                        push_skeleton_dot(&mut row, x, y, t);
                     } else {
                         row.push(' ');
                     }
@@ -494,7 +452,6 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             let profile_chars = profile.chars().count();
             let git_chars = git_info.chars().count();
 
-            // Stack grid: 46 * 3 = 138 cells
             let mut grid: [Option<(char, &'static str)>; 138] = [None; 138];
 
             // Row 0
@@ -511,12 +468,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             // Row 1
             grid[box_w + 2] = Some(('│', ANSI_BRIGHT));
             grid[box_w + 3] = Some((' ', ANSI_RESET));
-            let mut chars = model.chars();
-            let (ch0, ch1) = match (chars.next(), chars.next()) {
-                (Some(a), Some(b)) => (a, b),
-                (Some(a), None) => (a, ' '),
-                _ => ('R', 'A'),
-            };
+            let (ch0, ch1) = model_initials(model);
             grid[box_w + 4] = Some((ch0, ANSI_WHITE));
             grid[box_w + 5] = Some((ch1, ANSI_WHITE));
             grid[box_w + 6] = Some((' ', ANSI_RESET));
@@ -538,14 +490,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 }
             }
 
-            let reveal = if progress < 0.35 {
-                0.0
-            } else if progress >= 1.0 {
-                1.0
-            } else {
-                ((progress - 0.35) / 0.65).min(1.0)
-            };
-
+            let reveal = calculate_reveal(progress);
             let t = progress * 2.0;
             let mut lines = Vec::with_capacity(line_count);
 
@@ -556,7 +501,6 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                     _ => git_chars.max(12).min(box_w - 13),
                 };
 
-                // Defend against out-of-bounds indexing: clamp row_end strictly to box_w (46)
                 let row_end = if progress >= 1.0 {
                     match y {
                         0 => (10 + model_chars).min(box_w),
@@ -573,7 +517,6 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                     let is_avatar = (2..8).contains(&x);
                     let is_text_bar = x >= 10 && x < 10 + bar_len;
                     let is_skeleton = is_avatar || is_text_bar;
-
                     let cell_thresh = if is_avatar { cell_dither_threshold(2, 0) } else { cell_dither_threshold(x, y) };
 
                     if progress >= 1.0 || (reveal > 0.0 && cell_thresh < reveal) {
@@ -585,26 +528,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                             row.push(' ');
                         }
                     } else if is_skeleton {
-                        let band = ((x as f64 * 0.16 - y as f64 * 0.32 - t * 2.8) * 1.3).cos();
-                        let intensity = if band > 0.0 { band.powi(6) } else { 0.0 };
-
-                        if intensity > 0.6 {
-                            row.push_str(ANSI_WHITE);
-                            row.push('●');
-                            row.push_str(ANSI_RESET);
-                        } else if intensity > 0.25 {
-                            row.push_str(ANSI_BRIGHT);
-                            row.push('•');
-                            row.push_str(ANSI_RESET);
-                        } else if intensity > 0.05 {
-                            row.push_str(ANSI_ACCENT);
-                            row.push('·');
-                            row.push_str(ANSI_RESET);
-                        } else {
-                            row.push_str(ANSI_MUTED);
-                            row.push('·');
-                            row.push_str(ANSI_RESET);
-                        }
+                        push_skeleton_dot(&mut row, x, y, t);
                     } else {
                         row.push(' ');
                     }
@@ -617,7 +541,6 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
         }
         6 => {
             // Style 6: Dot Slab Avatar Badge (Style 5 + Style 2)
-            // 5-line halftone skeleton wave animation across all dots & badge elements
             let slab_w: usize = 47;
             let line_count: usize = 5;
             let max_avail = slab_w.saturating_sub(14);
@@ -632,10 +555,9 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 cutout_end += 1;
             }
 
-            // Stack grid: 47 * 5 = 235 cells (zero heap allocation)
             let mut grid: [Option<(char, &'static str)>; 235] = [None; 235];
 
-            // Row 0: Top dot border with signature glyph at col 4
+            // Row 0
             for x in 0..slab_w {
                 if x == 4 {
                     grid[x] = Some(('○', ANSI_BRIGHT));
@@ -644,41 +566,34 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 }
             }
 
-            // Row 4: Bottom dot border
+            // Row 4
             for x in 0..slab_w {
                 if x % 2 == 0 {
                     grid[4 * slab_w + x] = Some(('·', slab_shader(x, slab_w)));
                 }
             }
 
-            // Rows 1..=3: Left border dot
+            // Rows 1..=3
             for y in 1..=3 {
                 grid[y * slab_w] = Some(('·', slab_shader(0, slab_w)));
             }
 
-            // Avatar frame (cols 3..9)
+            // Avatar frame
             let av1 = "╭────╮";
             for (i, c) in av1.chars().enumerate() {
                 grid[slab_w + 3 + i] = Some((c, ANSI_BRIGHT));
             }
-
             grid[2 * slab_w + 3] = Some(('│', ANSI_BRIGHT));
-            let mut chars = model.chars();
-            let (ch0, ch1) = match (chars.next(), chars.next()) {
-                (Some(a), Some(b)) => (a, b),
-                (Some(a), None) => (a, ' '),
-                _ => ('R', 'A'),
-            };
+            let (ch0, ch1) = model_initials(model);
             grid[2 * slab_w + 5] = Some((ch0, ANSI_WHITE));
             grid[2 * slab_w + 6] = Some((ch1, ANSI_WHITE));
             grid[2 * slab_w + 8] = Some(('│', ANSI_BRIGHT));
-
             let av3 = "╰────╯";
             for (i, c) in av3.chars().enumerate() {
                 grid[3 * slab_w + 3 + i] = Some((c, ANSI_BRIGHT));
             }
 
-            // Content lines (cols 11..)
+            // Content lines
             for (i, c) in model.chars().take(max_avail).enumerate() {
                 grid[slab_w + (11 + i)] = Some((c, ANSI_WHITE));
             }
@@ -689,7 +604,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 grid[3 * slab_w + (11 + i)] = Some((c, ANSI_MUTED));
             }
 
-            // Trailing dots after text cutout
+            // Trailing dots
             for y in 1..=3 {
                 for x in cutout_end..slab_w {
                     if x % 2 == 0 {
@@ -698,14 +613,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 }
             }
 
-            let reveal = if progress < 0.35 {
-                0.0
-            } else if progress >= 1.0 {
-                1.0
-            } else {
-                ((progress - 0.35) / 0.65).min(1.0)
-            };
-
+            let reveal = calculate_reveal(progress);
             let t = progress * 2.0;
             let mut lines = Vec::with_capacity(line_count);
 
@@ -713,12 +621,10 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                 let mut row = String::with_capacity(512);
 
                 for x in 0..slab_w {
-                    // All 5 lines participate in the Style 5 halftone skeleton wave
                     let is_avatar = (3..9).contains(&x) && (1..=3).contains(&y);
                     let is_text_bar = (1..=3).contains(&y) && (x >= 11 && x < cutout_end);
                     let is_dot = (y == 0 || y == 4 || x == 0 || x >= cutout_end) && (x % 2 == 0);
                     let is_skeleton = is_avatar || is_text_bar || is_dot;
-
                     let cell_thresh = if is_avatar { cell_dither_threshold(3, 1) } else { cell_dither_threshold(x, y) };
 
                     if progress >= 1.0 || (reveal > 0.0 && cell_thresh < reveal) {
@@ -730,26 +636,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                             row.push(' ');
                         }
                     } else if is_skeleton {
-                        let band = ((x as f64 * 0.16 - y as f64 * 0.32 - t * 2.8) * 1.3).cos();
-                        let intensity = if band > 0.0 { band.powi(6) } else { 0.0 };
-
-                        if intensity > 0.6 {
-                            row.push_str(ANSI_WHITE);
-                            row.push('●');
-                            row.push_str(ANSI_RESET);
-                        } else if intensity > 0.25 {
-                            row.push_str(ANSI_BRIGHT);
-                            row.push('•');
-                            row.push_str(ANSI_RESET);
-                        } else if intensity > 0.05 {
-                            row.push_str(ANSI_ACCENT);
-                            row.push('·');
-                            row.push_str(ANSI_RESET);
-                        } else {
-                            row.push_str(ANSI_MUTED);
-                            row.push('·');
-                            row.push_str(ANSI_RESET);
-                        }
+                        push_skeleton_dot(&mut row, x, y, t);
                     } else {
                         row.push(' ');
                     }
@@ -766,9 +653,9 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
 }
 
 pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Option<char> {
-    let git_info = resolve_git_status();
-
-    if !animate {
+    // Early exit without terminal switching if unbuffered or raw mode fails
+    if !animate || enable_raw_mode().is_err() {
+        let git_info = if style >= 4 { resolve_git_status() } else { String::new() };
         let (lines, _) = render_frame_inner(model, profile, &git_info, style, 1.0);
         let stdout = io::stdout();
         let mut handle = stdout.lock();
@@ -780,19 +667,14 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
         return None;
     }
 
-    if enable_raw_mode().is_err() {
-        let (lines, _) = render_frame_inner(model, profile, &git_info, style, 1.0);
-        let stdout = io::stdout();
-        let mut handle = stdout.lock();
-        for line in lines {
-            let _ = writeln!(handle, "{}", line);
-        }
-        let _ = writeln!(handle);
-        let _ = handle.flush();
-        return None;
-    }
+    // Zero-latency boot: spawn git status in background so Frame 0 renders immediately
+    let mut git_handle = if style >= 4 {
+        Some(std::thread::spawn(resolve_git_status))
+    } else {
+        None
+    };
+    let mut git_info = String::from("git: scanning…");
 
-    // RAII guard restores terminal mode and cursor on any return or panic
     let _guard = RawModeGuard;
     let mut stdout = io::stdout();
     let _ = crossterm::execute!(stdout, Hide);
@@ -810,6 +692,17 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
     let mut first_frame = true;
 
     loop {
+        // Collect background git status as soon as it completes
+        if let Some(ref handle) = git_handle {
+            if handle.is_finished() {
+                if let Some(h) = git_handle.take() {
+                    if let Ok(info) = h.join() {
+                        git_info = info;
+                    }
+                }
+            }
+        }
+
         let elapsed = start_time.elapsed();
         let progress = (elapsed.as_secs_f64() / duration.as_secs_f64()).min(1.0);
 
@@ -840,6 +733,13 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
                     }
                 }
             }
+        }
+    }
+
+    // Ensure background git resolution has completed before rendering final resting frame
+    if let Some(h) = git_handle.take() {
+        if let Ok(info) = h.join() {
+            git_info = info;
         }
     }
 

@@ -71,7 +71,7 @@
 ·  LFM3-1.7B  · · · · · · · · · · · · · · · · ·
 ·  chat       · · · · · · · · · · · · · · · · ·
 
-╭────────────────────────────────────────────╮
+╭─ ○ ────────────────────────────────────────╮
 │  ╭────╮  LFM3-1.7B                         │
 │  │ LF │  chat                              │
 │  ╰────╯  git: master · clean               │
@@ -144,7 +144,7 @@
 | Invocation | Interface | Description |
 | :--- | :---: | :--- |
 | `[shortcut]` | **Shell Teleport** | Sub-millisecond router via `rs-context.md` (e.g. `lfm`, `ling`) |
-| 👤 `ai` | **Interactive Chat** | Conversational REPL with thinking gutters, responsive `/pad`, and ~180t ceiling |
+| 👤 `ai` | **Interactive Chat** | Conversational REPL with thinking gutters, context padding `/pad`, and ~180t chat profile |
 | 👤 `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security kernel |
 | `/task [goal]` | **Task Loop** | Autonomous goal loop; auto-discovers `TASK.md` when prompt is omitted |
 | `/t3` / `/t3 web` | **T3 Code ADE** | Quiet compositor handover to official T3 Code GUI with diffs & security gates |
