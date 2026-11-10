@@ -641,17 +641,31 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         if input.starts_with("/box") {
             let parts: Vec<&str> = input.split_whitespace().collect();
             current_box_style = if parts.len() > 1 {
-                parts[1].parse::<usize>().unwrap_or((current_box_style % 5) + 1)
+                let parsed = parts[1].parse::<usize>().unwrap_or((current_box_style % 6) + 1);
+                if (1..=6).contains(&parsed) {
+                    parsed
+                } else {
+                    (current_box_style % 6) + 1
+                }
             } else {
-                (current_box_style % 5) + 1
+                (current_box_style % 6) + 1
             };
             state::set_box_style(current_box_style);
 
-            print!("\x1b[H\x1b[2J");
-            println!();
-            println!("\x1b[1;32m✓\x1b[0m \x1b[2mTheme set to box style\x1b[0m \x1b[1;36m{}\x1b[0m", current_box_style);
-            let second_line = if cfg.is_agent { &cfg.profile_name } else { "chat" };
-            ui::draw_box(&provider.model, second_line, current_box_style, true);
+            let second_line = if cfg.is_agent {
+                if instance_num > 1 {
+                    format!("{} · {}", cfg.profile_name, instance_num)
+                } else {
+                    cfg.profile_name.clone()
+                }
+            } else {
+                if instance_num > 1 {
+                    format!("chat · {}", instance_num)
+                } else {
+                    "chat".to_string()
+                }
+            };
+            ui::draw_box(&provider.model, &second_line, current_box_style, true);
             let _ = io::stdout().flush();
             continue;
         }

@@ -149,6 +149,84 @@ fn render_dot_slab_inner(model: &str, profile: &str) -> (String, String) {
     (l1, l2)
 }
 
+// Progressive column-sliced laser wipe for Style 2 & 3
+fn render_dot_slab_inner_wipe(model: &str, profile: &str, col: usize) -> (String, String) {
+    let slab_w: usize = 47;
+    let max_avail = slab_w.saturating_sub(6);
+
+    let model_clamped: String =
+        if model.chars().count() > max_avail { model.chars().take(max_avail).collect() } else { model.to_string() };
+
+    let profile_clamped: String = if profile.chars().count() > max_avail {
+        profile.chars().take(max_avail).collect()
+    } else {
+        profile.to_string()
+    };
+
+    let max_txt = model_clamped.chars().count().max(profile_clamped.chars().count());
+    let mut cutout_end = (3 + max_txt + 2).min(slab_w);
+    if cutout_end % 2 != 0 && cutout_end < slab_w {
+        cutout_end += 1;
+    }
+
+    let render_line = |text: &str, color: &'static str| -> String {
+        let mut l = String::with_capacity(128);
+        if col == 0 {
+            return l;
+        }
+
+        // Col 0: Dot
+        l.push_str(slab_shader(0, slab_w));
+        l.push('·');
+        l.push_str(ANSI_RESET);
+
+        if col <= 1 { return l; }
+        l.push(' ');
+        if col <= 2 { return l; }
+        l.push(' ');
+
+        // Text starts at col 3
+        let chars: Vec<char> = text.chars().collect();
+        let txt_len = chars.len();
+        let txt_visible = if col > 3 { (col - 3).min(txt_len) } else { 0 };
+
+        if txt_visible > 0 {
+            l.push_str(color);
+            for c in &chars[..txt_visible] {
+                l.push(*c);
+            }
+            l.push_str(ANSI_RESET);
+        }
+
+        // Padding spaces before dot trail
+        let curr_x = 3 + txt_len;
+        if col > curr_x && curr_x < cutout_end {
+            let pad_end = col.min(cutout_end);
+            for _ in curr_x..pad_end {
+                l.push(' ');
+            }
+        }
+
+        // Trailing dots
+        if col > cutout_end {
+            let trail_end = col.min(slab_w);
+            for x in cutout_end..trail_end {
+                if x % 2 == 0 {
+                    l.push_str(slab_shader(x, slab_w));
+                    l.push('·');
+                    l.push_str(ANSI_RESET);
+                } else {
+                    l.push(' ');
+                }
+            }
+        }
+
+        l
+    };
+
+    (render_line(&model_clamped, ANSI_WHITE), render_line(&profile_clamped, ANSI_MUTED))
+}
+
 pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) -> (Vec<String>, usize) {
     let git_info = resolve_git_status();
     render_frame_inner(model, profile, &git_info, style, progress)
@@ -221,12 +299,17 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             }
         }
         2 => {
-            // Style 2: Dot Slab (Nothing OS) - 4 lines, 47 cols odd
+            // Style 2: Dot Slab (Nothing OS) - 4 lines with snappy laser wipe
             let slab_w: usize = 47;
-            let (l1, l2) = render_dot_slab_inner(model, profile);
+            let col = if progress >= 1.0 { slab_w } else { ((slab_w as f64) * progress).round() as usize };
+            let (l1, l2) = if progress >= 1.0 {
+                render_dot_slab_inner(model, profile)
+            } else {
+                render_dot_slab_inner_wipe(model, profile, col)
+            };
 
             let mut top = String::with_capacity(128);
-            for x in 0..slab_w {
+            for x in 0..col.min(slab_w) {
                 if x == 4 {
                     top.push_str(ANSI_BRIGHT);
                     top.push('○');
@@ -241,7 +324,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             }
 
             let mut bot = String::with_capacity(128);
-            for x in 0..slab_w {
+            for x in 0..col.min(slab_w) {
                 if x % 2 == 0 {
                     bot.push_str(slab_shader(x, slab_w));
                     bot.push('·');
@@ -254,8 +337,14 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             (vec![top, l1, l2, bot], 4)
         }
         3 => {
-            // Style 3: Minimal Dot Trail (Exact Style 2 inner rows without top and bottom)
-            let (l1, l2) = render_dot_slab_inner(model, profile);
+            // Style 3: Minimal Dot Trail with snappy laser wipe
+            let slab_w: usize = 47;
+            let col = if progress >= 1.0 { slab_w } else { ((slab_w as f64) * progress).round() as usize };
+            let (l1, l2) = if progress >= 1.0 {
+                render_dot_slab_inner(model, profile)
+            } else {
+                render_dot_slab_inner_wipe(model, profile, col)
+            };
             (vec![l1, l2], 2)
         }
         4 => {
@@ -522,6 +611,155 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
 
             (lines, line_count)
         }
+        6 => {
+            // Style 6: Dot Slab Avatar Badge (Style 5 + Style 2)
+            // 5-line halftone skeleton wave animation across all dots & badge elements
+            let slab_w: usize = 47;
+            let line_count: usize = 5;
+            let max_avail = slab_w.saturating_sub(14);
+
+            let m_len = model.chars().count().min(max_avail);
+            let p_len = profile.chars().count().min(max_avail);
+            let g_len = git_info.chars().count().min(max_avail);
+            let max_txt = m_len.max(p_len).max(g_len);
+
+            let mut cutout_end = (11 + max_txt + 2).min(slab_w);
+            if cutout_end % 2 != 0 && cutout_end < slab_w {
+                cutout_end += 1;
+            }
+
+            // Stack grid: 47 * 5 = 235 cells (zero heap allocation)
+            let mut grid: [Option<(char, &'static str)>; 235] = [None; 235];
+
+            // Row 0: Top dot border
+            for x in 0..slab_w {
+                if x % 2 == 0 {
+                    grid[x] = Some(('·', slab_shader(x, slab_w)));
+                }
+            }
+
+            // Row 4: Bottom dot border
+            for x in 0..slab_w {
+                if x % 2 == 0 {
+                    grid[4 * slab_w + x] = Some(('·', slab_shader(x, slab_w)));
+                }
+            }
+
+            // Rows 1..=3: Left border dot
+            for y in 1..=3 {
+                grid[y * slab_w] = Some(('·', slab_shader(0, slab_w)));
+            }
+
+            // Avatar frame (cols 3..9)
+            let av1 = "╭────╮";
+            for (i, c) in av1.chars().enumerate() {
+                grid[slab_w + 3 + i] = Some((c, ANSI_BRIGHT));
+            }
+
+            grid[2 * slab_w + 3] = Some(('│', ANSI_BRIGHT));
+            let mut chars = model.chars();
+            let (ch0, ch1) = match (chars.next(), chars.next()) {
+                (Some(a), Some(b)) => (a, b),
+                (Some(a), None) => (a, ' '),
+                _ => ('R', 'A'),
+            };
+            grid[2 * slab_w + 5] = Some((ch0, ANSI_WHITE));
+            grid[2 * slab_w + 6] = Some((ch1, ANSI_WHITE));
+            grid[2 * slab_w + 8] = Some(('│', ANSI_BRIGHT));
+
+            let av3 = "╰────╯";
+            for (i, c) in av3.chars().enumerate() {
+                grid[3 * slab_w + 3 + i] = Some((c, ANSI_BRIGHT));
+            }
+
+            // Content lines (cols 11..)
+            for (i, c) in model.chars().take(max_avail).enumerate() {
+                grid[slab_w + (11 + i)] = Some((c, ANSI_WHITE));
+            }
+            for (i, c) in profile.chars().take(max_avail).enumerate() {
+                grid[2 * slab_w + (11 + i)] = Some((c, ANSI_ACCENT));
+            }
+            for (i, c) in git_info.chars().take(max_avail).enumerate() {
+                grid[3 * slab_w + (11 + i)] = Some((c, ANSI_MUTED));
+            }
+
+            // Trailing dots after text cutout
+            for y in 1..=3 {
+                for x in cutout_end..slab_w {
+                    if x % 2 == 0 {
+                        grid[y * slab_w + x] = Some(('·', slab_shader(x, slab_w)));
+                    }
+                }
+            }
+
+            let reveal = if progress < 0.35 {
+                0.0
+            } else if progress >= 1.0 {
+                1.0
+            } else {
+                ((progress - 0.35) / 0.65).min(1.0)
+            };
+
+            let t = progress * 2.0;
+            let mut lines = Vec::with_capacity(line_count);
+
+            for y in 0..line_count {
+                let mut row = String::with_capacity(512);
+
+                for x in 0..slab_w {
+                    // All 5 lines participate in the Style 5 halftone skeleton wave
+                    let is_avatar = (3..9).contains(&x) && (1..=3).contains(&y);
+                    let is_text_bar = (1..=3).contains(&y) && (x >= 11 && x < cutout_end);
+                    let is_dot = (y == 0 || y == 4 || x == 0 || x >= cutout_end) && (x % 2 == 0);
+                    let is_skeleton = is_avatar || is_text_bar || is_dot;
+
+                    let cell_thresh = if is_avatar {
+                        cell_dither_threshold(3, 1)
+                    } else {
+                        cell_dither_threshold(x, y)
+                    };
+
+                    if progress >= 1.0 || (reveal > 0.0 && cell_thresh < reveal) {
+                        if let Some((ch, col)) = grid[y * slab_w + x] {
+                            row.push_str(col);
+                            row.push(ch);
+                            row.push_str(ANSI_RESET);
+                        } else {
+                            row.push(' ');
+                        }
+                    } else if is_skeleton {
+                        let band = ((x as f64 * 0.16 - y as f64 * 0.32 - t * 2.8) * 1.3).cos();
+                        let intensity = if band > 0.0 { band.powi(6) } else { 0.0 };
+
+                        if intensity > 0.6 {
+                            row.push_str(ANSI_WHITE);
+                            row.push('●');
+                            row.push_str(ANSI_RESET);
+                        } else if intensity > 0.25 {
+                            row.push_str(ANSI_BRIGHT);
+                            row.push('•');
+                            row.push_str(ANSI_RESET);
+                        } else if intensity > 0.05 {
+                            row.push_str(ANSI_ACCENT);
+                            row.push('·');
+                            row.push_str(ANSI_RESET);
+                        } else {
+                            row.push_str(ANSI_MUTED);
+                            row.push('·');
+                            row.push_str(ANSI_RESET);
+                        }
+                    } else {
+                        row.push(' ');
+                    }
+                }
+
+                lines.push(row);
+            }
+
+            (lines, line_count)
+        }
+
+
         _ => render_frame_inner(model, profile, git_info, 1, progress),
     }
 }
@@ -561,8 +799,9 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
 
     let duration = match style {
         1 => Duration::from_millis(160),
-        4 | 5 => Duration::from_millis(550),
-        _ => Duration::from_millis(100),
+        2 | 3 => Duration::from_millis(200),
+        4 | 5 | 6 => Duration::from_millis(550),
+        _ => Duration::from_millis(200),
     };
 
     let start_time = Instant::now();

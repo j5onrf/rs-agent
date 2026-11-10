@@ -26,7 +26,7 @@ pub fn get_box_style() -> usize {
     let path = get_state_path();
     if let Ok(content) = fs::read_to_string(path) {
         if let Ok(state) = serde_json::from_str::<AppState>(&content) {
-            if state.box_style >= 1 && state.box_style <= 5 {
+            if state.box_style >= 1 && state.box_style <= 6 {
                 return state.box_style;
             }
         }
