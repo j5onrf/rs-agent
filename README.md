@@ -131,7 +131,7 @@
   </table>
 
   <p>
-    <sub><b>Unified Binary Bridge:</b> Embedded JSON-RPC 2.0 ACP server runs natively from <code>ai --bridge</code> .</sub>
+    <sub><b>Unified Binary Bridge:</b> Embedded JSON-RPC 2.0 ACP server runs natively from <code>ai --bridge</code></sub>
   </p>
 </div>
 
