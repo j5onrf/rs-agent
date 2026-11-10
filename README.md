@@ -83,7 +83,7 @@
   
 · · ○ · · · · · · · · · · · · · · · · · · · · ·
 ·  ╭────╮  LFM3-1.7B                · · · · · ·
-·  │ Li │  lfm3                     · · · · · ·
+·  │ LF │  lfm3                     · · · · · ·
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
@@ -99,7 +99,7 @@
 <h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Client Surfaces</h2>
 
 <p align="center">
-  <b><a href="https://t3.codes">T3 Code</a> is the official agent developer environment (ADE) for Rs-Agent.</b><br>
+  <b><a href="https://t3.codes">T3 Code</a> is the official agent developer environment (ADE) for rs-agent.</b><br>
   <sub>A direct pairing connecting rs-agent's native Rust execution kernel to T3 Code via stdio ACP (Agent Client Protocol).</sub>
 </p>
 
