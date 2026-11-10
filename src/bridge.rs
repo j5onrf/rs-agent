@@ -220,7 +220,7 @@ fn generate_write_diff(boundary: &SecurityBoundary, path_str: &str, new_content:
     (old, new_content.to_string())
 }
 
-async fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>, bool) {
+async fn assemble_system_prompt(workspace: &Path) -> Result<(String, Option<Value>, bool)> {
     let cfg = WorkspaceConfig::load_or_default(workspace);
     let inherited_profile = std::env::var("AI_ACTIVE_PROFILE").unwrap_or_else(|_| cfg.profile_name.clone());
 
@@ -229,18 +229,14 @@ async fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>, boo
 
     let active_profile = Profile::load(&inherited_profile);
 
+    let prof = active_profile
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found in ~/.config/rs-agent/profiles/", inherited_profile))?;
+
     let mut prompt = if is_agent {
-        if let Some(prof) = &active_profile {
-            format!("{}\n\nWorkspace Path: {}", prof.system_prompt, workspace.display())
-        } else {
-            format!("You are an autonomous agent working in workspace: {}.", workspace.display())
-        }
+        format!("{}\n\nWorkspace Path: {}", prof.system_prompt, workspace.display())
     } else {
-        if let Some(prof) = &active_profile {
-            prof.system_prompt.clone()
-        } else {
-            "You are an articulate, perceptive, and intellectually honest conversational partner.".to_string()
-        }
+        prof.system_prompt.clone()
     };
 
     if let Some(global_rules) = config::load_global_instructions() {
@@ -273,7 +269,7 @@ async fn assemble_system_prompt(workspace: &Path) -> (String, Option<Value>, boo
     let active_tools =
         if is_agent { Some(tools::get_tools_schema_with_mcp(&cfg.tier, false, &mcp_servers).await) } else { None };
 
-    (prompt, active_tools, is_agent)
+    Ok((prompt, active_tools, is_agent))
 }
 
 pub async fn run_bridge() -> Result<()> {
@@ -359,7 +355,13 @@ pub async fn run_bridge() -> Result<()> {
                     .map(PathBuf::from)
                     .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
-                let (sys_prompt, active_tools, is_agent) = assemble_system_prompt(&cwd).await;
+                let (sys_prompt, active_tools, is_agent) = match assemble_system_prompt(&cwd).await {
+                    Ok(v) => v,
+                    Err(e) => {
+                        send_rpc(req_id, None, Some(json!({ "code": -32603, "message": e.to_string() })));
+                        continue;
+                    }
+                };
                 let history = vec![ChatMessage::system(sys_prompt)];
 
                 sessions.lock().await.insert(
@@ -498,10 +500,11 @@ pub async fn run_bridge() -> Result<()> {
                     };
 
                     if let Some(ws) = ws_opt {
-                        let (sys_prompt, _, _) = assemble_system_prompt(&ws).await;
-                        let mut lock = sessions.lock().await;
-                        if let Some(sess) = lock.get_mut(&sid) {
-                            sess.history = vec![ChatMessage::system(sys_prompt)];
+                        if let Ok((sys_prompt, _, _)) = assemble_system_prompt(&ws).await {
+                            let mut lock = sessions.lock().await;
+                            if let Some(sess) = lock.get_mut(&sid) {
+                                sess.history = vec![ChatMessage::system(sys_prompt)];
+                            }
                         }
                     }
 

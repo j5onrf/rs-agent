@@ -186,12 +186,12 @@ fn handle_new_project(name: &str, intents_arg: Option<&str>) -> anyhow::Result<(
     Ok(())
 }
 
-fn build_system_prompt(active_profile: &Option<Profile>, active_skills: &[String]) -> String {
-    let mut prompt = if let Some(prof) = active_profile {
-        prof.system_prompt.clone()
-    } else {
-        "You are an articulate, perceptive, and intellectually honest conversational partner.".to_string()
-    };
+fn build_system_prompt(active_profile: &Profile, active_skills: &[String]) -> String {
+    let mut prompt = active_profile.system_prompt.clone();
+
+    if let Some(global_rules) = rs_agent::config::load_global_instructions() {
+        prompt.push_str(&format!("\n\n---\nGLOBAL SYSTEM INSTRUCTIONS:\n{}", global_rules));
+    }
 
     for sk_name in active_skills {
         if let Some(sk) = Skill::load(sk_name) {
@@ -357,8 +357,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         c
     };
 
-    let mut active_profile = if cfg.is_agent { Profile::load(&cfg.profile_name) } else { Profile::load("chat") };
-    client.set_reasoning_budget(active_profile.as_ref().and_then(|p| p.reasoning_budget));
+    let mut active_profile = Profile::load(&cfg.profile_name)
+        .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found in ~/.config/rs-agent/profiles/", cfg.profile_name))?;
+    client.set_reasoning_budget(active_profile.reasoning_budget);
 
     let (instance_num, _lock_guard) = resolve_instance_number(&cfg.profile_name);
     let second_line = if cfg.is_agent {
@@ -384,7 +385,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
     let mut system_prompt = build_system_prompt(&active_profile, &active_skills);
     let mut history = vec![ChatMessage::system(&system_prompt)];
-    let mcp_servers = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
+    let mcp_servers = active_profile.mcp_servers.clone();
     let mut active_tools = if cfg.is_agent {
         Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &mcp_servers).await)
     } else {
@@ -533,35 +534,39 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             }
 
             if let Some(new_prof) = Profile::select_interactive(target_dir, &cfg.profile_name) {
-                cfg.profile_name = new_prof;
-                active_profile = Profile::load(&cfg.profile_name);
-                client.set_reasoning_budget(active_profile.as_ref().and_then(|p| p.reasoning_budget));
+                if let Some(loaded) = Profile::load(&new_prof) {
+                    cfg.profile_name = new_prof;
+                    cfg.tier = loaded.tier.clone();
+                    cfg.adapters = loaded.adapters;
+                    cfg.delegate = loaded.delegate;
+                    client.set_reasoning_budget(loaded.reasoning_budget);
+                    let new_mcp = loaded.mcp_servers.clone();
+                    active_profile = loaded;
 
-                if let Some(p) = &active_profile {
-                    cfg.tier = p.tier.clone();
-                    cfg.adapters = p.adapters;
-                    cfg.delegate = p.delegate;
-                }
+                    system_prompt = build_system_prompt(&active_profile, &active_skills);
+                    let _ = cfg.save(target_dir);
+                    router = matcher::ContextRouter::load();
 
-                system_prompt = build_system_prompt(&active_profile, &active_skills);
-                let _ = cfg.save(target_dir);
-                router = matcher::ContextRouter::load();
+                    history.clear();
+                    last_total_tokens = 0;
+                    history.push(ChatMessage::system(&system_prompt));
+                    active_tools = if cfg.is_agent {
+                        Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &new_mcp).await)
+                    } else {
+                        None
+                    };
 
-                history.clear();
-                last_total_tokens = 0;
-                history.push(ChatMessage::system(&system_prompt));
-                let new_mcp = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
-                active_tools = if cfg.is_agent {
-                    Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &new_mcp).await)
+                    print!("\x1b[H\x1b[2J");
+                    println!();
+                    println!(
+                        "  \x1b[1;32m✓\x1b[0m \x1b[2mProfile set to:\x1b[0m \x1b[1;36m{}\x1b[0m",
+                        cfg.profile_name
+                    );
+                    ui::draw_box(&provider.model, &cfg.profile_name, current_box_style, false);
+                    let _ = io::stdout().flush();
                 } else {
-                    None
-                };
-
-                print!("\x1b[H\x1b[2J");
-                println!();
-                println!("\x1b[1;32m✓\x1b[0m \x1b[2mProfile set to:\x1b[0m \x1b[1;36m{}\x1b[0m", cfg.profile_name);
-                ui::draw_box(&provider.model, &cfg.profile_name, current_box_style, false);
-                let _ = io::stdout().flush();
+                    println!("  \x1b[1;31m✗\x1b[0m \x1b[2mProfile '{}' not found in profiles/\x1b[0m\n", new_prof);
+                }
             }
             continue;
         }

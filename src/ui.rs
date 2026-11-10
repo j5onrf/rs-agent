@@ -180,9 +180,13 @@ fn render_dot_slab_inner_wipe(model: &str, profile: &str, col: usize) -> (String
         l.push('·');
         l.push_str(ANSI_RESET);
 
-        if col <= 1 { return l; }
+        if col <= 1 {
+            return l;
+        }
         l.push(' ');
-        if col <= 2 { return l; }
+        if col <= 2 {
+            return l;
+        }
         l.push(' ');
 
         // Text starts at col 3
@@ -715,11 +719,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                     let is_dot = (y == 0 || y == 4 || x == 0 || x >= cutout_end) && (x % 2 == 0);
                     let is_skeleton = is_avatar || is_text_bar || is_dot;
 
-                    let cell_thresh = if is_avatar {
-                        cell_dither_threshold(3, 1)
-                    } else {
-                        cell_dither_threshold(x, y)
-                    };
+                    let cell_thresh = if is_avatar { cell_dither_threshold(3, 1) } else { cell_dither_threshold(x, y) };
 
                     if progress >= 1.0 || (reveal > 0.0 && cell_thresh < reveal) {
                         if let Some((ch, col)) = grid[y * slab_w + x] {
@@ -760,7 +760,6 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
 
             (lines, line_count)
         }
-
 
         _ => render_frame_inner(model, profile, git_info, 1, progress),
     }

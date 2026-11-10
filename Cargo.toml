@@ -1,6 +1,6 @@
 [package]
 name = "rs-agent"
-version = "0.5.4"
+version = "0.5.7"
 edition = "2021"
 
 [workspace]
