@@ -367,6 +367,9 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             for x in 1..box_w - 1 {
                 grid[x] = Some(('─', ANSI_BRIGHT));
             }
+            grid[2] = Some((' ', ANSI_RESET));
+            grid[3] = Some(('○', ANSI_BRIGHT));
+            grid[4] = Some((' ', ANSI_RESET));
             grid[box_w - 1] = Some(('╮', ANSI_BRIGHT));
 
             // Row 4
