@@ -337,9 +337,22 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         let mut c = WorkspaceConfig::load_or_default(target_dir);
         c.is_agent = true;
 
-        if Profile::load(&c.profile_name).is_none() {
-            let dir_name = target_dir.file_name().and_then(|n| n.to_str()).unwrap_or("agent").to_string();
-            c.profile_name = Profile::resolve_for_workspace(&dir_name, &provider.model, Some(&provider.base_url));
+        let has_config = target_dir.join(".rs/config.json").is_file();
+        let dir_name = target_dir.file_name().and_then(|n| n.to_str()).unwrap_or("agent").to_string();
+
+        let needs_profile = !has_config || c.profile_name == "chat" || Profile::load(&c.profile_name).is_none();
+        if needs_profile {
+            if Profile::load(&dir_name).is_some() {
+                c.profile_name = dir_name;
+            } else if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+                if let Some(selected) = Profile::select_interactive(target_dir, &c.profile_name) {
+                    c.profile_name = selected;
+                } else {
+                    c.profile_name = Profile::resolve_for_workspace(&dir_name, &provider.model, Some(&provider.base_url));
+                }
+            } else {
+                c.profile_name = Profile::resolve_for_workspace(&dir_name, &provider.model, Some(&provider.base_url));
+            }
         }
 
         if let Some(p) = Profile::load(&c.profile_name) {
