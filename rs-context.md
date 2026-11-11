@@ -26,6 +26,7 @@ date "+Current Date: %A, %B %-d, %Y" ---> get date
 ~/.config/rs-agent/tools/eval-stack/eval-stack ---> eva
 
 # --- Gated Tools ---
+[gate] ~/.config/rs-agent/tools/git-backup/git-backup ---> gitbackup
 [gate] date "+Current Date: %A, %B %-d, %Y" ---> test gate
 ```
 

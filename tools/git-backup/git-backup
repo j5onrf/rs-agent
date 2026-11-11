@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -e
+
+# Verify git repository
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo -e "  \033[1;31m✗ [gitbackup]\033[0m Not inside a git repository."
+    exit 1
+fi
+
+TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
+BRANCH_NAME="backup-snapshot"
+
+# Stage all files
+git add -A
+
+# Commit (allow empty so it never fails even if clean)
+git commit -m "State before changes: $TIMESTAMP" --allow-empty --quiet
+
+# Update/create the backup branch pointer
+git branch -f "$BRANCH_NAME"
+
+COMMIT_HASH=$(git rev-parse --short HEAD)
+echo -e "  \033[1;32m✓ [gitbackup]\033[0m Snapshot saved to branch \033[1;36m${BRANCH_NAME}\033[0m (\033[33m${COMMIT_HASH}\033[0m @ ${TIMESTAMP})"
