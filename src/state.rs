@@ -9,63 +9,60 @@ pub struct AppState {
     pub pad: bool,
 }
 
+// =============================================================================
+// THE SINGLE SOURCE FOR DEFAULTS:
+// =============================================================================
 impl Default for AppState {
     fn default() -> Self {
         Self {
             box_style: 1,
-            pad: false, // Default is dense (no extra padding)
+            pad: true, // Default: true = padded layout (/pad toggles)
         }
     }
 }
 
 fn get_state_path() -> PathBuf {
-    dirs::home_dir().map(|h| h.join(".config/rs-agent/state.json")).unwrap_or_else(|| PathBuf::from("state.json"))
+    dirs::home_dir()
+        .map(|h| h.join(".config/rs-agent/state.json"))
+        .unwrap_or_else(|| PathBuf::from("state.json"))
+}
+
+fn load_state() -> AppState {
+    let path = get_state_path();
+    fs::read_to_string(path)
+        .ok()
+        .and_then(|c| serde_json::from_str(&c).ok())
+        .unwrap_or_default()
+}
+
+fn save_state(state: &AppState) {
+    let path = get_state_path();
+    if let Ok(content) = serde_json::to_string_pretty(state) {
+        let _ = fs::write(path, content);
+    }
 }
 
 pub fn get_box_style() -> usize {
-    let path = get_state_path();
-    if let Ok(content) = fs::read_to_string(path) {
-        if let Ok(state) = serde_json::from_str::<AppState>(&content) {
-            if state.box_style >= 1 && state.box_style <= 6 {
-                return state.box_style;
-            }
-        }
+    let style = load_state().box_style;
+    if (1..=6).contains(&style) {
+        style
+    } else {
+        AppState::default().box_style
     }
-    1
 }
 
 pub fn set_box_style(style: usize) {
-    let path = get_state_path();
-    let mut state = if let Ok(content) = fs::read_to_string(&path) {
-        serde_json::from_str::<AppState>(&content).unwrap_or_default()
-    } else {
-        AppState::default()
-    };
+    let mut state = load_state();
     state.box_style = style;
-    if let Ok(content) = serde_json::to_string_pretty(&state) {
-        let _ = fs::write(path, content);
-    }
+    save_state(&state);
 }
 
 pub fn get_pad() -> bool {
-    let path = get_state_path();
-    if let Ok(content) = fs::read_to_string(path) {
-        if let Ok(state) = serde_json::from_str::<AppState>(&content) {
-            return state.pad;
-        }
-    }
-    false // Dense by default
+    load_state().pad
 }
 
 pub fn set_pad(pad: bool) {
-    let path = get_state_path();
-    let mut state = if let Ok(content) = fs::read_to_string(&path) {
-        serde_json::from_str::<AppState>(&content).unwrap_or_default()
-    } else {
-        AppState::default()
-    };
+    let mut state = load_state();
     state.pad = pad;
-    if let Ok(content) = serde_json::to_string_pretty(&state) {
-        let _ = fs::write(path, content);
-    }
+    save_state(&state);
 }
