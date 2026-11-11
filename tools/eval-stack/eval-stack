@@ -41,9 +41,14 @@ RE_ANSI = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]|\x1b\([B0]")
 
 
 def sanitize_terminal_output(raw: str) -> list[str]:
-    """Strips ANSI sequences, cursor codes, and transient spinner lines."""
+    """Strips ANSI sequences, cursor codes, transient spinner lines, and pre-task setup banners."""
     clean = RE_ANSI.sub("", raw)
     clean = clean.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Slice strictly from the task loop start to discard pre-task UI animations entirely
+    idx = clean.find("[Task Loop]")
+    if idx != -1:
+        clean = clean[idx:]
 
     filtered = []
     for line in clean.splitlines():
@@ -55,7 +60,7 @@ def sanitize_terminal_output(raw: str) -> list[str]:
             "Working...", "Drafting tool action...", "Evaluating tool results..."
         )):
             continue
-        if re.match(r"^[·\s○●]+$", s):
+        if re.match(r"^[·\s○●•]+$", s):
             continue
         filtered.append(s)
     return filtered
@@ -292,6 +297,34 @@ PUREBASH_BENCHMARKS = [
 ]
 
 
+def parse_profile_frontmatter(prof_name: str) -> dict[str, Any]:
+    prof_file = os.path.join(CFG_DIR, "profiles", f"{prof_name}.md")
+    meta = {
+        "reasoning_budget": None,
+        "adapters": True,
+        "purebash": False,
+        "delegate": False,
+    }
+    if os.path.isfile(prof_file):
+        content = _safe_read(prof_file)
+        if content.startswith("---"):
+            parts = content.split("---", 2)
+            if len(parts) >= 3:
+                for line in parts[1].splitlines():
+                    s = line.strip()
+                    if s.startswith("reasoning_budget:"):
+                        val = s.split(":", 1)[1].strip()
+                        if val.isdigit():
+                            meta["reasoning_budget"] = int(val)
+                    elif s.startswith("adapters:"):
+                        meta["adapters"] = "true" in s.lower()
+                    elif s.startswith("purebash:"):
+                        meta["purebash"] = "true" in s.lower()
+                    elif s.startswith("delegate:"):
+                        meta["delegate"] = "true" in s.lower()
+    return meta
+
+
 def list_available_profiles() -> list[str]:
     prof_dir = os.path.join(CFG_DIR, "profiles")
     found = []
@@ -304,35 +337,27 @@ def list_available_profiles() -> list[str]:
                         found.append(f"{entry}/{sub[:-3]}")
             elif entry.endswith(".md") and entry != "chat.md":
                 found.append(entry[:-3])
-    # Sort top-level first, then nested alphabetically
     found.sort(key=lambda x: (1 if "/" in x else 0, x))
     return found
 
 
 def resolve_cli_profile(query: str, profiles: list[str]) -> str | None:
-    """Smart resolver allowing 'eva groot' or 'eva groot2' to resolve to 'groot/groot'."""
     q = query.strip().lower()
-    # 1. Exact match
     for p in profiles:
         if p.lower() == q:
             return p
-    # 2. Match sub-name (e.g. 'groot2' matches 'groot/groot2', 'photocraft-c' matches 'artcraft/photocraft-c')
     matches = [p for p in profiles if p.lower().endswith(f"/{q}")]
     if matches:
         return matches[0]
-    # 3. Match folder name (e.g. 'groot' matches 'groot/groot')
     matches = [p for p in profiles if p.lower().startswith(f"{q}/")]
     if matches:
-        # Prefer matching subfile with same name (groot/groot)
         self_match = [p for p in matches if p.lower() == f"{q}/{q}"]
         return self_match[0] if self_match else matches[0]
-    # 4. Partial substring
     matches = [p for p in profiles if q in p.lower()]
     return matches[0] if matches else None
 
 
 def detect_default_profile(model_name: str, profiles: list[str]) -> str:
-    """Dynamically matches active model against both flat and nested profiles."""
     m_clean = re.sub(r"[^a-zA-Z0-9]", "", model_name.lower())
     tokens = [t for t in re.split(r"[-_\s\.]+", model_name.lower()) if len(t) >= 3 and not t.isdigit()]
 
@@ -407,7 +432,6 @@ def select_profile_interactive(profiles: list[str], default_key: str) -> str:
             )
 
             for idx, p in enumerate(profiles):
-                # Clean nested label display (e.g. 📁 groot / groot)
                 if "/" in p:
                     folder, stem = p.split("/", 1)
                     display_p = f"{folder} / {stem}"
@@ -545,7 +569,7 @@ def run_single_agentic_test(bench: dict, prof_name: str, is_purebash: bool, mode
         clean_prompt = " ".join(bench["prompt"].split())
         task_payload = f"/task {clean_prompt}\nexit\n"
         try:
-            captured_stdout, _ = proc.communicate(input=task_payload, timeout=90)
+            captured_stdout, _ = proc.communicate(input=task_payload, timeout=180)
         except subprocess.TimeoutExpired:
             proc.kill()
             captured_stdout, _ = proc.communicate()
@@ -612,7 +636,6 @@ def main():
     model_name, endpoint = get_current_model_info()
     default_p = detect_default_profile(model_name, profiles)
 
-    # Check CLI argument: e.g. 'eva groot' or 'eva groot2' or 'eva groot/groot'
     chosen_prof = None
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
         cli_arg = sys.argv[1]
@@ -635,6 +658,10 @@ def main():
 
     mode_label = "Pure Bash (1-Tool Shell)" if is_purebash else ("Native 7-Tool (Delegate)" if has_delegate else "Native 6-Tool")
 
+    fm = parse_profile_frontmatter(chosen_prof)
+    budget_str = f"{fm['reasoning_budget']} tokens" if fm.get("reasoning_budget") else "unclamped"
+    adapters_str = "enabled" if fm.get("adapters", True) else "disabled"
+
     if HAS_RICH:
         console.print(
             Panel(
@@ -643,11 +670,12 @@ def main():
                 border_style="cyan",
             )
         )
-        console.print(f"Target Model: [bold]{model_name}[/bold]")
-        console.print(f"Target Endpoint: {endpoint}")
-        console.print(f"Harness Profile: [cyan]{chosen_prof}[/cyan] ({mode_label})\n")
+        console.print(f"Target Model:   [bold]{model_name}[/bold]")
+        console.print(f"Harness Profile: [cyan]{chosen_prof}[/cyan] ({mode_label})")
+        console.print(f"Governors:      [dim]Reasoning Budget: [bold yellow]{budget_str}[/bold yellow] · Adapters: [bold green]{adapters_str}[/bold green][/dim]\n")
     else:
-        print(f"\n  rs-agent Benchmark Suite: {model_name} | {chosen_prof} ({mode_label})\n")
+        print(f"\n  rs-agent Benchmark Suite: {model_name} | {chosen_prof} ({mode_label})")
+        print(f"  Governors: Reasoning Budget: {budget_str} · Adapters: {adapters_str}\n")
 
     if os.path.isfile(FAILURES_LOG):
         with contextlib.suppress(OSError):
@@ -759,6 +787,10 @@ def main():
             "timestamp": int(time.time()),
             "model": model_name,
             "profile": chosen_prof,
+            "governors": {
+                "reasoning_budget": fm.get("reasoning_budget"),
+                "adapters": fm.get("adapters", True),
+            },
             "mode": mode_label,
             "accuracy": round(accuracy, 1),
             "par_efficiency": round(par_eff, 1),
@@ -771,10 +803,8 @@ def main():
             "traces": RUN_TRACES,
         }
 
-        tmp_trace = f"{trace_file}.tmp.{os.getpid()}"
-        with open(tmp_trace, "w", encoding="utf-8") as wf:
+        with open(trace_file, "w", encoding="utf-8") as wf:
             json.dump(run_payload, wf, indent=2)
-        os.replace(tmp_trace, trace_file)
 
         if HAS_RICH:
             console.print(f"[dim]Run trace saved: [cyan]{trace_file}[/cyan][/dim]")

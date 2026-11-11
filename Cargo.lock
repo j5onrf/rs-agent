@@ -1002,7 +1002,7 @@ dependencies = [
 
 [[package]]
 name = "rs-agent"
-version = "0.5.7"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "clap",

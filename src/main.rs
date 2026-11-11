@@ -214,15 +214,11 @@ async fn execute_task_loop(
     spinner: &mut InlineSpinner,
 ) -> anyhow::Result<bool> {
     let max_rounds = get_max_rounds();
-    // UTF-8 character-safe display truncation (avoids char boundary panics)
-    let display_goal: String = if goal.chars().count() > 80 {
-        format!("{}...", goal.chars().take(80).collect::<String>())
-    } else {
-        goal.to_string()
-    };
+    let display_goal: String = goal.chars().take(80).collect();
+    let ellipsis = if goal.chars().count() > 80 { "..." } else { "" };
 
     println!("  \x1b[1;36m✦ [Task Loop]\x1b[0m Starting autonomous run in \x1b[1;37m{}\x1b[0m", target_dir.display());
-    println!("  \x1b[2mGoal: {} (Max steps: {})\x1b[0m\n", display_goal, max_rounds);
+    println!("  \x1b[2mGoal: {}{} (Max steps: {})\x1b[0m\n", display_goal, ellipsis, max_rounds);
 
     history.push(ChatMessage::user(goal.to_string()));
 
