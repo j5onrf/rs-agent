@@ -103,11 +103,15 @@ fn get_config_options(current_val: &str) -> Value {
             "type": "select",
             "currentValue": current_val,
             "options": [
-                { "id": "0", "value": "0", "name": "Off (0 tokens)" },
-                { "id": "250", "value": "250", "name": "Low (250 tokens)" },
-                { "id": "500", "value": "500", "name": "Medium (500 tokens)" },
-                { "id": "1000", "value": "1000", "name": "High (1000 tokens)" },
-                { "id": "-1", "value": "-1", "name": "Unrestricted" }
+                { "id": "low", "value": "low", "name": "Low (Cloud / 250t)" },
+                { "id": "medium", "value": "medium", "name": "Medium (Cloud / 500t)" },
+                { "id": "high", "value": "high", "name": "High (Cloud / 1000t)" },
+                { "id": "xhigh", "value": "xhigh", "name": "XHigh (Cloud / 4000t)" },
+                { "id": "0", "value": "0", "name": "Off (0t local / Low Gemini)" },
+                { "id": "250", "value": "250", "name": "250 tokens (Local)" },
+                { "id": "500", "value": "500", "name": "500 tokens (Local)" },
+                { "id": "1000", "value": "1000", "name": "1000 tokens (Local)" },
+                { "id": "-1", "value": "-1", "name": "Default / Unrestricted" }
             ]
         }
     ])
@@ -178,36 +182,8 @@ fn generate_edit_diff(
     }
 
     let original = fs::read_to_string(&full_path).ok()?;
-    if original.contains(old_str) {
-        let updated = original.replacen(old_str, new_str, 1);
-        Some((original, updated))
-    } else {
-        let clean_orig = original.replace("\r\n", "\n");
-        let clean_old = old_str.replace("\r\n", "\n");
-        let clean_new = new_str.replace("\r\n", "\n");
-        let norm_lines_orig: Vec<String> = clean_orig.lines().map(|l| l.trim().to_string()).collect();
-        let norm_lines_old: Vec<String> = clean_old.lines().map(|l| l.trim().to_string()).collect();
-
-        if !norm_lines_old.is_empty() && norm_lines_orig.len() >= norm_lines_old.len() {
-            for i in 0..=(norm_lines_orig.len() - norm_lines_old.len()) {
-                if norm_lines_orig[i..i + norm_lines_old.len()] == norm_lines_old[..] {
-                    let lines_raw: Vec<&str> = clean_orig.lines().collect();
-                    let mut new_content = lines_raw[..i].join("\n");
-                    if !new_content.is_empty() {
-                        new_content.push('\n');
-                    }
-                    new_content.push_str(&clean_new);
-                    let tail = lines_raw[i + norm_lines_old.len()..].join("\n");
-                    if !tail.is_empty() {
-                        new_content.push('\n');
-                        new_content.push_str(&tail);
-                    }
-                    return Some((original, new_content));
-                }
-            }
-        }
-        None
-    }
+    let updated = tools::resilient_replace(&original, old_str, new_str).ok()?;
+    Some((original, updated))
 }
 
 /// Safely generates write diff previews verified against the zero-trust SecurityBoundary.
@@ -266,8 +242,9 @@ async fn assemble_system_prompt(workspace: &Path) -> Result<(String, Option<Valu
     }
 
     let mcp_servers = active_profile.as_ref().map(|p| p.mcp_servers.clone()).unwrap_or_default();
+    let delegate = active_profile.as_ref().map(|p| p.delegate).unwrap_or(cfg.delegate);
     let active_tools =
-        if is_agent { Some(tools::get_tools_schema_with_mcp(&cfg.tier, false, &mcp_servers).await) } else { None };
+        if is_agent { Some(tools::get_tools_schema_with_mcp(&cfg.tier, delegate, &mcp_servers).await) } else { None };
 
     Ok((prompt, active_tools, is_agent))
 }
@@ -376,14 +353,16 @@ pub async fn run_bridge() -> Result<()> {
                 );
 
                 let cfg = WorkspaceConfig::load_or_default(&cwd);
-                let prof = Profile::load(&cfg.profile_name);
+                let active_prof_name = std::env::var("AI_ACTIVE_PROFILE").unwrap_or_else(|_| cfg.profile_name.clone());
+                let prof = Profile::load(&active_prof_name);
                 let initial_val = prof
                     .as_ref()
-                    .and_then(|p| p.reasoning_budget)
-                    .map(|b| b.to_string())
+                    .and_then(|p| p.reasoning_effort.clone())
+                    .or_else(|| prof.as_ref().and_then(|p| p.reasoning_budget).map(|b| b.to_string()))
                     .unwrap_or_else(|| "-1".to_string());
 
                 client.set_reasoning_budget(prof.as_ref().and_then(|p| p.reasoning_budget));
+                client.set_reasoning_effort(prof.as_ref().and_then(|p| p.reasoning_effort.as_deref()));
 
                 let available_commands = get_available_commands();
 
@@ -425,6 +404,13 @@ pub async fn run_bridge() -> Result<()> {
                     if let Ok(b) = value_str.parse::<i64>() {
                         let budget = if b < 0 { None } else { Some(b as usize) };
                         client.set_reasoning_budget(budget);
+                        client.set_reasoning_effort(None);
+                    } else if value_str == "-1" {
+                        client.set_reasoning_budget(None);
+                        client.set_reasoning_effort(None);
+                    } else {
+                        client.set_reasoning_budget(None);
+                        client.set_reasoning_effort(Some(&value_str));
                     }
                 }
 
@@ -606,7 +592,7 @@ pub async fn run_bridge() -> Result<()> {
                     let boundary = SecurityBoundary::new(&workspace);
                     let cfg = WorkspaceConfig::load_or_default(&workspace);
 
-                    let max_rounds = if is_agent { 10 } else { 1 };
+                    let max_rounds = if is_agent { config::get_max_rounds() } else { 1 };
                     for _round in 0..max_rounds {
                         if cancel_flag.load(Ordering::SeqCst) {
                             send_acp_chunk(&sid, "\n\n*(Cancelled)*", false);
@@ -640,8 +626,9 @@ pub async fn run_bridge() -> Result<()> {
                                         history.push(assistant_msg);
 
                                         let mut any_declined = false;
+                                        let mut idx = 0;
 
-                                        for (idx, call) in calls.iter().enumerate() {
+                                        while idx < calls.len() {
                                             // Handle cancellation mid-turn: synthesize responses for remaining tool calls to maintain pairing
                                             if cancel_flag.load(Ordering::SeqCst) {
                                                 for remaining_call in &calls[idx..] {
@@ -655,9 +642,52 @@ pub async fn run_bridge() -> Result<()> {
                                                 break;
                                             }
 
+                                            let fn_name = calls[idx]["function"]["name"].as_str().unwrap_or("tool");
+                                            if tools::is_read_only_tool(fn_name) {
+                                                let mut batch_end = idx + 1;
+                                                while batch_end < calls.len()
+                                                    && tools::is_read_only_tool(
+                                                        calls[batch_end]["function"]["name"].as_str().unwrap_or("tool"),
+                                                    )
+                                                {
+                                                    batch_end += 1;
+                                                }
+
+                                                let mut futs = Vec::with_capacity(batch_end - idx);
+                                                for call in &calls[idx..batch_end] {
+                                                    let c_id = call["id"].as_str().unwrap_or("call_0").to_string();
+                                                    let c_name = call["function"]["name"].as_str().unwrap_or("tool").to_string();
+                                                    let raw_a = call["function"]["arguments"].as_str().unwrap_or("{}");
+                                                    let c_args = if cfg.adapters {
+                                                        adapter::repair_tool_args(&c_name, raw_a)
+                                                    } else {
+                                                        raw_a.to_string()
+                                                    };
+                                                    send_acp_chunk(&sid, &format!("\n\n*Running `{}`...*\n", c_name), false);
+                                                    let ws = &workspace;
+                                                    let bnd = &boundary;
+                                                    futs.push(async move {
+                                                        let res = tools::execute_tool(&c_name, &c_args, ws, bnd).await;
+                                                        (c_id, res)
+                                                    });
+                                                }
+
+                                                for (c_id, tool_res) in futures_util::future::join_all(futs).await {
+                                                    let out = tool_res.unwrap_or_else(|e| format!("[tool error] {}", e));
+                                                    history.push(ChatMessage::tool_response(c_id, out));
+                                                }
+                                                idx = batch_end;
+                                                continue;
+                                            }
+
+                                            let call = &calls[idx];
                                             let call_id = call["id"].as_str().unwrap_or("call_0").to_string();
-                                            let fn_name = call["function"]["name"].as_str().unwrap_or("tool");
                                             let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
+                                            let final_args = if cfg.adapters {
+                                                adapter::repair_tool_args(fn_name, fn_args)
+                                            } else {
+                                                fn_args.to_string()
+                                            };
 
                                             let is_mutating = fn_name == "write_file"
                                                 || fn_name == "edit_file"
@@ -670,7 +700,7 @@ pub async fn run_bridge() -> Result<()> {
                                                 };
 
                                                 let raw_input: Value =
-                                                    serde_json::from_str(fn_args).unwrap_or_else(|_| json!({}));
+                                                    serde_json::from_str(&final_args).unwrap_or_else(|_| json!({}));
                                                 let brief = raw_input
                                                     .get("path")
                                                     .or_else(|| raw_input.get("command"))
@@ -798,12 +828,6 @@ pub async fn run_bridge() -> Result<()> {
 
                                             send_acp_chunk(&sid, &format!("\n\n*Running `{}`...*\n", fn_name), false);
 
-                                            let final_args = if cfg.adapters {
-                                                adapter::repair_tool_args(fn_name, fn_args)
-                                            } else {
-                                                fn_args.to_string()
-                                            };
-
                                             let tool_res =
                                                 tools::execute_tool(fn_name, &final_args, &workspace, &boundary).await;
                                             let out = match tool_res {
@@ -811,6 +835,7 @@ pub async fn run_bridge() -> Result<()> {
                                                 Err(e) => format!("[tool error] {}", e),
                                             };
                                             history.push(ChatMessage::tool_response(call_id, out));
+                                            idx += 1;
                                         }
 
                                         if any_declined {

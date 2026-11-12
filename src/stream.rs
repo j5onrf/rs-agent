@@ -70,6 +70,7 @@ impl StreamRenderer {
     /// Closes thinking gutter; emits spacer line only when pad is true
     pub fn close_thinking(&mut self) {
         if self.thinking_started && !self.answer_started {
+            self.flush_think_word();
             if !self.at_line_start {
                 println!();
                 self.at_line_start = true;
@@ -120,7 +121,7 @@ impl StreamRenderer {
                     }
                     _ => {
                         self.think_word_buf.push(ch);
-                        if self.think_word_buf.len() >= self.avail_width {
+                        if self.think_word_buf.chars().count() >= self.avail_width {
                             self.flush_think_word();
                         }
                     }
@@ -184,10 +185,17 @@ impl StreamRenderer {
             parts.push(format!("CH{}%", cch));
         }
 
-        let max_ctx = 8192;
+        let max_ctx = crate::config::get_max_tokens().max(1);
         let ctx_used = in_tok + out_tok;
         let ctx_pct = (ctx_used as f64 / max_ctx as f64) * 100.0;
-        parts.push(format!("{:.1}%/8.2k", ctx_pct));
+        let max_ctx_s = if max_ctx >= 1_000_000 {
+            format!("{:.1}M", max_ctx as f64 / 1_000_000.0)
+        } else if max_ctx >= 1_000 {
+            format!("{:.1}k", max_ctx as f64 / 1000.0)
+        } else {
+            format!("{}", max_ctx)
+        };
+        parts.push(format!("{:.1}%/{}", ctx_pct, max_ctx_s));
 
         let speed = out_tok as f64 / elapsed_gen;
         parts.push(format!("{:.1}s @ {:.1} t/s", elapsed_gen, speed));

@@ -137,23 +137,22 @@ pub fn ensure_env_file() {
 
 pub fn get_max_tokens() -> usize {
     ensure_env_file();
-    let env_path = get_env_path();
-
-    if let Ok(content) = fs::read_to_string(env_path) {
-        for l in content.lines() {
-            let s = l.trim();
-            if !s.starts_with('#') && s.contains("AI_MAX_TOKENS=") {
-                let parts: Vec<&str> = s.splitn(2, '=').collect();
-                if let Some(v) = parts.get(1) {
-                    let clean = v.split('#').next().unwrap_or("").trim().trim_matches('"').trim_matches('\'');
-                    if let Ok(n) = clean.parse::<usize>() {
-                        return n;
-                    }
-                }
-            }
+    if let Ok(content) = fs::read_to_string(get_env_path()) {
+        if let Some(n) = get_env_val(&content, "AI_MAX_TOKENS").and_then(|v| v.parse::<usize>().ok()) {
+            return n;
         }
     }
     std::env::var("AI_MAX_TOKENS").ok().and_then(|v| v.parse().ok()).unwrap_or(8192)
+}
+
+pub fn get_max_rounds() -> usize {
+    ensure_env_file();
+    if let Ok(content) = fs::read_to_string(get_env_path()) {
+        if let Some(n) = get_env_val(&content, "AI_MAX_AGENT_ROUNDS").and_then(|v| v.parse::<usize>().ok()) {
+            return n;
+        }
+    }
+    std::env::var("AI_MAX_AGENT_ROUNDS").ok().and_then(|v| v.parse().ok()).unwrap_or(15)
 }
 
 pub fn get_context_ceilings() -> ContextCeilings {

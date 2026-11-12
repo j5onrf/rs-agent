@@ -9,12 +9,23 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone)]
 pub struct Profile {
     pub reasoning_budget: Option<usize>,
+    pub reasoning_effort: Option<String>,
     pub tier: ToolTier,
     pub adapters: bool,
     pub memory: bool,
     pub delegate: bool,
     pub system_prompt: String,
     pub mcp_servers: Vec<String>,
+}
+
+struct RawModeGuard;
+
+impl Drop for RawModeGuard {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
+        print!("\x1b[?25h");
+        let _ = io::stdout().flush();
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -37,6 +48,7 @@ impl MenuRow {
 impl Profile {
     pub fn parse(raw_content: &str) -> Self {
         let mut reasoning_budget = None;
+        let mut reasoning_effort = None;
         let mut tier = ToolTier::Smol;
         let mut adapters = false;
         let mut memory = false;
@@ -65,13 +77,32 @@ impl Profile {
                     let val = v.trim();
                     match key {
                         "reasoning_budget" => {
-                            reasoning_budget = val.parse().ok();
+                            if let Ok(n) = val.parse::<usize>() {
+                                reasoning_budget = Some(n);
+                            } else {
+                                let eff = val.trim_matches('"').trim_matches('\'').trim().to_ascii_lowercase();
+                                if matches!(eff.as_str(), "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") {
+                                    reasoning_effort = Some(eff);
+                                }
+                            }
+                        }
+                        "reasoning_effort" => {
+                            let eff = val.trim_matches('"').trim_matches('\'').trim().to_ascii_lowercase();
+                            if matches!(eff.as_str(), "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") {
+                                reasoning_effort = Some(eff);
+                            }
                         }
                         "tier" if val.eq_ignore_ascii_case("purebash") => {
                             tier = ToolTier::PureBash;
                         }
+                        "tier" if val.eq_ignore_ascii_case("core4") => {
+                            tier = ToolTier::Core4;
+                        }
                         "purebash" if val.eq_ignore_ascii_case("true") => {
                             tier = ToolTier::PureBash;
+                        }
+                        "core4" if val.eq_ignore_ascii_case("true") => {
+                            tier = ToolTier::Core4;
                         }
                         "adapters" => {
                             adapters = val.eq_ignore_ascii_case("true");
@@ -100,7 +131,16 @@ impl Profile {
             }
         }
 
-        Self { reasoning_budget, tier, adapters, memory, delegate, system_prompt: body.trim().to_string(), mcp_servers }
+        Self {
+            reasoning_budget,
+            reasoning_effort,
+            tier,
+            adapters,
+            memory,
+            delegate,
+            system_prompt: body.trim().to_string(),
+            mcp_servers,
+        }
     }
 
     pub fn profile_dirs() -> Vec<PathBuf> {
@@ -234,11 +274,8 @@ impl Profile {
     }
 
     fn is_local_env(base_url: Option<&str>, model_name: &str) -> bool {
-        if let Some(url) = base_url {
-            let u = url.to_lowercase();
-            if u.contains("localhost") || u.contains("127.0.0.1") || u.contains(":8080") || u.contains(":11434") {
-                return true;
-            }
+        if base_url.map(crate::client::is_local_endpoint).unwrap_or(false) {
+            return true;
         }
         let m = model_name.to_lowercase();
         m.contains("local") || m.contains("llama-server") || m.contains("lfm") || m.contains("gguf")
@@ -428,6 +465,7 @@ impl Profile {
             visible_rows.iter().position(|r| r.profile_id().as_deref() == Some(&target_default)).unwrap_or(0);
 
         let _ = enable_raw_mode();
+        let _raw_guard = RawModeGuard;
         let mut stdout = io::stdout();
 
         print!("\x1b[?25l");
@@ -504,7 +542,11 @@ impl Profile {
 
             prev_row_count = visible_rows.len();
 
-            if let Ok(Event::Key(key_event)) = event::read() {
+            let ev = match event::read() {
+                Ok(e) => e,
+                Err(_) => return None,
+            };
+            if let Event::Key(key_event) = ev {
                 if key_event.kind != KeyEventKind::Press {
                     continue;
                 }
@@ -583,5 +625,21 @@ impl Profile {
                 }
             }
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_profile_parses_cloud_effort_and_core4() {
+        let raw = "---\ncore4: true\nreasoning_budget: xhigh\nadapters: true\n---\nSystem prompt";
+        let prof = Profile::parse(raw);
+        assert!(matches!(prof.tier, ToolTier::Core4));
+        assert_eq!(prof.reasoning_budget, None);
+        assert_eq!(prof.reasoning_effort.as_deref(), Some("xhigh"));
+        assert!(prof.adapters);
     }
 }

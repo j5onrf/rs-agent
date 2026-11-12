@@ -1,9 +1,9 @@
 <div align="center">
   <img alt="rs-agent" src="logo.svg?v=2" height="460" />
   <h1>Rs-Agent</h1>
- 
+
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.3.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.5.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -15,8 +15,8 @@
   </p>
 
   <p>
-    <b>A native Rust AI harness built for low-latency local <code>llama-server</code> C++ backends, GGUF, and cloud endpoints.</b><br>
-    <sub>Sub-millisecond boot, autonomous 6-tool execution loop, zero-trust security kernel, and edge-model JSON repair.</sub>
+    <b>Sub-millisecond native Rust AI harness for local <code>llama-server</code> GGUF backends and cloud reasoning models.</b><br>
+    <sub>Parallel 6-tool execution kernel • Parallel read-only tool kernel • 3-stage resilient edits • Zero-trust path sandbox • Native T3 Code ACP bridge</sub>
   </p>
 
   <table>
@@ -41,20 +41,51 @@
       </td>
     </tr>
   </table>
-  
+
   <p>
     * Primary edge baselines &nbsp;•&nbsp; Auto-discovers local models loaded on <code>http://127.0.0.1:8080</code>
   </p>
 
   <p>
-    <sub><b>Cloud Endpoints:</b> <a href="https://ai.google.dev">Google Gemini</a>, <a href="https://openrouter.ai">OpenRouter</a>, and <a href="https://tokenharbor.ai">TokenHarbor</a><br>
+    <sub><b>Cloud Endpoints:</b> <a href="https://ai.google.dev">Google Gemini</a> (<code>gemini-4-hydrogen</code>), <a href="https://openrouter.ai">OpenRouter</a>, and <a href="https://tokenharbor.ai">TokenHarbor</a><br>
     <b>Free Endpoints:</b> <a href="https://ai.google.dev"><code>gemini-3.5-flash-lite</code></a> (Google AI Studio) &nbsp;•&nbsp; <a href="https://openrouter.ai/models?variant=free"><code>openrouter/free</code></a> (OpenRouter) &nbsp;•&nbsp; <a href="https://tokenharbor.ai"><code>deepseek-v4.1-flash:free</code></a> (TokenHarbor)</sub>
   </p>
 </div>
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Cli Box Styles</h2>
+## Execution Modes & Controls
+
+| Invocation | Mode | Description |
+| :--- | :--- | :--- |
+| `[shortcut]` | **Shell Teleport** | Sub-`0.2ms` router via `rs-context.md` (`lfm`, `ling`, etc.) |
+| 👤 `ai` | **Interactive Chat** | Pure conversational REPL (`~180t` profile, thinking gutters, `/pad`) |
+| 👤 `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security sandbox |
+| `/task [goal]` | **Task Loop** | Multi-step autonomous loop; auto-loads `TASK.md` if goal is omitted |
+| `/t3` / `/t3 web` | **T3 Code ADE** | Compositor handover to official T3 Code GUI with live diffs & permission gates |
+| `ai --bridge` | **Headless ACP** | Embedded stdio JSON-RPC 2.0 server for ADEs and desktop surfaces |
+
+**In-Session Slash Commands:**
+`/p` profile select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/box [1-6]` box themes • `/pad` spacing • `/r` reset
+
+---
+
+## Client Surface: T3 Code ADE
+
+**[T3 Code](https://t3.codes)** is the official agent developer environment for `rs-agent`, connected directly to `ai --bridge` over stdio JSON-RPC 2.0 (ACP).
+
+| Capability | Mechanism | What It Gives You |
+| :--- | :--- | :--- |
+| **Seamless Handover** | `/t3` · `/t3 web` | Instant desktop or browser launch (`projects/chat` for chat, workspace root for agents) |
+| **Interactive Diff Review** | `session/request_permission` | Live split/unified previews with T3's 4-tier controls (*Supervised*, *Auto-accept*, *Auto*, *Full access*) |
+| **Dynamic Controls** | `$skills` · `/commands` · `thought_level` | Autocomplete `$` skill pills, reasoning selector (`low`–`xhigh` cloud / token budgets local), multimodal vision |
+
+---
+
+## CLI Box Styles (`/box [1-6]`)
+
+<details>
+<summary><b>Preview all 6 box themes (halftone skeleton dither, dot slabs, wake-on-key animations)</b></summary>
 
 ```console
 ~ ❯ ai
@@ -80,7 +111,7 @@
   ╭────╮  LFM3-1.7B
   │ LF │  chat · 2
   ╰────╯  git: master · clean
-  
+
 · · ○ · · · · · · · · · · · · · · · · · · · · ·
 ·  ╭────╮  LFM3-1.7B                · · · · · ·
 ·  │ LF │  lfm3                     · · · · · ·
@@ -90,146 +121,81 @@
 ❯ █
 ```
 
-<div align="center">
-  <p><sub>Switch with <code>/box [1-6]</code> · Halftone skeleton dither, Nothing OS dot slabs, and snappy laser wipes · Wake-on-key input</sub></p>
-</div>
+</details>
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Client Surfaces</h2>
+## Runtime Architecture
 
-<p align="center">
-  <b><a href="https://t3.codes">T3 Code</a> is the official agent developer environment (ADE) for rs-agent.</b><br>
-  <sub>A direct pairing connecting rs-agent's native Rust execution kernel to T3 Code via stdio ACP (Agent Client Protocol).</sub>
-</p>
+```text
+Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─▶ Workspace Teleport
+                                     └─▶ ai / ai --bridge
+                                            ├── client.rs   (SSE stream, thought_signature, cloud effort / local budget)
+                                            ├── adapter.rs  (JSON bracket balancer, gutter strip, alias normalization)
+                                            ├── tools.rs    (concurrent read-only batching, 3-stage edit, 30s timeout)
+                                            ├── security.rs (symlink-safe canonical jail, dangerous command gates)
+                                            └── mcp.rs      (on-demand stdio MCP plugins e.g. photocraft)
+```
 
-<div align="center">
-  <table>
-    <tr>
-      <td align="center" width="220" valign="top">
-        <br>
-        <h3>Seamless Handover</h3>
-        <p>👤 <code>/t3</code> · <code>/t3 web</code></p>
-        <sub>Instant desktop or browser launch. Conversational chat isolates to <code>projects/chat</code>; agent sessions inherit workspace root.</sub>
-        <br><br>
-      </td>
-      <td align="center" width="220" valign="top">
-        <br>
-        <h3>Interactive Diff Review</h3>
-        <p><code>session/request_permission</code></p>
-        <sub>Full support for T3's 4-tier security controls (<i>Supervised</i>, <i>Auto-accept edits</i>, <i>Auto</i>, <i>Full access</i>) with live split/unified diff previews.</sub>
-        <br><br>
-      </td>
-      <td align="center" width="220" valign="top">
-        <br>
-        <h3>Dynamic Controls</h3>
-        <p><code>$skills</code> · <code>/commands</code> · <code>thought_level</code></p>
-        <sub>Autocomplete <code>$</code> skill pills with side-panel instruction viewer, <code>/task</code> goal loop, reasoning budget dials, and multimodal vision.</sub>
-        <br><br>
-      </td>
-    </tr>
-  </table>
-
-  <p>
-    <sub><b>Unified Binary Bridge:</b> Embedded JSON-RPC 2.0 ACP server runs natively from <code>ai --bridge</code></sub>
-  </p>
-</div>
+* **Parallel Read-Only Tool Kernel (`tools.rs`):** Executes contiguous `read_file`, `list_dir`, and `search_code` calls concurrently while keeping mutating actions (`edit_file`, `write_file`, `run_command`) strictly ordered.
+* **3-Stage Resilient Edits (`tools.rs`):** Patches files through *Exact match → Indent-delta whitespace normalization → Levenshtein fuzzy match (≥ 0.85)*, with automatic process-group reaping (`SIGTERM` → `SIGKILL`) after 30s on `run_command`.
+* **Edge Argument Healer (`adapter.rs`):** Strips copied line gutters (`12: `), fixes container paths (`/workspace/...`), balances truncated JSON quotes/brackets, and normalizes parameter aliases in memory.
+* **Zero-Trust Security Boundary (`security.rs`):** Walks ancestors and inspects symlinks before canonicalization. Fails closed on `../` traversal, system directories (`/etc`, `/usr`, `/root`, ...), `python -m pip`, destructive `rm`, and privileged binaries.
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Execution Modes</h2>
+## Efficiency & Context Scaling
 
-<div align="center">
+### Tool Schema Footprint
 
-| Invocation | Interface | Description |
-| :--- | :---: | :--- |
-| `[shortcut]` | **Shell Teleport** | Sub-millisecond router via `rs-context.md` (e.g. `lfm`, `ling`) |
-| 👤 `ai` | **Interactive Chat** | Conversational REPL with thinking gutters, line padding `/pad`, and ~180t chat profile |
-| 👤 `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security kernel |
-| `/task [goal]` | **Task Loop** | Autonomous goal loop; auto-discovers `TASK.md` when prompt is omitted |
-| `/t3` / `/t3 web` | **T3 Code ADE** | Quiet compositor handover to official T3 Code GUI with diffs & security gates |
-| `ai --bridge` | **Headless ACP** | Embedded stdio JSON-RPC 2.0 interface for ADEs and desktop surfaces |
+| Operational Tier | Frontmatter Flag | Schema Cost | Intended Workload |
+| :--- | :--- | :---: | :--- |
+| **Pure Chat** (`ai`) | *(none)* | **~180t** | Pure conversation and fast reasoning (0 tools) |
+| **Pure Bash** | `purebash: true` | **~95t** | Single-tool shell dispatch (`run_command`) |
+| **Core 4-Tool** | `core4: true` | **~480t** | 27B+ LLMs & cloud models (`read`, `edit`, `write`, `run_command`) |
+| **Native 6-Tool** | *(default)* | **~680t** | Full local code exploration (`+ list_dir`, `search_code`) |
+| **+ Sub-Agent** | `delegate: true` | **+ ~100t** | Attaches isolated `delegate_task` sub-agent to any tier |
+| **Context Router** | *(shell hook)* | **0t** | Sub-millisecond directory/command routing via `rs-context.md` |
 
-</div>
+### Context Ceilings (`AI_MAX_TOKENS`)
 
-<p align="center">
-  <sub><code>/p</code> profile select &nbsp;•&nbsp; <code>/task</code> goal loop &nbsp;•&nbsp; <code>/t3</code> launch ADE &nbsp;•&nbsp; <code>/s</code> toggle skills &nbsp;•&nbsp; <code>/box</code> themes &nbsp;•&nbsp; <code>/pad</code> padding &nbsp;•&nbsp; <code>/r</code> reset</sub>
-</p>
+File reads and shell outputs adapt dynamically to `AI_MAX_TOKENS`, offloading overflows to `.rs/scratchpad.log` with clean head/tail previews:
 
----
-
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Developer Tools</h2>
-
-Standalone native Rust binaries in `tools/` for project maintenance:
-
-<div align="center">
-
-| Binary | Tool | Purpose |
-| :--- | :---: | :--- |
-| 👤 `ms` | **Model Selector** | Dynamic TUI for toggling universal providers, context budget, and loop limit |
-| `newp` | **Project Creator** | Scaffolds workspace, `.rs/config.json`, and auto-links router aliases |
-| `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) |
-| `ta` | **System Diagnostics** | 10-pass native test harness checking kernel, safety, and UI |
-| `eva` | **Agentic Benchmark** | Full-stack `eval-stack` measuring par efficiency and token economy |
-
-</div>
+| `AI_MAX_TOKENS` | `read_file` Ceiling | `run_command` Cap | `search_code` Cap |
+| :--- | :---: | :---: | :---: |
+| **`<= 16k`** | 250 lines | 20,000 chars | 30 matches |
+| **`32k`** | 1,000 lines | 45,000 chars | 50 matches |
+| **`64k`** | 2,000 lines | 90,000 chars | 75 matches |
+| **`>= 128k`** | 4,000 lines | 180,000 chars | 100 matches |
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Runtime Architecture</h2>
+## Workspace Profiles & Skills
 
-`rs-agent` discards heavy agent frameworks in favor of simple, predictable primitives:
+Configure agent personas, tool tiers, MCP servers, and reasoning behavior in `profiles/*.md` frontmatter:
 
-* **Sub-Millisecond Shell Intercept (`matcher.rs`):** `rs-hook.sh` intercepts terminal input and matches against `rs-context.md` in `< 0.2ms`. Typing `lfm` jumps into the target directory and launches the workspace instantly.
-* **Native 6 Tools (`tools.rs`):** Full tool set ready for SLMs and LLMs: `read_file`, `edit_file` (2-stage exact + whitespace-tolerant replacer), `write_file`, `list_dir`, `search_code`, and `run_command`.
-* **Embedded ACP Bridge (`bridge.rs`):** Stdio JSON-RPC 2.0 server inside the core binary. Dispatches live file diffs for T3 Code review, handles multimodal image attachments, and streams token cancellation mid-turn.
-* **Autonomous Task Loop (`/task`):** Multi-step goal loop with failure decomposition (reminds models to inspect lines after tool errors) and anti-hallucination verification.
-* **Edge Argument Healer (`adapter.rs`):** Small models often hallucinate parameter aliases (`filepath` vs `path`, `cmd` vs `command`) or unclosed quotes. An in-memory stack balancer normalizes keys and heals broken JSON frames on the fly.
-* **Zero-Trust Security Boundary (`security.rs`):** Canonicalizes all paths inside workspace root. Traversal attempts (`../`), protected system trees (`/etc`, `/usr`, `/root`), and mutating binaries (`sudo`, `pacman`, `pip`, `rm -rf`, `mkfs`) fail closed and require explicit approval.
+```markdown
+---
+description: "High-Speed Coding & Systems Engineer"
+adapters: true          # Strip line gutters, normalize aliases, heal malformed JSON
+core4: true             # Minimal 4-tool schema (~480t) for 27B+ / cloud (omit for 6-tool)
+reasoning_budget: 500   # Local: 0-10000 tokens (0 = off) | Cloud: low, medium, high, xhigh
+reasoning_effort: high  # Explicit cloud tier: low, medium, high, xhigh (e.g. gemini-4-hydrogen)
+memory: true            # Inject project-isolated rules from .rs/memory.md
+purebash: true          # Single run_command tool (~95t). Omit for Core 4 / Native 6
+delegate: true          # Attach isolated delegate_task sub-agent (+~100t)
+mcp: photocraft         # Attach stdio MCP server(s) from plugins/mcp/servers.json
+---
+```
+
+* **Skills (`skills/`):** Modular runtime directives toggled via `/s` or T3 Code's `$` picker (`ponytail.md`, `humanizer.md`, `ub-mode.md`).
+* **Global Rules (`system_instructions.md`):** Universal rules injected across every workspace and profile.
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Efficiency & Token Footprint</h2>
+## Agent Evaluation (`eval-stack`)
 
-<div align="center">
-
-| Operational Tier | Token Budget | Runtime Footprint | Target Workload |
-| :--- | :---: | :---: | :--- |
-| **Pure Chat** (`ai`) | **~180 tokens** | < 1ms startup · 0 MB idle | Conversational queries and fast reasoning (0 tools) |
-| **Pure Bash** (`purebash: true`) | **~95 tokens** | Single-tool dispatch loop | Low-parameter shell commands (1 tool) |
-| **Core 4-Tool** (`core4: true`) | **~480 tokens** | Minimal | 27B+ LLMs and Cloud endpoints relying on shell tools (4 tools) |
-| **Native 6-Tool** *(Default)* | **~680 tokens** | Full | Code refactoring, test execution, and file search (6 tools) |
-| **+ Delegate** (`delegate: true`) | **+ ~100 tokens** | Additive modifier | Attaches `delegate_task` (+1 tool) to any active tier for sub-agents |
-| **Context Router** (`matcher.rs`) | **0 tokens** | < 0.2ms shell lookup | Instant shortcut teleportation via `rs-context.md` |
-
-</div>
-
-<div align="center">
-
-### Context Ceilings & Scratchpad Scaling
-<sub>File inspection and command outputs dynamically adapt to <code>AI_MAX_TOKENS</code> to protect the context window:</sub>
-
-| Budget (`AI_MAX_TOKENS`) | Line Ceiling (`read_file`) | Character Cap (`run_command`) |
-| :--- | :---: | :---: |
-| **<= 16k** | **250 lines** | ~20,000 chars |
-| **32k** | **1,000 lines** | ~45,000 chars |
-| **64k** | **2,000 lines** | ~90,000 chars |
-| **>= 128k** | **4,000 lines** | ~180,000 chars |
-
-<p><sub>When outputs exceed limits, raw output is automatically offloaded to <code>.rs/scratchpad.log</code> with truncated previews returned to model context.</sub></p>
-
-</div>
-
----
-
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Agent Evaluation (<code>eval-stack</code>)</h2>
-
-<p align="center">
-  Decision-grade evaluation across 5-stage agentic challenges (<code>eval-stack</code>).<br>
-  <sub>Results scale with tuning: select a model foundation and optimize for your workload via profile directives, sampling flags, and <code>adapters</code>.</sub>
-</p>
-
-<div align="center">
+5-stage autonomous benchmark measuring par efficiency, tool resilience, and token economy via `eva`:
 
 | Rank | Model | Par Eff | Agent Index |
 | :---: | :--- | :---: | :---: |
@@ -237,52 +203,29 @@ Standalone native Rust binaries in `tools/` for project maintenance:
 | **2** | **Groot-19B-A3B** *(MTP)* | **162.5%** | **100.0 (A+)** |
 | **3** | **Sage-A1.5-35B** | **111.1%** | **100.0 (A+)** |
 | **4** | **Qwen3.8-35B-Distill** *(MTP)* | **136.4%** | **92.2 (A)** |
-| **—** | **Ling-3.0-tiny** *(SLM)* | **162.5%** | **100.0  (A+)** |
+| **—** | **Ling-3.0-tiny** *(SLM)* | **162.5%** | **100.0 (A+)** |
 | **—** | **LFM3-1.7B** *(SLM)* | **173.3%** | **100.0 (A+)** |
 
-<p><sub>Decision-grade evaluation via <code>eva</code>: autonomous eval measuring par efficiency, tool resilience, and token economy.</sub></p>
+---
 
-</div>
+## Developer Tools (`tools/`)
+
+| Binary | Tool | Purpose |
+| :--- | :--- | :--- |
+| 👤 `ms` | **Model Selector** | Interactive TUI for switching active providers, `AI_MAX_TOKENS`, and loop limits |
+| `newp` | **Project Creator** | Scaffolds workspace, `.rs/config.json`, profile, and `rs-context.md` aliases |
+| `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) |
+| `ta` | **System Diagnostics** | 10-pass native test harness checking kernel, security boundary, and UI |
+| `eva` | **Agentic Benchmark** | Full-stack `eval-stack` evaluation runner |
 
 ---
 
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Workspace Profiles & Skills</h2>
+## Setup & Configuration
 
-Define agent profiles and runtime behavior in Markdown frontmatter (`profiles/*.md`):
-
-```markdown
----
-description: "Edge Systems Engineer (Model Profile)"
-adapters: true          # Tool argument repair (strips markdown fences, heals newlines)
-core4: true             # Optional: minimal 4-tool (~480t schema) for 27B+ / cloud
-reasoning_budget: 500   # Thinking tokens clamp: 0 (off), 500 (medium), or omit for unrestricted
-memory: true            # Opt-in: injects workspace rules from .rs/memory.md if present
-purebash: true          # Optional: single bash tool (~95t schema). Omit for Native 6-tool (~680t)
-delegate: true          # Opt-in: adds delegate_task tool (~100t) for sub-agents. Omit for Native 6-tool
-mcp: photocraft         # Connect MCP apps (e.g. photocraft, blender). Omit for pure 6-tool
----
-```
-
-* **Profiles (`profiles/`):** Model configurations and system personas (e.g. `lfm3.md`, `lingtiny.md`, `chat.md`). Run `newp` to scaffold new workspaces with interactive profile selection.
-* **Skills (`skills/`):** Modular runtime directives toggled via `/s` or T3 Code's `$` picker (e.g. `ponytail.md` for YAGNI minimalism, `humanizer.md` for clean output, `ub-mode.md` for clean craftsmanship).
-* **Runtime Adapters (`adapters: true`):** In-memory heuristic kernel (`adapter.rs`) that strips copied line gutters, heals broken JSON, and normalizes key aliases. Strongly recommended for both SLMs and ~35B 4-bit quant LLMs to eliminate syntax retry loops.
-* **Core 4-Tool (`core4: true`):** Minimal option (`read_file`, `edit_file`, `write_file`, `run_command`) saving ~200t/turn. Designed for low token usage on 27B+ and cloud models that handle discovery directly via `run_command`.
-* **Workspace Memory (`.rs/memory.md`):** Optional, project-isolated rules loaded into context when `memory: true` is set in the profile frontmatter.
-* **Global Rules (`system_instructions.md`):** Universal directives loaded across every profile and workspace.
-
----
-
-<h2 align="center"><img alt="rs-agent" src="logo.svg?v=2" height="50" /> Setup & Installation</h2>
-
-### 1. 👤 Quick Start (Linux x86_64)
-
-Pre-built native binaries are included. No Rust installation or build tools required:
+### 👤 Quick Start (Linux x86_64)
 
 ```bash
-# 1. Clone into config directory
 git clone https://github.com/j5onrf/rs-agent.git ~/.config/rs-agent
-
-# 2. Register shell hook
 echo 'source ~/.config/rs-agent/rs-hook.sh' >> ~/.bashrc
 source ~/.config/rs-agent/rs-hook.sh
 ```
@@ -290,17 +233,12 @@ source ~/.config/rs-agent/rs-hook.sh
 <details>
 <summary><b>macOS / Build from Source</b></summary>
 
-For macOS (Apple Silicon / Intel), ARM64, or custom modifications:
-
 ```bash
 cd ~/.config/rs-agent
-cargo build --release
+cargo build --release --workspace
 mkdir -p bin ~/.local/bin
 cp target/release/ai bin/ai
 cp target/release/ai bin/rs-agent
-
-# Build model selector (ms) and create global symlink
-cargo build --release --package model-select
 cp target/release/model-select bin/ms
 ln -sf ~/.config/rs-agent/bin/ms ~/.local/bin/ms
 
@@ -310,18 +248,15 @@ source ~/.config/rs-agent/rs-hook.sh
 
 </details>
 
-### 2. 👤 Configure Providers (`.env`)
-
 <details>
-<summary><b>View Example (<code>~/.config/rs-agent/.env</code>)</b></summary>
+<summary><b>Provider Cascade &amp; Governors (<code>~/.config/rs-agent/.env</code>)</b></summary>
+
+Priority goes to the first uncommented active key; when all cloud keys are commented out, `rs-agent` falls back to local `llama-server` on `:8080`.
 
 ```env
-# Rs-Agent Provider Cascade (.env) — Priority: First active key | Switch with: ms
-# Fallback: Local llama-server (:8080) when all cloud keys are commented with '#'.
-
 # ── 1. Google Gemini ──────────────────────────────────────────────────────────
 #GEMINI_API_KEY="AQ.your-key-here"
-GEMINI_MODEL="gemini-3.5-flash-lite"
+GEMINI_MODEL="gemini-4-hydrogen"       # or gemini-3.5-flash-lite (free tier)
 
 # ── 2. OpenRouter ─────────────────────────────────────────────────────────────
 #OPENROUTER_API_KEY="sk-or-v1-your-key-here"
@@ -331,23 +266,21 @@ OPENROUTER_MODEL="openrouter/free"
 #TOKENHARBOR_API_KEY="thk_live_your-key-here"
 TOKENHARBOR_MODEL="deepseek-v4.1-flash:free"
 
-# ── More Direct Providers e.g. ────────────────────────────────────────────────
+# ── More Direct Providers ─────────────────────────────────────────────────────
 # OPENAI_API_KEY="sk-your-key-here"
 # ANTHROPIC_API_KEY="sk-ant-your-key-here"
 
-# ── 4. Custom Direct Endpoint ─────────────────────────────────────────────────
-# Add: Define CUSTOM1_*, CUSTOM2_*, up to CUSTOM9_*
+# ── 4. Custom Direct Slots (CUSTOM1..CUSTOM9) ─────────────────────────────────
 # CUSTOM1_NAME="Custom Provider"
 # CUSTOM1_API_KEY="sk-your-key-here"
 CUSTOM1_URL="https://api.deepseek.com/chat/completions"
 CUSTOM1_MODEL="deepseek-flash"
 
 # ── MCP Server Keys (Optional) ────────────────────────────────────────────────
-# API keys for tools configured in plugins/mcp/servers.json
 # FIRECRAWL_API_KEY="fc-your-actual-api-key"
 
 # ── Runtime Governors ─────────────────────────────────────────────────────────
-AI_MAX_TOKENS="8192"
+AI_MAX_TOKENS="8192"                   # Set 65536+ for cloud models like gemini-4-hydrogen
 AI_MAX_AGENT_ROUNDS="10"
 ```
 

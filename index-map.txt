@@ -9,6 +9,7 @@
 #   ├── Cargo.toml                       - name = "rs-agent"
 #   ├── README.md                        - gguf llama.cpp t3code omarchy local-first
 #   ├── bin/ai
+#   ├── bin/git-backup                   - #!/usr/bin/env bash
 #   ├── bin/ms
 #   ├── bin/newp
 #   ├── bin/rs-agent
@@ -25,17 +26,20 @@
 #   ├── profiles/artcraft/photocraft-c.md - PhotoCraft Visual Engine & Automation Specialist (Gemini Flash Lite)
 #   ├── profiles/artcraft/photocraft-l.md - LFM3 PhotoCraft Automation Engineer (Native MCP)
 #   ├── profiles/chat.md                 - Adaptive, high-signal conversational partner
+#   ├── profiles/flint.md                - Recursive Flint 40B-A2.5B Autonomous Systems Architect
 #   ├── profiles/gem35.md                - description: "Google Gemini 3.5 Flash Lite High-Speed Conversational & Systems E
 #   ├── profiles/groot/groot.md          - Groot-19B-A3B Autonomous Systems Engineer
 #   ├── profiles/groot/groot2.md         - Groot-19B-A3B APEX-I-MiniPlus-V2.1 Autonomous Systems Engineer
-#   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer (Native 6-Tool)
-#   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer (Native 6-Tool)
+#   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer
+#   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer
 #   ├── profiles/purebash.md             - Pure Bash LFM Minimalist Shell Agent
 #   ├── profiles/sage.md                 - InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent
-#   ├── projects/lfm3/acp:/skill/humanizer - ROLE DIRECTIVE: Direct, grounded, and intellectually honest collaborator.
-#   ├── projects/lfm3/acp:/skill/ponytail - ROLE DIRECTIVE: Ponytail Systems & Rust Architect.
-#   ├── projects/lfm3/acp:/skill/ub-mode - ROLE DIRECTIVE: Uncle Bob Clean Code & Architecture Practitioner.
-#   ├── projects/lfm3/test_calc.py       - def add(a, b):
+#   ├── projects/groot/New Document.txt
+#   ├── projects/lfm3/New Document.txt
+#   ├── projects/ling-tiny/New Document.txt
+#   ├── projects/ling-tiny/binary_search_tree.py - class Node:
+#   ├── projects/ling-tiny/test_calc.py  - def add(a, b):
+#   ├── projects/sage/test_calc.py       - def add(a, b):
 #   ├── rs-context.md                    - Rs-Agent Context Router
 #   ├── rs-hook.sh                       - Rs-Agent shell hook (ponytail minimalism: < 0.2ms, Bash & Zsh, macOS & Linux)
 #   ├── skills/humanizer.md              - Anti-AI Slop Humanizer Directive
@@ -59,6 +63,8 @@
 #   ├── src/ui.rs                        - fn: render_frame, draw_box
 #   ├── system_instructions.md           - Global System Instructions (identical to .cursorrules or CLAUDE.md):
 #   ├── tools/eval-stack/eval-stack      - #!/usr/bin/env python3
+#   ├── tools/git-backup/Readme.md       - # Git Snapshot Backup (`git-backup`)
+#   ├── tools/git-backup/git-backup      - #!/usr/bin/env bash
 #   ├── tools/model-select/Cargo.toml    - name = "model-select"
 #   ├── tools/model-select/model-select
 #   ├── tools/model-select/src/main.rs   - CLI Entrypoint & Runtime Loop
@@ -97,9 +103,16 @@
 
 ### `src/main.rs`
 ```rust
-  L058: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
-  L075: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff, Mcp { .. } }
-  L825: async fn main() -> anyhow :: Result<()>;
+  L031: pub struct InstanceLockGuard(PathBuf);
+  L033: impl AsRef<Path> for InstanceLockGuard {
+    L034: fn as_ref(&self) -> &Path;
+  }
+  L039: impl Drop for InstanceLockGuard {
+    L040: fn drop(&mut self);
+  }
+  L111: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
+  L128: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff, Mcp { .. } }
+  L907: async fn main() -> anyhow :: Result<()>;
 ```
 
 ### `tools/model-select/src/main.rs`
@@ -123,15 +136,15 @@
 ### `src/adapter.rs`
 ```rust
   L001: pub fn strip_line_gutters(text: &str) -> String; // Strips copied line gutters (e.g. "12: ", " 42 | ") while preserving timestamps (12:30:00) and code literals.
-  L041: pub fn normalize_params(map: &mut serde_json :: Map<String, serde_json :: Value>);
-  L113: pub fn heal_json_args(raw_args: &str) -> serde_json :: Value;
-  L216: pub fn repair_tool_args(_fn_name: &str, raw_args: &str) -> String;
-  L224: mod tests;
+  L049: pub fn normalize_params(map: &mut serde_json :: Map<String, serde_json :: Value>);
+  L134: pub fn heal_json_args(raw_args: &str) -> serde_json :: Value;
+  L271: pub fn repair_tool_args(_fn_name: &str, raw_args: &str) -> String;
+  L279: mod tests;
 ```
 
 ### `src/bridge.rs`
 ```rust
-  L279: pub async fn run_bridge() -> Result<()>;
+  L275: pub async fn run_bridge() -> Result<()>;
 ```
 
 ### `src/client.rs`
@@ -213,13 +226,13 @@
   L009: pub struct Profile { pub reasoning_budget: Option<usize>, pub tier: ToolTier, pub adapters: bool, ... (7 fields) }
   L037: impl Profile {
     L038: pub fn parse(raw_content: &str) -> Self;
-    L110: pub fn profile_dirs() -> Vec<PathBuf>;
-    L119: pub fn load(profile_name: &str) -> Option<Self>;
-    L190: pub fn list_available() -> Vec<String>;
-    L251: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
-    L279: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
-    L325: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
-    L368: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
+    L106: pub fn profile_dirs() -> Vec<PathBuf>;
+    L115: pub fn load(profile_name: &str) -> Option<Self>;
+    L186: pub fn list_available() -> Vec<String>;
+    L247: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
+    L275: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
+    L317: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
+    L360: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
   }
 ```
 
@@ -243,8 +256,8 @@
     L021: pub fn parse(name: &str, raw_content: &str) -> Self;
     L035: pub fn skill_dirs() -> Vec<PathBuf>;
     L044: pub fn list_available() -> Vec<String>;
-    L069: pub fn load(skill_name: &str) -> Option<Self>;
-    L081: pub fn select_interactive(active_skills: &[String]) -> Option<SkillAction>;
+    L071: pub fn load(skill_name: &str) -> Option<Self>;
+    L083: pub fn select_interactive(active_skills: &[String]) -> Option<SkillAction>;
   }
 ```
 
@@ -257,24 +270,24 @@
   L019: impl InlineSpinner {
     L020: pub fn new() -> Self;
     L024: pub fn start(&mut self, msg: &str);
-    L056: pub fn update(&self, msg: &str);
-    L062: pub fn stop(&mut self);
+    L066: pub fn update(&self, msg: &str);
+    L073: pub fn stop(&mut self);
   }
-  L075: impl Drop for InlineSpinner {
-    L076: fn drop(&mut self);
+  L088: impl Drop for InlineSpinner {
+    L089: fn drop(&mut self);
   }
 ```
 
 ### `src/state.rs`
 ```rust
   L005: pub struct AppState { pub box_style: usize, pub pad: bool }
-  L012: impl Default for AppState {
-    L013: fn default() -> Self;
+  L015: impl Default for AppState {
+    L016: fn default() -> Self;
   }
-  L025: pub fn get_box_style() -> usize;
-  L037: pub fn set_box_style(style: usize);
-  L050: pub fn get_pad() -> bool;
-  L060: pub fn set_pad(pad: bool);
+  L040: pub fn get_box_style() -> usize;
+  L049: pub fn set_box_style(style: usize);
+  L055: pub fn get_pad() -> bool;
+  L059: pub fn set_pad(pad: bool);
 ```
 
 ### `src/stream.rs`
@@ -293,12 +306,15 @@
 ```rust
   L038: pub fn get_tools_schema(tier: &ToolTier, delegate: bool) -> Value;
   L042: pub async fn get_tools_schema_with_mcp(tier: &ToolTier, delegate: bool, mcp_servers: &[String]) -> Value;
-  L232: pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result<String, String>; // 3-Stage Resilient Replacer ported from py-agent (Exact -> Indent-Delta Whitespace -> Fuzzy)
-  L370: pub async fn execute_tool(name: &str, raw_args: &str, workspace: &Path, boundary: &SecurityBoundary ,) -> Result<String, String>;
+  L234: pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result<String, String>; // 3-Stage Resilient Replacer ported from py-agent (Exact -> Indent-Delta Whitespace -> Fuzzy)
+  L372: pub async fn execute_tool(name: &str, raw_args: &str, workspace: &Path, boundary: &SecurityBoundary ,) -> Result<String, String>;
 ```
 
 ### `src/ui.rs`
 ```rust
-  L129: pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) ->(Vec<String>, usize);
-  L493: pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Option<char>;
+  L019: impl Drop for RawModeGuard {
+    L020: fn drop(&mut self);
+  }
+  L229: pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) ->(Vec<String>, usize);
+  L654: pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Option<char>;
 ```

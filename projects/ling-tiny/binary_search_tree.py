@@ -5,7 +5,7 @@ class Node:
         self.right = None
 
 
-class BinarySearchTree:
+class BST:
     def __init__(self):
         self.root = None
 
@@ -40,5 +40,19 @@ class BinarySearchTree:
         else:
             return self._search(node.right, key)
 
-    def __repr__(self):
-        return f"BST(root={self.root.key if self.root else None})"
+    def __str__(self):
+        return self._inorder(self.root)
+
+    def _inorder(self, node):
+        if node is None:
+            return ""
+        return self._inorder(node.left) + str(node.key) + " " + self._inorder(node.right)
+
+
+if __name__ == "__main__":
+    bst = BST()
+    for key in [50, 30, 70, 20, 40, 60, 80]:
+        bst.insert(key)
+    print("Inorder:", bst)
+    print("Search 40:", bst.search(40))
+    print("Search 90:", bst.search(90))

@@ -160,7 +160,12 @@ impl McpSession {
         let mut line = String::new();
         loop {
             line.clear();
-            let bytes_read = self.reader.read_line(&mut line).await?;
+            let bytes_read = tokio::time::timeout(
+                std::time::Duration::from_secs(30),
+                self.reader.read_line(&mut line),
+            )
+            .await
+            .context("MCP server RPC timed out after 30s")??;
             if bytes_read == 0 {
                 break;
             }
@@ -171,6 +176,10 @@ impl McpSession {
 
             if let Ok(data) = serde_json::from_str::<Value>(trimmed) {
                 if data.get("id").and_then(|v| v.as_u64()) == Some(id) {
+                    if let Some(err) = data.get("error") {
+                        let msg = err.get("message").and_then(|m| m.as_str()).unwrap_or("Unknown MCP error");
+                        anyhow::bail!("MCP JSON-RPC error: {}", msg);
+                    }
                     return Ok(data.get("result").cloned());
                 }
             }

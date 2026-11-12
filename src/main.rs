@@ -154,21 +154,126 @@ fn expand_path(p: &str) -> PathBuf {
     }
 }
 
-fn get_max_rounds() -> usize {
-    fs::read_to_string(dirs::home_dir().map(|h| h.join(".config/rs-agent/.env")).unwrap_or_default())
+fn format_instance_label(is_agent: bool, profile_name: &str, instance_num: usize) -> String {
+    let base = if is_agent { profile_name } else { "chat" };
+    if instance_num > 1 {
+        format!("{} · {}", base, instance_num)
+    } else {
+        base.to_string()
+    }
+}
+
+fn tool_brief(final_args: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(final_args)
         .ok()
-        .and_then(|c| {
-            for l in c.lines() {
-                let s = l.trim();
-                if !s.starts_with('#') && s.contains("AI_MAX_AGENT_ROUNDS=") {
-                    let parts: Vec<&str> = s.splitn(2, '=').collect();
-                    let v = parts.get(1)?.split('#').next()?.trim().trim_matches('"').trim_matches('\'');
-                    return v.parse::<usize>().ok();
+        .and_then(|parsed| {
+            parsed
+                .get("path")
+                .or_else(|| parsed.get("command"))
+                .or_else(|| parsed.get("pattern"))
+                .and_then(|v| v.as_str())
+                .map(ToString::to_string)
+        })
+        .unwrap_or_default()
+}
+
+fn tool_verb(fn_name: &str, autonomous: bool) -> &'static str {
+    if autonomous {
+        return "executing";
+    }
+    match fn_name {
+        "write_file" => "updating",
+        "edit_file" => "surgically editing",
+        "read_file" | "list_dir" => "checking",
+        "search_code" => "searching codebase",
+        "run_command" => "executing",
+        _ => "working",
+    }
+}
+
+async fn execute_tool_batch(
+    calls: &[serde_json::Value],
+    target_dir: &Path,
+    boundary: &SecurityBoundary,
+    use_adapters: bool,
+    history: &mut Vec<ChatMessage>,
+    autonomous: bool,
+) -> usize {
+    let mut executed = 0;
+    let mut idx = 0;
+
+    while idx < calls.len() {
+        let fn_name = calls[idx]["function"]["name"].as_str().unwrap_or("tool");
+        if tools::is_read_only_tool(fn_name) {
+            let mut batch_end = idx + 1;
+            while batch_end < calls.len()
+                && tools::is_read_only_tool(calls[batch_end]["function"]["name"].as_str().unwrap_or("tool"))
+            {
+                batch_end += 1;
+            }
+
+            let mut futs = Vec::with_capacity(batch_end - idx);
+            for call in &calls[idx..batch_end] {
+                executed += 1;
+                let call_id = call["id"].as_str().unwrap_or("call_0").to_string();
+                let c_name = call["function"]["name"].as_str().unwrap_or("tool").to_string();
+                let raw_args = call["function"]["arguments"].as_str().unwrap_or("{}");
+                let final_args =
+                    if use_adapters { adapter::repair_tool_args(&c_name, raw_args) } else { raw_args.to_string() };
+                let brief = tool_brief(&final_args);
+                println!("  \x1b[2m∗ {} •\x1b[0m \x1b[36m{}\x1b[0m \x1b[2m{}\x1b[0m", tool_verb(&c_name, autonomous), c_name, brief);
+
+                futs.push(async move {
+                    let t_start = Instant::now();
+                    let res = tools::execute_tool(&c_name, &final_args, target_dir, boundary).await;
+                    (call_id, res, t_start.elapsed().as_secs_f64())
+                });
+            }
+            let _ = io::stdout().flush();
+
+            for (call_id, tool_res, elapsed) in futures_util::future::join_all(futs).await {
+                match tool_res {
+                    Ok(out) => {
+                        println!("  \x1b[1;32m✓\x1b[0m \x1b[2mDone ({:.1}s)\x1b[0m\n", elapsed);
+                        history.push(ChatMessage::tool_response(call_id, out));
+                    }
+                    Err(err) => {
+                        println!("  \x1b[1;31m✗\x1b[0m \x1b[2mFailed ({:.1}s): {}\x1b[0m\n", elapsed, err);
+                        history.push(ChatMessage::tool_response(call_id, format!("[tool error] {}", err)));
+                    }
                 }
             }
-            None
-        })
-        .unwrap_or(15)
+            idx = batch_end;
+        } else {
+            executed += 1;
+            let call = &calls[idx];
+            let call_id = call["id"].as_str().unwrap_or("call_0").to_string();
+            let raw_args = call["function"]["arguments"].as_str().unwrap_or("{}");
+            let final_args =
+                if use_adapters { adapter::repair_tool_args(fn_name, raw_args) } else { raw_args.to_string() };
+            let brief = tool_brief(&final_args);
+            println!("  \x1b[2m∗ {} •\x1b[0m \x1b[36m{}\x1b[0m \x1b[2m{}\x1b[0m", tool_verb(fn_name, autonomous), fn_name, brief);
+            let _ = io::stdout().flush();
+
+            let t_start = Instant::now();
+            let tool_res = tools::execute_tool(fn_name, &final_args, target_dir, boundary).await;
+            let elapsed = t_start.elapsed().as_secs_f64();
+
+            match tool_res {
+                Ok(out) => {
+                    println!("  \x1b[1;32m✓\x1b[0m \x1b[2mDone ({:.1}s)\x1b[0m\n", elapsed);
+                    history.push(ChatMessage::tool_response(call_id, out));
+                }
+                Err(err) => {
+                    println!("  \x1b[1;31m✗\x1b[0m \x1b[2mFailed ({:.1}s): {}\x1b[0m\n", elapsed, err);
+                    history.push(ChatMessage::tool_response(call_id, format!("[tool error] {}", err)));
+                }
+            }
+            idx += 1;
+        }
+    }
+
+    executed
 }
 
 fn read_task_spec(target_dir: &Path) -> Option<String> {
@@ -266,7 +371,7 @@ async fn execute_task_loop(
     active_tools: Option<serde_json::Value>,
     spinner: &mut InlineSpinner,
 ) -> anyhow::Result<bool> {
-    let max_rounds = get_max_rounds();
+    let max_rounds = rs_agent::config::get_max_rounds();
     let display_goal: String = goal.chars().take(80).collect();
     let ellipsis = if goal.chars().count() > 80 { "..." } else { "" };
 
@@ -305,47 +410,8 @@ async fn execute_task_loop(
                 assistant_msg.tool_calls = Some(serde_json::Value::Array(calls.clone()));
                 history.push(assistant_msg);
 
-                for call in calls {
-                    total_tools_run += 1;
-                    let call_id = call["id"].as_str().unwrap_or("call_0").to_string();
-                    let fn_name = call["function"]["name"].as_str().unwrap_or("tool");
-                    let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
-
-                    // 1. Delegate healing & normalization exclusively to adapter.rs
-                    let final_args =
-                        if cfg.adapters { adapter::repair_tool_args(fn_name, fn_args) } else { fn_args.to_string() };
-
-                    // 2. Read canonical summary from the repaired arguments
-                    let brief = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&final_args) {
-                        parsed
-                            .get("path")
-                            .or_else(|| parsed.get("command"))
-                            .or_else(|| parsed.get("pattern"))
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("")
-                            .to_string()
-                    } else {
-                        String::new()
-                    };
-
-                    println!("  \x1b[2m∗ executing •\x1b[0m \x1b[36m{}\x1b[0m \x1b[2m{}\x1b[0m", fn_name, brief);
-                    let _ = io::stdout().flush();
-
-                    let t_start = Instant::now();
-                    let tool_res = tools::execute_tool(fn_name, &final_args, target_dir, boundary).await;
-                    let elapsed = t_start.elapsed().as_secs_f64();
-
-                    match tool_res {
-                        Ok(out) => {
-                            println!("  \x1b[1;32m✓\x1b[0m \x1b[2mDone ({:.1}s)\x1b[0m\n", elapsed);
-                            history.push(ChatMessage::tool_response(call_id, out));
-                        }
-                        Err(err) => {
-                            println!("  \x1b[1;31m✗\x1b[0m \x1b[2mFailed ({:.1}s): {}\x1b[0m\n", elapsed, err);
-                            history.push(ChatMessage::tool_response(call_id, format!("[tool error] {}", err)));
-                        }
-                    }
-                }
+                total_tools_run +=
+                    execute_tool_batch(&calls, target_dir, boundary, cfg.adapters, history, true).await;
             } else {
                 history.push(ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone()));
             }
@@ -423,21 +489,10 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     let mut active_profile = Profile::load(&cfg.profile_name)
         .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found in ~/.config/rs-agent/profiles/", cfg.profile_name))?;
     client.set_reasoning_budget(active_profile.reasoning_budget);
+    client.set_reasoning_effort(active_profile.reasoning_effort.as_deref());
 
     let (instance_num, _lock_guard) = resolve_instance_number(&cfg.profile_name);
-    let second_line = if cfg.is_agent {
-        if instance_num > 1 {
-            format!("{} · {}", cfg.profile_name, instance_num)
-        } else {
-            cfg.profile_name.clone()
-        }
-    } else {
-        if instance_num > 1 {
-            format!("chat · {}", instance_num)
-        } else {
-            "chat".to_string()
-        }
-    };
+    let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
 
     print!("\x1b]0;rs-agent: {}\x07", second_line);
     let _ = io::stdout().flush();
@@ -459,7 +514,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     let mut last_total_tokens = 0;
     let mut line_buf = String::with_capacity(512);
     let mut router = matcher::ContextRouter::load();
-    let max_rounds = get_max_rounds();
+    let max_rounds = rs_agent::config::get_max_rounds();
 
     loop {
         print!("\x1b[?25h");
@@ -603,6 +658,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     cfg.adapters = loaded.adapters;
                     cfg.delegate = loaded.delegate;
                     client.set_reasoning_budget(loaded.reasoning_budget);
+                    client.set_reasoning_effort(loaded.reasoning_effort.as_deref());
                     let new_mcp = loaded.mcp_servers.clone();
                     active_profile = loaded;
 
@@ -720,19 +776,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             };
             state::set_box_style(current_box_style);
 
-            let second_line = if cfg.is_agent {
-                if instance_num > 1 {
-                    format!("{} · {}", cfg.profile_name, instance_num)
-                } else {
-                    cfg.profile_name.clone()
-                }
-            } else {
-                if instance_num > 1 {
-                    format!("chat · {}", instance_num)
-                } else {
-                    "chat".to_string()
-                }
-            };
+            let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
             ui::draw_box(&provider.model, &second_line, current_box_style, true);
             let _ = io::stdout().flush();
             continue;
@@ -848,56 +892,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             history.push(assistant_msg);
 
             println!();
-            for call in calls {
-                let call_id = call["id"].as_str().unwrap_or("call_0").to_string();
-                let fn_name = call["function"]["name"].as_str().unwrap_or("tool");
-                let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
-
-                // 1. Delegate healing & normalization exclusively to adapter.rs
-                let final_args =
-                    if cfg.adapters { adapter::repair_tool_args(fn_name, fn_args) } else { fn_args.to_string() };
-
-                let verb = match fn_name {
-                    "write_file" => "updating",
-                    "edit_file" => "surgically editing",
-                    "read_file" => "checking",
-                    "list_dir" => "checking",
-                    "search_code" => "searching codebase",
-                    "run_command" => "executing",
-                    _ => "working",
-                };
-
-                // 2. Read canonical summary from the repaired arguments
-                let brief = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&final_args) {
-                    parsed
-                        .get("path")
-                        .or_else(|| parsed.get("command"))
-                        .or_else(|| parsed.get("pattern"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("")
-                        .to_string()
-                } else {
-                    String::new()
-                };
-
-                println!("  \x1b[2m∗ {} •\x1b[0m \x1b[36m{}\x1b[0m \x1b[2m{}\x1b[0m", verb, fn_name, brief);
-                let _ = io::stdout().flush();
-
-                let t_start = Instant::now();
-                let tool_res = tools::execute_tool(fn_name, &final_args, target_dir, &boundary).await;
-                let elapsed = t_start.elapsed().as_secs_f64();
-
-                match tool_res {
-                    Ok(out) => {
-                        println!("  \x1b[1;32m✓\x1b[0m \x1b[2mDone ({:.1}s)\x1b[0m\n", elapsed);
-                        history.push(ChatMessage::tool_response(call_id, out));
-                    }
-                    Err(err) => {
-                        println!("  \x1b[1;31m✗\x1b[0m \x1b[2mFailed ({:.1}s): {}\x1b[0m\n", elapsed, err);
-                        history.push(ChatMessage::tool_response(call_id, format!("[tool error] {}", err)));
-                    }
-                }
-            }
+            execute_tool_batch(&calls, target_dir, &boundary, cfg.adapters, &mut history, false).await;
         }
     }
 

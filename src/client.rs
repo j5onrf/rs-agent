@@ -91,12 +91,13 @@ impl ChatMessage {
 
 pub struct LlmClient {
     pub reasoning_budget: std::sync::atomic::AtomicI64,
+    reasoning_effort: std::sync::Mutex<Option<String>>,
     http: Client,
     config: ProviderConfig,
 }
 
 #[inline]
-fn is_local_endpoint(url: &str) -> bool {
+pub fn is_local_endpoint(url: &str) -> bool {
     let u = url.to_lowercase();
     u.contains("127.0.0.1")
         || u.contains("localhost")
@@ -376,6 +377,64 @@ impl LlmClient {
         self.reasoning_budget.store(val, Ordering::Relaxed);
     }
 
+    pub fn set_reasoning_effort(&self, effort: Option<&str>) {
+        if let Ok(mut guard) = self.reasoning_effort.lock() {
+            *guard = effort.map(|s| s.trim().to_ascii_lowercase()).filter(|s| !s.is_empty());
+        }
+    }
+
+    fn resolve_cloud_reasoning_effort(&self, is_google: bool) -> Option<String> {
+        let explicit = self.reasoning_effort.lock().ok().and_then(|g| g.clone());
+        let raw_effort = if let Some(eff) = explicit {
+            eff
+        } else {
+            let rb = self.reasoning_budget.load(Ordering::Relaxed);
+            if rb < 0 {
+                return None;
+            } else if rb == 0 {
+                if is_google { "low".to_string() } else { "none".to_string() }
+            } else if rb <= 350 {
+                "low".to_string()
+            } else if rb <= 750 {
+                "medium".to_string()
+            } else if rb <= 2000 {
+                "high".to_string()
+            } else {
+                "xhigh".to_string()
+            }
+        };
+
+        if is_google {
+            let m = self.config.model.to_lowercase();
+            // Gemini 4 Hydrogen and 3.8 Flash reject "none" / "minimal" with HTTP 400
+            if (m.contains("gemini-4") || m.contains("gemini-3.8"))
+                && matches!(raw_effort.as_str(), "none" | "minimal")
+            {
+                return Some("low".to_string());
+            }
+            if raw_effort == "max" {
+                return Some("xhigh".to_string());
+            }
+        }
+        Some(raw_effort)
+    }
+
+    fn resolve_local_reasoning_budget(&self) -> i64 {
+        let rb = self.reasoning_budget.load(Ordering::Relaxed);
+        if rb >= 0 {
+            return rb;
+        }
+        let effort = self.reasoning_effort.lock().ok().and_then(|g| g.clone());
+        match effort.as_deref() {
+            Some("none") | Some("minimal") => 0,
+            Some("low") => 250,
+            Some("medium") => 500,
+            Some("high") => 1000,
+            Some("xhigh") | Some("max") => 4000,
+            _ => -1,
+        }
+    }
+
     pub fn new(config: ProviderConfig) -> Self {
         let http = Client::builder()
             .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
@@ -385,7 +444,12 @@ impl LlmClient {
             .build()
             .unwrap_or_default();
 
-        Self { reasoning_budget: std::sync::atomic::AtomicI64::new(-1), http, config }
+        Self {
+            reasoning_budget: std::sync::atomic::AtomicI64::new(-1),
+            reasoning_effort: std::sync::Mutex::new(None),
+            http,
+            config,
+        }
     }
 
     fn build_request_body(&self, messages: &[ChatMessage], tools: Option<Value>) -> Value {
@@ -404,26 +468,26 @@ impl LlmClient {
                 for msg in arr {
                     if msg.get("role").and_then(|r| r.as_str()) == Some("assistant") {
                         if let Some(tcs) = msg.get_mut("tool_calls").and_then(|v| v.as_array_mut()) {
-                            for tc in tcs {
-                                let has_sig = tc
-                                    .get("extra_content")
-                                    .and_then(|ec| ec.get("google"))
-                                    .and_then(|g| g.get("thought_signature"))
-                                    .and_then(|s| s.as_str())
-                                    .map(|s| !s.is_empty())
-                                    .unwrap_or(false);
+                            // Gemini 4 parallel tool turns carry thought_signature only on the first call
+                            let first_has_sig = tcs
+                                .first()
+                                .and_then(|tc| tc.get("extra_content"))
+                                .and_then(|ec| ec.get("google"))
+                                .and_then(|g| g.get("thought_signature"))
+                                .and_then(|s| s.as_str())
+                                .map(|s| !s.is_empty())
+                                .unwrap_or(false);
 
-                                if !has_sig {
-                                    if let Some(obj) = tc.as_object_mut() {
-                                        obj.insert(
-                                            "extra_content".to_string(),
-                                            serde_json::json!({
-                                                "google": {
-                                                    "thought_signature": "skip_thought_signature_validator"
-                                                }
-                                            }),
-                                        );
-                                    }
+                            if !first_has_sig {
+                                if let Some(first_obj) = tcs.first_mut().and_then(|tc| tc.as_object_mut()) {
+                                    first_obj.insert(
+                                        "extra_content".to_string(),
+                                        serde_json::json!({
+                                            "google": {
+                                                "thought_signature": "skip_thought_signature_validator"
+                                            }
+                                        }),
+                                    );
                                 }
                             }
                         }
@@ -446,7 +510,7 @@ impl LlmClient {
         if is_local {
             body["cache_prompt"] = serde_json::json!(true);
 
-            let rb = self.reasoning_budget.load(Ordering::Relaxed);
+            let rb = self.resolve_local_reasoning_budget();
             if rb >= 0 {
                 if let Some(obj) = body.as_object_mut() {
                     obj.insert("reasoning_budget".to_string(), serde_json::json!(rb));
@@ -457,6 +521,8 @@ impl LlmClient {
                     }
                 }
             }
+        } else if let Some(effort) = self.resolve_cloud_reasoning_effort(is_google) {
+            body["reasoning_effort"] = serde_json::json!(effort);
         }
 
         body
@@ -749,5 +815,49 @@ mod tests {
         let formatted = format_http_error(reqwest::StatusCode::UNAUTHORIZED, err_json, "gemini-3.5", "https://api.com");
         assert!(formatted.contains("HTTP 401 Unauthorized"));
         assert!(formatted.contains("Invalid API key"));
+    }
+
+    #[test]
+    fn test_hydrogen_cloud_reasoning_and_parallel_signatures() {
+        let cfg = ProviderConfig {
+            base_url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions".into(),
+            api_key: "test".into(),
+            model: "gemini-4-hydrogen".into(),
+            max_tokens: 65536,
+        };
+        let client = LlmClient::new(cfg);
+        client.set_reasoning_effort(Some("xhigh"));
+
+        let mut assistant = ChatMessage::assistant("");
+        assistant.tool_calls = Some(serde_json::json!([
+            {
+                "id": "call_1",
+                "type": "function",
+                "function": { "name": "read_file", "arguments": "{\"path\":\"a.rs\"}" },
+                "extra_content": { "google": { "thought_signature": "sig_abc" } }
+            },
+            {
+                "id": "call_2",
+                "type": "function",
+                "function": { "name": "read_file", "arguments": "{\"path\":\"b.rs\"}" }
+            }
+        ]));
+        let msgs = vec![
+            ChatMessage::user("check both"),
+            assistant,
+            ChatMessage::tool_response("call_1".into(), "a".into()),
+            ChatMessage::tool_response("call_2".into(), "b".into()),
+        ];
+
+        let body = client.build_request_body(&msgs, None);
+        assert_eq!(body["reasoning_effort"], "xhigh");
+        assert!(body.get("reasoning_budget").is_none());
+        let tcs = body["messages"][1]["tool_calls"].as_array().unwrap();
+        assert_eq!(tcs[0]["extra_content"]["google"]["thought_signature"], "sig_abc");
+        assert!(tcs[1].get("extra_content").is_none());
+
+        client.set_reasoning_effort(Some("none"));
+        let body_clamped = client.build_request_body(&[ChatMessage::user("hi")], None);
+        assert_eq!(body_clamped["reasoning_effort"], "low");
     }
 }

@@ -35,6 +35,11 @@ const SIGKILL: i32 = 9;
 
 static SUBAGENT_DEPTH: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
+#[inline]
+pub fn is_read_only_tool(name: &str) -> bool {
+    matches!(name, "read_file" | "list_dir" | "search_code")
+}
+
 pub fn get_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
     get_base_tools_schema(tier, delegate)
 }
@@ -279,11 +284,15 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
         }
     }
 
-    if matches.len() == 1 {
-        let (start_idx, end_idx) = matches[0];
+    fn reconstruct_with_indent(
+        orig_lines: &[&str],
+        start_idx: usize,
+        end_idx: usize,
+        old_first_line: &str,
+        clean_new: &str,
+    ) -> String {
         let orig_first_line = orig_lines[start_idx];
         let orig_indent = orig_first_line.len() - orig_first_line.trim_start().len();
-        let old_first_line = old_lines[0];
         let old_indent = old_first_line.len() - old_first_line.trim_start().len();
         let indent_delta = orig_indent as isize - old_indent as isize;
 
@@ -310,7 +319,12 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
             reconstructed.push('\n');
             reconstructed.push_str(&orig_lines[end_idx..].join("\n"));
         }
-        return Ok(reconstructed);
+        reconstructed
+    }
+
+    if matches.len() == 1 {
+        let (start_idx, end_idx) = matches[0];
+        return Ok(reconstruct_with_indent(&orig_lines, start_idx, end_idx, old_lines[0], &clean_new));
     } else if matches.len() > 1 {
         return Err(format!(
             "Whitespace-normalized old_str matched {} locations. Include more surrounding lines to make it unique.",
@@ -334,36 +348,7 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
     }
 
     if let Some((start_idx, end_idx)) = best_window.filter(|_| best_ratio >= 0.85) {
-        let orig_first_line = orig_lines[start_idx];
-        let orig_indent = orig_first_line.len() - orig_first_line.trim_start().len();
-        let old_first_line = old_lines[0];
-        let old_indent = old_first_line.len() - old_first_line.trim_start().len();
-        let indent_delta = orig_indent as isize - old_indent as isize;
-
-        let mut adjusted_new_lines = Vec::new();
-        for nl in clean_new.lines() {
-            if nl.trim().is_empty() {
-                adjusted_new_lines.push(String::new());
-            } else if indent_delta > 0 {
-                adjusted_new_lines.push(format!("{}{}", " ".repeat(indent_delta as usize), nl));
-            } else if indent_delta < 0 && nl.starts_with(&" ".repeat(indent_delta.unsigned_abs())) {
-                adjusted_new_lines.push(nl[indent_delta.unsigned_abs()..].to_string());
-            } else {
-                adjusted_new_lines.push(nl.to_string());
-            }
-        }
-
-        let mut reconstructed = String::new();
-        if start_idx > 0 {
-            reconstructed.push_str(&orig_lines[..start_idx].join("\n"));
-            reconstructed.push('\n');
-        }
-        reconstructed.push_str(&adjusted_new_lines.join("\n"));
-        if end_idx < orig_lines.len() {
-            reconstructed.push('\n');
-            reconstructed.push_str(&orig_lines[end_idx..].join("\n"));
-        }
-        return Ok(reconstructed);
+        return Ok(reconstruct_with_indent(&orig_lines, start_idx, end_idx, old_lines[0], &clean_new));
     }
 
     Err("Target 'old_str' not found in file (even with whitespace tolerance and fuzzy matching). Use read_file to inspect exact lines.".into())
@@ -426,16 +411,50 @@ pub async fn execute_tool(
                                 tool_calls: Some(serde_json::Value::Array(calls.clone())),
                                 tool_call_id: None,
                             });
-                            for call in calls {
-                                let c_id = call["id"].as_str().unwrap_or("call_sub").to_string();
-                                let fn_name = call["function"]["name"].as_str().unwrap_or("tool");
-                                let fn_args = call["function"]["arguments"].as_str().unwrap_or("{}");
-                                let res = Box::pin(execute_tool(fn_name, fn_args, workspace, &sub_boundary)).await;
-                                let res_str = match res {
-                                    Ok(o) => o,
-                                    Err(e) => format!("[error] {}", e),
-                                };
-                                sub_history.push(crate::client::ChatMessage::tool_response(c_id, res_str));
+                            let mut idx = 0;
+                            while idx < calls.len() {
+                                let fn_name = calls[idx]["function"]["name"].as_str().unwrap_or("tool");
+                                if is_read_only_tool(fn_name) {
+                                    let mut batch_end = idx + 1;
+                                    while batch_end < calls.len()
+                                        && is_read_only_tool(
+                                            calls[batch_end]["function"]["name"].as_str().unwrap_or("tool"),
+                                        )
+                                    {
+                                        batch_end += 1;
+                                    }
+                                    let mut futs = Vec::with_capacity(batch_end - idx);
+                                    for call in &calls[idx..batch_end] {
+                                        let c_id = call["id"].as_str().unwrap_or("call_sub").to_string();
+                                        let c_name = call["function"]["name"].as_str().unwrap_or("tool").to_string();
+                                        let c_args = crate::adapter::repair_tool_args(
+                                            &c_name,
+                                            call["function"]["arguments"].as_str().unwrap_or("{}"),
+                                        );
+                                        let ws = workspace;
+                                        let bnd = &sub_boundary;
+                                        futs.push(async move {
+                                            let res = Box::pin(execute_tool(&c_name, &c_args, ws, bnd)).await;
+                                            (c_id, res)
+                                        });
+                                    }
+                                    for (c_id, res) in futures_util::future::join_all(futs).await {
+                                        let res_str = res.unwrap_or_else(|e| format!("[error] {}", e));
+                                        sub_history.push(crate::client::ChatMessage::tool_response(c_id, res_str));
+                                    }
+                                    idx = batch_end;
+                                } else {
+                                    let call = &calls[idx];
+                                    let c_id = call["id"].as_str().unwrap_or("call_sub").to_string();
+                                    let c_args = crate::adapter::repair_tool_args(
+                                        fn_name,
+                                        call["function"]["arguments"].as_str().unwrap_or("{}"),
+                                    );
+                                    let res = Box::pin(execute_tool(fn_name, &c_args, workspace, &sub_boundary)).await;
+                                    let res_str = res.unwrap_or_else(|e| format!("[error] {}", e));
+                                    sub_history.push(crate::client::ChatMessage::tool_response(c_id, res_str));
+                                    idx += 1;
+                                }
                             }
                         } else {
                             break;
@@ -469,14 +488,25 @@ pub async fn execute_tool(
             let l_start = args.get("line_start").and_then(|v| v.as_u64()).map(|v| v as usize);
             let l_end = args.get("line_end").and_then(|v| v.as_u64()).map(|v| v as usize);
 
-            if let (Some(s), Some(e)) = (l_start, l_end) {
+            if l_start.is_some() || l_end.is_some() {
+                let s = l_start.unwrap_or(1).max(1);
                 let start_idx = s.saturating_sub(1);
-                let end_idx = e.min(total);
-                if start_idx >= total || start_idx >= end_idx {
-                    return Err(format!("Invalid line range {}-{} for file with {} lines", s, e, total));
+                if total == 0 || start_idx >= total {
+                    return Err(format!("Invalid line range starting at {} for file with {} lines", s, total));
+                }
+                let end_idx = l_end
+                    .map(|e| e.min(total))
+                    .unwrap_or_else(|| (start_idx + ceilings.line_ceiling).min(total));
+                if start_idx >= end_idx {
+                    return Err(format!("Invalid line range {}-{} for file with {} lines", s, end_idx, total));
                 }
                 let slice = lines[start_idx..end_idx].join("\n");
-                Ok(format!("### File: {} (Lines {}-{} of {})\n{}", path_str, s, end_idx, total, slice))
+                let note = if l_end.is_none() && end_idx < total {
+                    format!("\n... [Clamped to {}-line ceiling; pass line_end to read further]", ceilings.line_ceiling)
+                } else {
+                    String::new()
+                };
+                Ok(format!("### File: {} (Lines {}-{} of {})\n{}{}", path_str, s, end_idx, total, slice, note))
             } else if total > ceilings.line_ceiling {
                 let preview_count = ceilings.preview_lines.min(total);
                 let preview = lines[..preview_count].join("\n");
@@ -667,7 +697,8 @@ pub async fn execute_tool(
             let combined = format!("{}{}", stdout, stderr);
             let trimmed = combined.trim();
 
-            let result = if trimmed.chars().count() > ceilings.char_cap {
+            let total_chars = trimmed.chars().count();
+            let result = if total_chars > ceilings.char_cap {
                 let scratchpad_dir = workspace.join(".rs");
                 let _ = fs::create_dir_all(&scratchpad_dir);
                 let _ = fs::write(scratchpad_dir.join("scratchpad.log"), trimmed);
@@ -679,19 +710,26 @@ pub async fn execute_tool(
 
                 format!(
                     "{}\n\n... [Output truncated: {} chars exceeds {} cap. Full raw output saved to .rs/scratchpad.log] ...\n\n{}",
-                    head, trimmed.len(), ceilings.char_cap, tail
+                    head, total_chars, ceilings.char_cap, tail
                 )
             } else if trimmed.is_empty() {
-                "(exit 0, no output)".into()
+                "(no output)".into()
             } else {
                 trimmed.to_string()
             };
 
-            let code = output.status.code().unwrap_or(0);
-            if code != 0 {
-                Ok(format!("(exit {})\n{}", code, result))
-            } else {
-                Ok(result)
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::ExitStatusExt;
+                if let Some(sig) = output.status.signal() {
+                    return Ok(format!("(killed by signal {})\n{}", sig, result));
+                }
+            }
+
+            match output.status.code() {
+                Some(0) => Ok(if trimmed.is_empty() { "(exit 0, no output)".into() } else { result }),
+                Some(code) => Ok(format!("(exit {})\n{}", code, result)),
+                None => Ok(format!("(terminated abnormally)\n{}", result)),
             }
         }
 
