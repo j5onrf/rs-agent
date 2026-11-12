@@ -667,7 +667,7 @@ def main():
             Panel(
                 "[bold cyan]Rs-Agent Full-Stack Agentic & Tool-Calling Benchmark Suite[/bold cyan]\n"
                 "[dim]Decision-grade evaluation: Par efficiency, token economy, tool resilience, and execution speed[/dim]",
-                border_style="cyan",
+                border_style="cyan", expand=False,
             )
         )
         console.print(f"Target Model:   [bold]{model_name}[/bold]")
@@ -772,7 +772,7 @@ def main():
         summary.append(f"Token Economy:    {total_tokens:,} total tokens (~{toks_per_turn:.0f} tokens/turn)\n", style="dim")
         summary.append(f"Effective Speed:  {avg_tps:.1f} tokens/second (Total elapsed: {total_time:.2f}s)\n", style="dim")
         summary.append(f"\nAgent Performance Index: {agent_index:.1f}/100 [Grade: {grade}]", style="bold yellow")
-        console.print(Panel(summary, title="Conclusive Benchmark Evaluation", border_style="green" if accuracy == 100 else "yellow", box=ROUNDED))
+        console.print(Panel(summary, title="Conclusive Benchmark Evaluation", border_style="green" if accuracy == 100 else "yellow", box=ROUNDED, expand=False))
     else:
         print(f"\n{'='*60}\nPass Rate:        {passed_count}/{evaluated_count} ({accuracy:.1f}%)\nPar Efficiency:   {par_eff:.1f}%\nAgent Index:      {agent_index:.1f}/100 [Grade: {grade}]\n{'='*60}\n")
 

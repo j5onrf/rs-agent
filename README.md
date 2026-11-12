@@ -3,7 +3,7 @@
   <h1>Rs-Agent</h1>
  
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.1.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.2.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -24,7 +24,7 @@
       <td align="center" width="28%" valign="top">
         <h3>👤 Sub-27B (SLM)</h3>
         <p><sub>Tool calling, fast refactoring, and single-turn edits</sub></p>
-        <code>LFM3-1.7B*</code> &nbsp;•&nbsp; <code>Ling-3.0-tiny</code><br>
+        <code>LFM3-1.7B</code> &nbsp;•&nbsp; <code>Ling-3.0-tiny*</code><br>
         <code>MiniCPM5-2B</code> &nbsp;•&nbsp; <code>Qwen3.5-2B+</code><br>
         <code>MiniCPM-V-4.7-1B</code> &nbsp;•&nbsp; <code>LFM2.5-24B-A2B</code>
       </td>
@@ -237,8 +237,8 @@ Standalone native Rust binaries in `tools/` for project maintenance:
 | **2** | **Groot-19B-A3B** *(MTP)* | **162.5%** | **100.0 (A+)** |
 | **3** | **Sage-A1.5-35B** | **111.1%** | **100.0 (A+)** |
 | **4** | **Qwen3.8-35B-Distill** *(MTP)* | **136.4%** | **92.2 (A)** |
-| **—** | **LFM3-1.7B** *(SLM)* | **162.5%** | **100.0 (A+)** |
-| **—** | **Ling-3.0-tiny** *(SLM)* | **130.0%** | **97.3 (A+)** |
+| **—** | **Ling-3.0-tiny** *(SLM)* | **162.5%** | **100.0  (A+)** |
+| **—** | **LFM3-1.7B** *(SLM)* | **173.3%** | **100.0 (A+)** |
 
 <p><sub>Decision-grade evaluation via <code>eva</code>: autonomous eval measuring par efficiency, tool resilience, and token economy.</sub></p>
 

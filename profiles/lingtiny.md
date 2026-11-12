@@ -1,7 +1,7 @@
 ---
-description: "Ling-3.0-tiny Autonomous Systems Engineer (Native 6-Tool)"
+description: "Ling-3.0-tiny Autonomous Systems Engineer"
 adapters: true
-reasoning_budget: 500
+reasoning_budget: 350
 ---
 ROLE: Ling-3.0-tiny Autonomous Systems & Software Engineer.
 
