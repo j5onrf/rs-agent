@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
@@ -24,9 +24,15 @@ impl InlineSpinner {
     pub fn start(&mut self, msg: &str) {
         self.stop();
 
+        // Finding 2 Fix: Gate interactive ticker exclusively to TTY devices
+        if !io::stdout().is_terminal() {
+            return;
+        }
+
         self.running.store(true, Ordering::SeqCst);
         if let Ok(mut m) = self.message.lock() {
-            *m = msg.to_string();
+            m.clear();
+            m.push_str(msg);
         }
 
         let running = Arc::clone(&self.running);
@@ -38,12 +44,16 @@ impl InlineSpinner {
                 let start_time = Instant::now();
                 while running.load(Ordering::Relaxed) {
                     let elapsed = start_time.elapsed().as_secs_f64();
-                    let msg_text = message.lock().map(|m| m.clone()).unwrap_or_default();
 
-                    let stdout = io::stdout();
-                    let mut lock = stdout.lock();
-                    let _ = write!(lock, "\r\x1b[2K  {} \x1b[2m{:.1}s\x1b[0m", msg_text, elapsed);
-                    let _ = lock.flush();
+                    // Finding 1 Fix: Scope stdout lock tightly so it drops before thread::sleep
+                    {
+                        let stdout = io::stdout();
+                        let mut lock = stdout.lock();
+                        if let Ok(m) = message.lock() {
+                            let _ = write!(lock, "\r\x1b[2K  {} \x1b[2m{:.1}s\x1b[0m", &*m, elapsed);
+                        }
+                        let _ = lock.flush();
+                    }
 
                     thread::sleep(Duration::from_millis(100));
                 }
@@ -55,7 +65,8 @@ impl InlineSpinner {
 
     pub fn update(&self, msg: &str) {
         if let Ok(mut m) = self.message.lock() {
-            *m = msg.to_string();
+            m.clear();
+            m.push_str(msg);
         }
     }
 
@@ -64,10 +75,12 @@ impl InlineSpinner {
             if let Some(h) = self.handle.take() {
                 let _ = h.join();
             }
-            let stdout = io::stdout();
-            let mut lock = stdout.lock();
-            let _ = write!(lock, "\r\x1b[2K");
-            let _ = lock.flush();
+            if io::stdout().is_terminal() {
+                let stdout = io::stdout();
+                let mut lock = stdout.lock();
+                let _ = write!(lock, "\r\x1b[2K");
+                let _ = lock.flush();
+            }
         }
     }
 }
