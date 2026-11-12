@@ -22,17 +22,12 @@ impl Default for AppState {
 }
 
 fn get_state_path() -> PathBuf {
-    dirs::home_dir()
-        .map(|h| h.join(".config/rs-agent/state.json"))
-        .unwrap_or_else(|| PathBuf::from("state.json"))
+    dirs::home_dir().map(|h| h.join(".config/rs-agent/state.json")).unwrap_or_else(|| PathBuf::from("state.json"))
 }
 
 fn load_state() -> AppState {
     let path = get_state_path();
-    fs::read_to_string(path)
-        .ok()
-        .and_then(|c| serde_json::from_str(&c).ok())
-        .unwrap_or_default()
+    fs::read_to_string(path).ok().and_then(|c| serde_json::from_str(&c).ok()).unwrap_or_default()
 }
 
 fn save_state(state: &AppState) {

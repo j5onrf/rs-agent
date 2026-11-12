@@ -9,10 +9,10 @@ use std::time::{Duration, Instant};
 // Exact ANSI constants (inherits active terminal palette)
 const ANSI_RESET: &str = "\x1b[0m";
 const ANSI_BRIGHT: &str = "\x1b[1;36m"; // Primary theme accent
-const ANSI_ACCENT: &str = "\x1b[36m";   // Regular theme accent
-const ANSI_WHITE: &str = "\x1b[1;37m";  // Bold foreground
-const ANSI_MUTED: &str = "\x1b[90m";    // Color 8 / Muted
-const ANSI_DIM: &str = "\x1b[2m";       // Faint / Low contrast
+const ANSI_ACCENT: &str = "\x1b[36m"; // Regular theme accent
+const ANSI_WHITE: &str = "\x1b[1;37m"; // Bold foreground
+const ANSI_MUTED: &str = "\x1b[90m"; // Color 8 / Muted
+const ANSI_DIM: &str = "\x1b[2m"; // Faint / Low contrast
 
 struct RawModeGuard;
 
@@ -113,9 +113,8 @@ fn resolve_git_status() -> String {
     }
 
     // --no-optional-locks guarantees no lock contention; --no-renames speeds up status
-    let Ok(out) = Command::new("git")
-        .args(["--no-optional-locks", "status", "--porcelain", "-b", "--no-renames"])
-        .output()
+    let Ok(out) =
+        Command::new("git").args(["--no-optional-locks", "status", "--porcelain", "-b", "--no-renames"]).output()
     else {
         return "git: [none]".to_string();
     };
@@ -668,11 +667,7 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
     }
 
     // Zero-latency boot: spawn git status in background so Frame 0 renders immediately
-    let mut git_handle = if style >= 4 {
-        Some(std::thread::spawn(resolve_git_status))
-    } else {
-        None
-    };
+    let mut git_handle = if style >= 4 { Some(std::thread::spawn(resolve_git_status)) } else { None };
     let mut git_info = String::from("git: scanning…");
 
     let _guard = RawModeGuard;

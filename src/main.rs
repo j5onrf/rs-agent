@@ -24,7 +24,57 @@ extern "C" {
     fn kill(pid: i32, sig: i32) -> i32;
 }
 
-fn resolve_instance_number(profile: &str) -> (usize, PathBuf) {
+use std::sync::Mutex;
+
+static CURRENT_LOCK_FILE: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+pub struct InstanceLockGuard(pub PathBuf);
+
+impl AsRef<Path> for InstanceLockGuard {
+    fn as_ref(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for InstanceLockGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_file(&self.0);
+        if let Ok(mut g) = CURRENT_LOCK_FILE.lock() {
+            if let Some(ref path) = *g {
+                if path == &self.0 {
+                    *g = None;
+                }
+            }
+        }
+    }
+}
+
+fn is_rs_agent_process(pid: i32) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        if unsafe { kill(pid, 0) != 0 } {
+            return false;
+        }
+        if let Ok(comm) = fs::read_to_string(format!("/proc/{}/comm", pid)) {
+            let trimmed = comm.trim();
+            if trimmed == "ai" || trimmed == "rs-agent" {
+                return true;
+            }
+        }
+        if let Ok(cmdline) = fs::read_to_string(format!("/proc/{}/cmdline", pid)) {
+            if cmdline.contains("ai") || cmdline.contains("rs-agent") {
+                return true;
+            }
+        }
+        false
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        unsafe { kill(pid, 0) == 0 }
+    }
+}
+
+fn resolve_instance_number(profile: &str) -> (usize, InstanceLockGuard) {
     let shm_dir = PathBuf::from("/dev/shm/rs-agent-instances");
     let _ = fs::create_dir_all(&shm_dir);
 
@@ -36,8 +86,8 @@ fn resolve_instance_number(profile: &str) -> (usize, PathBuf) {
                 let parts: Vec<&str> = fname.split('.').collect();
                 if parts.len() == 2 {
                     if let Ok(pid) = parts[0].parse::<i32>() {
-                        let is_alive = unsafe { kill(pid, 0) == 0 };
-                        if !is_alive {
+                        let is_active = is_rs_agent_process(pid);
+                        if !is_active {
                             let _ = fs::remove_file(&path);
                         } else if parts[1] == profile {
                             active_count += 1;
@@ -52,7 +102,10 @@ fn resolve_instance_number(profile: &str) -> (usize, PathBuf) {
     let my_pid = std::process::id();
     let lock_file = shm_dir.join(format!("{}.{}", my_pid, profile));
     let _ = fs::write(&lock_file, instance_num.to_string());
-    (instance_num, lock_file)
+    if let Ok(mut g) = CURRENT_LOCK_FILE.lock() {
+        *g = Some(lock_file.clone());
+    }
+    (instance_num, InstanceLockGuard(lock_file))
 }
 
 #[derive(Parser, Debug)]
@@ -344,7 +397,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 if let Some(selected) = Profile::select_interactive(target_dir, &c.profile_name) {
                     c.profile_name = selected;
                 } else {
-                    c.profile_name = Profile::resolve_for_workspace(&dir_name, &provider.model, Some(&provider.base_url));
+                    c.profile_name =
+                        Profile::resolve_for_workspace(&dir_name, &provider.model, Some(&provider.base_url));
                 }
             } else {
                 c.profile_name = Profile::resolve_for_workspace(&dir_name, &provider.model, Some(&provider.base_url));
@@ -854,6 +908,12 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 async fn main() -> anyhow::Result<()> {
     tokio::spawn(async {
         if tokio::signal::ctrl_c().await.is_ok() {
+            if let Ok(mut guard) = CURRENT_LOCK_FILE.lock() {
+                if let Some(ref path) = *guard {
+                    let _ = fs::remove_file(path);
+                    *guard = None;
+                }
+            }
             let _ = crossterm::terminal::disable_raw_mode();
             print!("\x1b[?25h\r\n");
             let _ = io::stdout().flush();
