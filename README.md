@@ -184,7 +184,7 @@ File reads and shell outputs adapt dynamically to `AI_MAX_TOKENS`, offloading ov
 
 Configure agent personas, tool tiers, MCP servers, and reasoning behavior in `profiles/*.md` frontmatter:
 
-```markdown
+```yaml
 ---
 description: "High-Speed Coding & Systems Engineer"
 adapters: true          # Strip line gutters, normalize aliases, heal malformed JSON
