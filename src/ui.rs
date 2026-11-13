@@ -161,7 +161,7 @@ fn render_dot_slab_inner_wipe(model: &str, profile: &str, col: usize) -> (String
 
     let max_txt = model_clamped.chars().count().max(profile_clamped.chars().count());
     let mut cutout_end = (3 + max_txt + 2).min(slab_w);
-    if cutout_end % 2 != 0 && cutout_end < slab_w {
+    if !cutout_end.is_multiple_of(2) && cutout_end < slab_w {
         cutout_end += 1;
     }
 
@@ -665,18 +665,18 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             let max_txt = m_len.max(p_len).max(g_len);
 
             let mut cutout_end = (11 + max_txt + 2).min(slab_w);
-            if cutout_end % 2 != 0 && cutout_end < slab_w {
+            if !cutout_end.is_multiple_of(2) && cutout_end < slab_w {
                 cutout_end += 1;
             }
 
             let mut grid: [Option<(char, &'static str)>; 235] = [None; 235];
 
             // Row 0
-            for x in 0..slab_w {
+            for (x, cell) in grid.iter_mut().enumerate().take(slab_w) {
                 if x == 4 {
-                    grid[x] = Some(('○', ANSI_BRIGHT));
-                } else if x % 2 == 0 {
-                    grid[x] = Some(('·', slab_shader(x, slab_w)));
+                    *cell = Some(('○', ANSI_BRIGHT));
+                } else if x.is_multiple_of(2) {
+                    *cell = Some(('·', slab_shader(x, slab_w)));
                 }
             }
 
@@ -794,7 +794,7 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
     let duration = match style {
         1 | 7 => Duration::from_millis(150),
         2 | 3 => Duration::from_millis(200),
-        4 | 5 | 6 => Duration::from_millis(550),
+        4..=6 => Duration::from_millis(550),
         _ => Duration::from_millis(200),
     };
 
@@ -1028,24 +1028,18 @@ pub fn read_ruled_input(
                         buf.remove(cur);
                     }
                 }
-                KeyCode::Backspace => {
-                    if cur > 0 {
-                        cur -= 1;
-                        buf.remove(cur);
-                    }
+                KeyCode::Backspace if cur > 0 => {
+                    cur -= 1;
+                    buf.remove(cur);
                 }
-                KeyCode::Delete => {
-                    if cur < buf.len() {
-                        buf.remove(cur);
-                    }
+                KeyCode::Delete if cur < buf.len() => {
+                    buf.remove(cur);
                 }
                 KeyCode::Left => {
                     cur = cur.saturating_sub(1);
                 }
-                KeyCode::Right => {
-                    if cur < buf.len() {
-                        cur += 1;
-                    }
+                KeyCode::Right if cur < buf.len() => {
+                    cur += 1;
                 }
                 KeyCode::Home => {
                     cur = 0;
