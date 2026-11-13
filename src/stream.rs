@@ -11,8 +11,11 @@ pub struct UsageStats {
 
 pub struct StreamRenderer {
     pub pad: bool,
+    pub show_thinking: Option<bool>,
     pub thinking_started: bool,
+    pub glyph_emitted: bool,
     pub answer_started: bool,
+    pub bullet_started: bool,
     pub at_line_start: bool,
     pub think_col: usize,
     pub think_word_buf: String,
@@ -29,8 +32,11 @@ impl StreamRenderer {
 
         Self {
             pad,
+            show_thinking: crate::state::get_show_thinking_summaries(),
             thinking_started: false,
+            glyph_emitted: false,
             answer_started: false,
+            bullet_started: false,
             at_line_start: true,
             think_col: 0,
             think_word_buf: String::with_capacity(64),
@@ -49,15 +55,25 @@ impl StreamRenderer {
         let w_len = self.think_word_buf.chars().count();
         let stdout = io::stdout();
         let mut handle = stdout.lock();
-
         if self.at_line_start {
             let clean = self.think_word_buf.trim_start();
-            let _ = write!(handle, "\x1b[2m│ \x1b[0m\x1b[2m{}", clean);
+            let prefix = if self.show_thinking == Some(true) {
+                if !self.glyph_emitted {
+                    self.glyph_emitted = true;
+                    "  \x1b[2;3m∴ "
+                } else {
+                    "    \x1b[2;3m"
+                }
+            } else {
+                "\x1b[2m│ \x1b[0m\x1b[2m"
+            };
+            let _ = write!(handle, "{}{}", prefix, clean);
             self.think_col = clean.chars().count();
             self.at_line_start = false;
         } else if self.think_col + w_len > self.avail_width {
             let clean = self.think_word_buf.trim_start();
-            let _ = write!(handle, "\x1b[0m\n\x1b[2m│ \x1b[0m\x1b[2m{}", clean);
+            let prefix = if self.show_thinking == Some(true) { "    \x1b[2;3m" } else { "\x1b[2m│ \x1b[0m\x1b[2m" };
+            let _ = write!(handle, "\x1b[0m\n{}{}", prefix, clean);
             self.think_col = clean.chars().count();
         } else {
             let _ = write!(handle, "{}", self.think_word_buf);
@@ -67,9 +83,20 @@ impl StreamRenderer {
         self.think_word_buf.clear();
     }
 
-    /// Closes thinking gutter; emits spacer line only when pad is true
+    /// Closes thinking block; emits spacer line only when pad is true
     pub fn close_thinking(&mut self) {
         if self.thinking_started && !self.answer_started {
+            if self.show_thinking == Some(false) {
+                let secs = self.first_token_time.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.0);
+                println!("\r\x1b[2K  \x1b[2;3m∴ Thought for {:.1}s\x1b[0m", secs);
+                if self.pad {
+                    println!();
+                }
+                self.answer_started = true;
+                self.at_line_start = true;
+                let _ = io::stdout().flush();
+                return;
+            }
             self.flush_think_word();
             if !self.at_line_start {
                 println!();
@@ -98,6 +125,14 @@ impl StreamRenderer {
                 self.thinking_started = true;
                 self.at_line_start = true;
                 self.think_col = 0;
+                if self.show_thinking == Some(false) {
+                    print!("  \x1b[2;3m∴ …\x1b[0m");
+                    let _ = io::stdout().flush();
+                }
+            }
+
+            if self.show_thinking == Some(false) {
+                return;
             }
 
             for ch in chunk.chars() {
@@ -108,7 +143,11 @@ impl StreamRenderer {
                         let stdout = io::stdout();
                         let mut handle = stdout.lock();
                         if self.at_line_start {
-                            let _ = writeln!(handle, "\x1b[2m│\x1b[0m");
+                            if self.show_thinking == Some(true) {
+                                let _ = writeln!(handle);
+                            } else {
+                                let _ = writeln!(handle, "\x1b[2m│\x1b[0m");
+                            }
                         } else {
                             let _ = writeln!(handle, "\x1b[0m");
                             self.at_line_start = true;
@@ -138,13 +177,27 @@ impl StreamRenderer {
 
             let stdout = io::stdout();
             let mut handle = stdout.lock();
-            let _ = write!(handle, "\x1b[0m{}", chunk);
-            self.at_line_start = chunk.ends_with('\n');
+            if !self.bullet_started {
+                let clean = chunk.trim_start_matches('\n');
+                if clean.is_empty() {
+                    return;
+                }
+                self.bullet_started = true;
+                let _ = write!(handle, "  \x1b[1;36m●\x1b[0m \x1b[0m{}", clean);
+                self.at_line_start = clean.ends_with('\n');
+            } else {
+                let _ = write!(handle, "\x1b[0m{}", chunk);
+                self.at_line_start = chunk.ends_with('\n');
+            }
             let _ = handle.flush();
         }
     }
 
     pub fn finish(&mut self, stats: &UsageStats, prompt_chars: usize) {
+        let _ = self.finish_with_print(stats, prompt_chars, true);
+    }
+
+    pub fn finish_with_print(&mut self, stats: &UsageStats, prompt_chars: usize, print_line: bool) -> String {
         self.close_thinking();
 
         let elapsed_gen = self.first_token_time.map(|t| t.elapsed().as_secs_f64()).unwrap_or(0.01).max(0.01);
@@ -201,7 +254,10 @@ impl StreamRenderer {
         parts.push(format!("{:.1}s @ {:.1} t/s", elapsed_gen, speed));
 
         let stat_line = parts.join(" · ");
-        println!("  \x1b[2m{}\x1b[0m\n", stat_line);
+        if print_line {
+            println!("    \x1b[2m{}\x1b[0m\n", stat_line);
+        }
         let _ = io::stdout().flush();
+        stat_line
     }
 }

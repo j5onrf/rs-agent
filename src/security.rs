@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
@@ -270,6 +270,9 @@ impl SecurityBoundary {
     }
 
     pub fn authorize(&self, violation: &str) -> bool {
+        if io::stdin().is_terminal() {
+            return crate::ui::authorize_prompt(violation);
+        }
         print!("\n\x1b[1;31m[SECURITY-ALERT] Authorize: {}? [y/N]: \x1b[0m", violation);
         let _ = io::stdout().flush();
 

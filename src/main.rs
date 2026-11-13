@@ -177,17 +177,118 @@ fn tool_brief(final_args: &str) -> String {
         .unwrap_or_default()
 }
 
-fn tool_verb(fn_name: &str, autonomous: bool) -> &'static str {
-    if autonomous {
-        return "executing";
-    }
+fn tool_display_name(fn_name: &str) -> &str {
     match fn_name {
-        "write_file" => "updating",
-        "edit_file" => "surgically editing",
-        "read_file" | "list_dir" => "checking",
-        "search_code" => "searching codebase",
-        "run_command" => "executing",
-        _ => "working",
+        "read_file" => "Read",
+        "edit_file" => "Edit",
+        "write_file" => "Write",
+        "list_dir" => "List",
+        "search_code" => "Search",
+        "run_command" => "Bash",
+        "delegate_task" => "Agent",
+        other => other,
+    }
+}
+
+fn summarize_tool_output(fn_name: &str, out: &str, elapsed: f64) -> String {
+    match fn_name {
+        "read_file" => {
+            let line_count = out.lines().count().saturating_sub(1);
+            format!("Read {} line(s) ({:.1}s)", line_count, elapsed)
+        }
+        "list_dir" => {
+            let count = out.lines().filter(|l| !l.trim().is_empty()).count();
+            format!("Listed {} item(s) ({:.1}s)", count, elapsed)
+        }
+        "search_code" => {
+            if out.starts_with("No matches") {
+                format!("No matches ({:.1}s)", elapsed)
+            } else {
+                let count = out.lines().count().saturating_sub(1);
+                format!("Found {} match(es) ({:.1}s)", count, elapsed)
+            }
+        }
+        "run_command" => {
+            let first = out.lines().next().unwrap_or("(no output)").trim();
+            let clamped: String = first.chars().take(72).collect();
+            let ell = if first.chars().count() > 72 { "…" } else { "" };
+            format!("{}{} ({:.1}s)", clamped, ell, elapsed)
+        }
+        _ => format!("Done ({:.1}s)", elapsed),
+    }
+}
+
+fn diff_counts(old_text: &str, new_text: &str) -> (usize, usize) {
+    let old_lines: Vec<&str> = old_text.lines().collect();
+    let new_lines: Vec<&str> = new_text.lines().collect();
+    let min_len = old_lines.len().min(new_lines.len());
+    let mut prefix = 0;
+    while prefix < min_len && old_lines[prefix] == new_lines[prefix] {
+        prefix += 1;
+    }
+    let mut suffix = 0;
+    while suffix < (min_len - prefix)
+        && old_lines[old_lines.len() - 1 - suffix] == new_lines[new_lines.len() - 1 - suffix]
+    {
+        suffix += 1;
+    }
+    (new_lines.len() - prefix - suffix, old_lines.len() - prefix - suffix)
+}
+
+fn print_inline_diff(old_text: &str, new_text: &str) {
+    let old_lines: Vec<&str> = old_text.lines().collect();
+    let new_lines: Vec<&str> = new_text.lines().collect();
+    let min_len = old_lines.len().min(new_lines.len());
+    let mut prefix = 0;
+    while prefix < min_len && old_lines[prefix] == new_lines[prefix] {
+        prefix += 1;
+    }
+    let mut suffix = 0;
+    while suffix < (min_len - prefix)
+        && old_lines[old_lines.len() - 1 - suffix] == new_lines[new_lines.len() - 1 - suffix]
+    {
+        suffix += 1;
+    }
+
+    let removed = &old_lines[prefix..old_lines.len() - suffix];
+    let added = &new_lines[prefix..new_lines.len() - suffix];
+    if removed.is_empty() && added.is_empty() {
+        return;
+    }
+
+    let diff_w =
+        crossterm::terminal::size().map(|(w, _)| (w as usize).saturating_sub(16)).unwrap_or(68).clamp(32, 76);
+
+    if prefix > 0 {
+        println!("       \x1b[2m{:>3}   {}\x1b[0m", prefix, old_lines[prefix - 1]);
+    }
+    for (i, line) in removed.iter().take(6).enumerate() {
+        let pad_len = diff_w.saturating_sub(line.chars().count());
+        println!(
+            "       \x1b[31m{:>3} -\x1b[0m \x1b[48;2;64;26;26m{}{}\x1b[0m",
+            prefix + i + 1,
+            line,
+            " ".repeat(pad_len)
+        );
+    }
+    if removed.len() > 6 {
+        println!("       \x1b[2m... (-{} more lines)\x1b[0m", removed.len() - 6);
+    }
+    for (i, line) in added.iter().take(6).enumerate() {
+        let pad_len = diff_w.saturating_sub(line.chars().count());
+        println!(
+            "       \x1b[1;32m{:>3} +\x1b[0m \x1b[48;2;22;52;32m{}{}\x1b[0m",
+            prefix + i + 1,
+            line,
+            " ".repeat(pad_len)
+        );
+    }
+    if added.len() > 6 {
+        println!("       \x1b[2m... (+{} more lines)\x1b[0m", added.len() - 6);
+    }
+    if suffix > 0 {
+        let ctx_idx = old_lines.len() - suffix;
+        println!("       \x1b[2m{:>3}   {}\x1b[0m", ctx_idx + 1, old_lines[ctx_idx]);
     }
 }
 
@@ -197,7 +298,7 @@ async fn execute_tool_batch(
     boundary: &SecurityBoundary,
     use_adapters: bool,
     history: &mut Vec<ChatMessage>,
-    autonomous: bool,
+    spinner: &mut InlineSpinner,
 ) -> usize {
     let mut executed = 0;
     let mut idx = 0;
@@ -212,7 +313,10 @@ async fn execute_tool_batch(
                 batch_end += 1;
             }
 
-            let mut futs = Vec::with_capacity(batch_end - idx);
+            let count = batch_end - idx;
+            spinner.start(if count > 1 { "Reading workspace..." } else { "Inspecting..." });
+
+            let mut futs = Vec::with_capacity(count);
             for call in &calls[idx..batch_end] {
                 executed += 1;
                 let call_id = call["id"].as_str().unwrap_or("call_0").to_string();
@@ -221,24 +325,28 @@ async fn execute_tool_batch(
                 let final_args =
                     if use_adapters { adapter::repair_tool_args(&c_name, raw_args) } else { raw_args.to_string() };
                 let brief = tool_brief(&final_args);
-                println!("  \x1b[2m∗ {} •\x1b[0m \x1b[36m{}\x1b[0m \x1b[2m{}\x1b[0m", tool_verb(&c_name, autonomous), c_name, brief);
 
                 futs.push(async move {
                     let t_start = Instant::now();
                     let res = tools::execute_tool(&c_name, &final_args, target_dir, boundary).await;
-                    (call_id, res, t_start.elapsed().as_secs_f64())
+                    (call_id, c_name, brief, res, t_start.elapsed().as_secs_f64())
                 });
             }
-            let _ = io::stdout().flush();
 
-            for (call_id, tool_res, elapsed) in futures_util::future::join_all(futs).await {
+            let results = futures_util::future::join_all(futs).await;
+            spinner.stop();
+
+            for (call_id, c_name, brief, tool_res, elapsed) in results {
+                let label = tool_display_name(&c_name);
+                println!("  \x1b[1;36m●\x1b[0m \x1b[1;37m{}\x1b[0m\x1b[2m({})\x1b[0m", label, brief);
                 match tool_res {
                     Ok(out) => {
-                        println!("  \x1b[1;32m✓\x1b[0m \x1b[2mDone ({:.1}s)\x1b[0m\n", elapsed);
+                        let summary = summarize_tool_output(&c_name, &out, elapsed);
+                        println!("    \x1b[90m⎿\x1b[0m  \x1b[2m{}\x1b[0m\n", summary);
                         history.push(ChatMessage::tool_response(call_id, out));
                     }
                     Err(err) => {
-                        println!("  \x1b[1;31m✗\x1b[0m \x1b[2mFailed ({:.1}s): {}\x1b[0m\n", elapsed, err);
+                        println!("    \x1b[90m⎿\x1b[0m  \x1b[1;31m✗ {}\x1b[0m \x1b[2m({:.1}s)\x1b[0m\n", err, elapsed);
                         history.push(ChatMessage::tool_response(call_id, format!("[tool error] {}", err)));
                     }
                 }
@@ -252,20 +360,47 @@ async fn execute_tool_batch(
             let final_args =
                 if use_adapters { adapter::repair_tool_args(fn_name, raw_args) } else { raw_args.to_string() };
             let brief = tool_brief(&final_args);
-            println!("  \x1b[2m∗ {} •\x1b[0m \x1b[36m{}\x1b[0m \x1b[2m{}\x1b[0m", tool_verb(fn_name, autonomous), fn_name, brief);
-            let _ = io::stdout().flush();
 
+            let pre_edit = if (fn_name == "edit_file" || fn_name == "write_file") && !brief.is_empty() {
+                let p = boundary.resolve_path(&brief);
+                if !boundary.is_outside(&p) { fs::read_to_string(&p).ok() } else { None }
+            } else {
+                None
+            };
+
+            let label = tool_display_name(fn_name);
+            spinner.start(&format!("Running {}({})...", label, brief));
             let t_start = Instant::now();
             let tool_res = tools::execute_tool(fn_name, &final_args, target_dir, boundary).await;
             let elapsed = t_start.elapsed().as_secs_f64();
+            spinner.stop();
 
+            println!("  \x1b[1;36m●\x1b[0m \x1b[1;37m{}\x1b[0m\x1b[2m({})\x1b[0m", label, brief);
             match tool_res {
                 Ok(out) => {
-                    println!("  \x1b[1;32m✓\x1b[0m \x1b[2mDone ({:.1}s)\x1b[0m\n", elapsed);
+                    if fn_name == "edit_file" || fn_name == "write_file" {
+                        let p = boundary.resolve_path(&brief);
+                        let new_disk = if !boundary.is_outside(&p) { fs::read_to_string(&p).ok() } else { None };
+                        if let Some(ref new_txt) = new_disk {
+                            let old_txt = pre_edit.as_deref().unwrap_or("");
+                            let (adds, rems) = diff_counts(old_txt, new_txt);
+                            println!(
+                                "    \x1b[90m⎿\x1b[0m  Updated \x1b[1;37m{}\x1b[0m with \x1b[1;32m{} addition(s)\x1b[0m and \x1b[31m{} removal(s)\x1b[0m \x1b[2m({:.1}s)\x1b[0m",
+                                brief, adds, rems, elapsed
+                            );
+                            print_inline_diff(old_txt, new_txt);
+                            println!();
+                        } else {
+                            println!("    \x1b[90m⎿\x1b[0m  \x1b[2mUpdated {} ({:.1}s)\x1b[0m\n", brief, elapsed);
+                        }
+                    } else {
+                        let summary = summarize_tool_output(fn_name, &out, elapsed);
+                        println!("    \x1b[90m⎿\x1b[0m  \x1b[2m{}\x1b[0m\n", summary);
+                    }
                     history.push(ChatMessage::tool_response(call_id, out));
                 }
                 Err(err) => {
-                    println!("  \x1b[1;31m✗\x1b[0m \x1b[2mFailed ({:.1}s): {}\x1b[0m\n", elapsed, err);
+                    println!("    \x1b[90m⎿\x1b[0m  \x1b[1;31m✗ {}\x1b[0m \x1b[2m({:.1}s)\x1b[0m\n", err, elapsed);
                     history.push(ChatMessage::tool_response(call_id, format!("[tool error] {}", err)));
                 }
             }
@@ -411,7 +546,7 @@ async fn execute_task_loop(
                 history.push(assistant_msg);
 
                 total_tools_run +=
-                    execute_tool_batch(&calls, target_dir, boundary, cfg.adapters, history, true).await;
+                    execute_tool_batch(&calls, target_dir, boundary, cfg.adapters, history, spinner).await;
             } else {
                 history.push(ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone()));
             }
@@ -512,25 +647,30 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
     let mut spinner = InlineSpinner::new();
     let mut last_total_tokens = 0;
-    let mut line_buf = String::with_capacity(512);
+    let mut last_stat_line: Option<String> = None;
+    let mut input_history: Vec<String> = Vec::new();
     let mut router = matcher::ContextRouter::load();
     let max_rounds = rs_agent::config::get_max_rounds();
 
     loop {
-        print!("\x1b[?25h");
-        print!("❯ ");
-        if let Some(c) = buffered_char.take() {
-            print!("{}", c);
-        }
-        io::stdout().flush()?;
+        let minimal_ui = current_box_style != 7;
+        let default_status = format!("{} · {}", second_line, provider.model);
+        let status_display = last_stat_line.as_deref().unwrap_or(&default_status);
 
-        line_buf.clear();
-        if io::stdin().read_line(&mut line_buf)? == 0 {
-            break;
-        }
-        let input = line_buf.trim();
+        let raw_input = match ui::read_ruled_input(status_display, &input_history, buffered_char.take(), minimal_ui)? {
+            ui::InputResult::Line(s) => s,
+            ui::InputResult::Eof => {
+                println!("Exiting session.");
+                break;
+            }
+        };
+        let input = raw_input.trim().to_string();
+        let input = input.as_str();
         if input.is_empty() {
             continue;
+        }
+        if !input.starts_with('/') && input != "q" && input != "exit" {
+            input_history.push(input.to_string());
         }
 
         if input == "q" || input == "exit" {
@@ -668,6 +808,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
                     history.clear();
                     last_total_tokens = 0;
+                    last_stat_line = None;
                     history.push(ChatMessage::system(&system_prompt));
                     active_tools = if cfg.is_agent {
                         Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &new_mcp).await)
@@ -762,17 +903,34 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             continue;
         }
 
+        if input == "/think" || input == "/tk" {
+            let next = match state::get_show_thinking_summaries() {
+                None => Some(true),
+                Some(true) => Some(false),
+                Some(false) => None,
+            };
+            state::set_show_thinking_summaries(next);
+            let label = match next {
+                None => "gutter (│)",
+                Some(true) => "expanded (∴)",
+                Some(false) => "collapsed (∴ Thought for Xs)",
+            };
+            println!("  \x1b[1;32m✓\x1b[0m \x1b[2mThinking view:\x1b[0m \x1b[1;36m{}\x1b[0m\n", label);
+            let _ = io::stdout().flush();
+            continue;
+        }
+
         if input.starts_with("/box") {
             let parts: Vec<&str> = input.split_whitespace().collect();
             current_box_style = if parts.len() > 1 {
-                let parsed = parts[1].parse::<usize>().unwrap_or((current_box_style % 6) + 1);
-                if (1..=6).contains(&parsed) {
+                let parsed = parts[1].parse::<usize>().unwrap_or((current_box_style % 7) + 1);
+                if (1..=7).contains(&parsed) {
                     parsed
                 } else {
-                    (current_box_style % 6) + 1
+                    (current_box_style % 7) + 1
                 }
             } else {
-                (current_box_style % 6) + 1
+                (current_box_style % 7) + 1
             };
             state::set_box_style(current_box_style);
 
@@ -788,6 +946,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
             history.clear();
             last_total_tokens = 0;
+            last_stat_line = None;
             system_prompt = build_system_prompt(&active_profile, &active_skills);
             history.push(ChatMessage::system(&system_prompt));
 
@@ -874,7 +1033,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             spinner.stop();
 
             if tool_calls.is_none() || tool_calls.as_ref().map(|v| v.is_empty()).unwrap_or(true) {
-                renderer.finish(&stats, last_total_tokens);
+                let stat_str = renderer.finish_with_print(&stats, last_total_tokens, current_box_style != 7);
+                last_stat_line = Some(stat_str);
                 last_total_tokens = stats.prompt_tokens + stats.completion_tokens;
 
                 if !active_skills.is_empty() {
@@ -892,7 +1052,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             history.push(assistant_msg);
 
             println!();
-            execute_tool_batch(&calls, target_dir, &boundary, cfg.adapters, &mut history, false).await;
+            execute_tool_batch(&calls, target_dir, &boundary, cfg.adapters, &mut history, &mut spinner).await;
         }
     }
 

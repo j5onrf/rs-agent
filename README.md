@@ -3,7 +3,7 @@
   <h1>Rs-Agent</h1>
 
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.5.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.6.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -15,40 +15,39 @@
   </p>
 
   <p>
-    <b>Sub-millisecond native Rust AI harness for local <code>llama-server</code> GGUF backends and cloud reasoning models.</b><br>
-    <sub>Parallel 6-tool execution kernel • Parallel read-only tool kernel • 3-stage resilient edits • Zero-trust path sandbox • Native T3 Code ACP bridge</sub>
+    <strong>Sub-millisecond native Rust AI harness for local <code>llama-server</code> GGUF backends and cloud reasoning models.</strong><br />
+    Parallel 6-tool kernel &nbsp;•&nbsp; 3-stage resilient edits &nbsp;•&nbsp; Zero-trust path sandbox &nbsp;•&nbsp; Native T3 Code ACP bridge
   </p>
 
   <table>
     <tr>
-      <td align="center" width="28%" valign="top">
+      <td align="center" width="320" valign="top">
         <h3>👤 Sub-27B (SLM)</h3>
-        <p><sub>Tool calling, fast refactoring, and single-turn edits</sub></p>
-        <code>LFM3-1.7B</code> &nbsp;•&nbsp; <code>Ling-3.0-tiny*</code><br>
-        <code>MiniCPM5-2B</code> &nbsp;•&nbsp; <code>Qwen3.5-2B+</code><br>
+        <p><em>Tool calling, fast refactoring, single-turn edits</em></p>
+        <code>LFM3-1.7B</code> &nbsp;•&nbsp; <code>Ling-3.0-tiny*</code><br />
+        <code>MiniCPM5-2B</code> &nbsp;•&nbsp; <code>Qwen3.5-2B+</code><br />
         <code>MiniCPM-V-4.7-1B</code> &nbsp;•&nbsp; <code>LFM2.5-24B-A2B</code>
       </td>
-      <td align="center" width="28%" valign="top">
+      <td align="center" width="320" valign="top">
         <h3>👤 27B+ (LLM)</h3>
-        <p><sub>Deep reasoning, complex logic, and multi-turn loops</sub></p>
-        <code>Groot-19B-A3B</code> &nbsp;•&nbsp; <code>Clover-35B-A3B</code><br>
-        <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br>
-        <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br>
-        <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br>
-        <code>Qwen3.8-27B</code> &nbsp;•&nbsp; <code>Qwen4.0-27B</code><br>
-        <code>Qwen3.8-Flash</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code><br>
-        <br>
+        <p><em>Deep reasoning, complex logic, multi-turn loops</em></p>
+        <code>Groot-19B-A3B</code> &nbsp;•&nbsp; <code>Clover-35B-A3B</code><br />
+        <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br />
+        <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br />
+        <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br />
+        <code>Qwen3.8-27B</code> &nbsp;•&nbsp; <code>Qwen4.0-27B</code><br />
+        <code>Qwen3.8-Flash</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code>
       </td>
     </tr>
   </table>
 
   <p>
-    * Primary edge baselines &nbsp;•&nbsp; Auto-discovers local models loaded on <code>http://127.0.0.1:8080</code>
+    <em>* Primary edge baselines &nbsp;•&nbsp; Auto-discovers local models on <code>http://127.0.0.1:8080</code></em>
   </p>
 
   <p>
-    <sub><b>Cloud Endpoints:</b> <a href="https://ai.google.dev">Google Gemini</a> (<code>gemini-4-hydrogen</code>), <a href="https://openrouter.ai">OpenRouter</a>, and <a href="https://tokenharbor.ai">TokenHarbor</a><br>
-    <b>Free Endpoints:</b> <a href="https://ai.google.dev"><code>gemini-3.5-flash-lite</code></a> (Google AI Studio) &nbsp;•&nbsp; <a href="https://openrouter.ai/models?variant=free"><code>openrouter/free</code></a> (OpenRouter) &nbsp;•&nbsp; <a href="https://tokenharbor.ai"><code>deepseek-v4.1-flash:free</code></a> (TokenHarbor)</sub>
+    <strong>Cloud Endpoints:</strong> <a href="https://ai.google.dev">Google Gemini</a> (<code>gemini-4-hydrogen</code>) &nbsp;•&nbsp; <a href="https://openrouter.ai">OpenRouter</a> &nbsp;•&nbsp; <a href="https://tokenharbor.ai">TokenHarbor</a><br />
+    <strong>Free Endpoints:</strong> <a href="https://ai.google.dev"><code>gemini-3.5-flash-lite</code></a> &nbsp;•&nbsp; <a href="https://openrouter.ai/models?variant=free"><code>openrouter/free</code></a> &nbsp;•&nbsp; <a href="https://tokenharbor.ai"><code>deepseek-v4.1-flash:free</code></a>
   </p>
 </div>
 
@@ -66,7 +65,7 @@
 | `ai --bridge` | **Headless ACP** | Embedded stdio JSON-RPC 2.0 server for ADEs and desktop surfaces |
 
 **In-Session Slash Commands:**
-`/p` profile select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/box [1-6]` box themes • `/pad` spacing • `/r` reset
+`/p` profile select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/box [1-7]` box themes • `/pad` spacing • `/tk` thinking view • `/r` reset
 
 ---
 
@@ -82,10 +81,14 @@
 
 ---
 
-## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> CLI Box Styles (`/box [1-6]`)
+## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> CLI Box Styles (`/box [1-7]`)
+
+* **`/box 1–6`:** Compact headers with minimal single-line `❯ ` prompt, inline telemetry, and dense layout (`pad: false` by default).
+* **`/box 7`:** 2-column welcome header with live ruled `────` input bar, bottom status telemetry, `/` command hints, and spaced layout (`pad: true`).
+* **`/tk` / `/think`:** Cycle reasoning display between `rs-agent` `│ ` gutter (default), expanded `∴` italic, or collapsed `∴ Thought for Xs` (persisted via `"showThinkingSummaries"` in `state.json`).
 
 <details>
-<summary><b>Preview all 6 box themes (halftone skeleton dither, dot slabs, wake-on-key animations)</b></summary>
+<summary><b>Preview all 7 box themes (halftone skeleton dither, dot slabs, 2-column header)</b></summary>
 
 ```console
 ~ ❯ ai
@@ -118,6 +121,13 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
+╭─── rs-agent v0.6.6 ──────────────────────────────────────────────────────────────────────╮
+│   ╭────╮  LFM3-1.7B                        │ Shortcuts & Modes                           │
+│   │ LF │  chat                             │ • /p profile   /s skills   /t3 ADE          │
+│   ╰────╯  git: main · 11 modified          │ • /task loop   /box theme  /r reset         │
+│   ~/.config/rs-agent/projects/chat         │ ↑/↓ history · Ctrl+C exit                   │
+╰──────────────────────────────────────────────────────────────────────────────────────────╯
+
 ❯ █
 ```
 
@@ -133,14 +143,14 @@ Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─�
                                             ├── client.rs   (SSE stream, thought_signature, cloud effort / local budget)
                                             ├── adapter.rs  (JSON bracket balancer, gutter strip, alias normalization)
                                             ├── tools.rs    (concurrent read-only batching, 3-stage edit, 30s timeout)
-                                            ├── security.rs (symlink-safe canonical jail, dangerous command gates)
+                                            ├── security.rs (symlink-safe canonical jail, arrow-key command gates)
                                             └── mcp.rs      (on-demand stdio MCP plugins e.g. photocraft)
 ```
 
-* **Parallel Read-Only Tool Kernel (`tools.rs`):** Executes contiguous `read_file`, `list_dir`, and `search_code` calls concurrently while keeping mutating actions (`edit_file`, `write_file`, `run_command`) strictly ordered.
+* **Parallel Read-Only Tool Kernel (`tools.rs`):** Executes contiguous `read_file`, `list_dir`, and `search_code` calls concurrently while keeping mutating actions (`edit_file`, `write_file`, `run_command`) strictly ordered, rendered as `● Tool(...)` / `⎿` trees with inline colored diffs.
 * **3-Stage Resilient Edits (`tools.rs`):** Patches files through *Exact match → Indent-delta whitespace normalization → Levenshtein fuzzy match (≥ 0.85)*, with automatic process-group reaping (`SIGTERM` → `SIGKILL`) after 30s on `run_command`.
 * **Edge Argument Healer (`adapter.rs`):** Strips copied line gutters (`12: `), fixes container paths (`/workspace/...`), balances truncated JSON quotes/brackets, and normalizes parameter aliases in memory.
-* **Zero-Trust Security Boundary (`security.rs`):** Walks ancestors and inspects symlinks before canonicalization. Fails closed on `../` traversal, system directories (`/etc`, `/usr`, `/root`, ...), `python -m pip`, destructive `rm`, and privileged binaries.
+* **Zero-Trust Security Boundary (`security.rs`):** Walks ancestors and inspects symlinks before canonicalization. Fails closed on `../` traversal, system directories (`/etc`, `/usr`, `/root`, ...), `python -m pip`, destructive `rm`, and privileged binaries with an interactive inline gate.
 
 ---
 
@@ -180,11 +190,11 @@ description: "High-Speed Coding & Systems Engineer"
 adapters: true          # Strip line gutters, normalize aliases, heal malformed JSON
 core4: true             # Minimal 4-tool schema (~480t) for 27B+ / cloud (omit for 6-tool)
 reasoning_budget: 500   # Local: 0-10000 tokens (0 = off) | Cloud: low, medium, high, xhigh
-reasoning_effort: high  # Explicit cloud tier: low, medium, high, xhigh (e.g. gemini-4-hydrogen)
+reasoning_effort: high  # Explicit cloud tier: low, medium, high, xhigh
 memory: true            # Inject project-isolated rules from .rs/memory.md
 purebash: true          # Single run_command tool (~95t). Omit for Core 4 / Native 6
 delegate: true          # Attach isolated delegate_task sub-agent (+~100t)
-mcp: photocraft         # Attach stdio MCP server(s) (e.g. photocraft, blender, mailcraft).
+mcp: photocraft         # Attach stdio MCP server(s) (e.g. photocraft, blender, mailcraft)
 ---
 ```
 
@@ -212,10 +222,10 @@ mcp: photocraft         # Attach stdio MCP server(s) (e.g. photocraft, blender, 
 
 | Binary | Tool | Purpose |
 | :--- | :--- | :--- |
-| 👤 `ms` | **Model Selector** | Interactive TUI for switching active providers, `AI_MAX_TOKENS`, and loop limits |
+| 👤 `ms` | **Model Selector** | Interactive TUI for switching active providers, `AI_MAX_TOKENS` (`4k`–`1M`), and loop limits |
 | `newp` | **Project Creator** | Scaffolds workspace, `.rs/config.json`, profile, and `rs-context.md` aliases |
 | `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) |
-| `ta` | **System Diagnostics** | 10-pass native test harness checking kernel, security boundary, and UI |
+| `ta` | **System Diagnostics** | 10-pass live verification suite checking tools, security boundary, UI, and `--bridge` ACP |
 | `eva` | **Agentic Benchmark** | Full-stack `eval-stack` evaluation runner |
 
 ---
@@ -280,7 +290,7 @@ CUSTOM1_MODEL="deepseek-flash"
 # FIRECRAWL_API_KEY="fc-your-actual-api-key"
 
 # ── Runtime Governors ─────────────────────────────────────────────────────────
-AI_MAX_TOKENS="8192"                   # Set 65536+ for cloud models like gemini-4-hydrogen
+AI_MAX_TOKENS="8192"                   # Set 65536+ for cloud models
 AI_MAX_AGENT_ROUNDS="10"
 ```
 
@@ -289,5 +299,5 @@ AI_MAX_AGENT_ROUNDS="10"
 ---
 
 <div align="center">
-  <sub>Built for speed, clarity, and terminal minimalism. Licensed under the <b><a href="LICENSE">MIT License</a></b>.</sub>
+  <em>Built for speed, clarity, and terminal minimalism. Licensed under the <strong><a href="LICENSE">MIT License</a></strong>.</em>
 </div>

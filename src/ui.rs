@@ -1,6 +1,7 @@
 use crossterm::cursor::{Hide, Show};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, DisableBracketedPaste, EnableBracketedPaste, Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
+use std::io::IsTerminal;
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::Command;
@@ -229,6 +230,120 @@ fn render_dot_slab_inner_wipe(model: &str, profile: &str, col: usize) -> (String
 pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) -> (Vec<String>, usize) {
     let git_info = if style >= 4 { resolve_git_status() } else { String::new() };
     render_frame_inner(model, profile, &git_info, style, progress)
+}
+
+fn clamp_chars(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        s.to_string()
+    } else if max_chars > 1 {
+        let mut out: String = s.chars().take(max_chars - 1).collect();
+        out.push('…');
+        out
+    } else {
+        s.chars().take(max_chars).collect()
+    }
+}
+
+fn short_cwd() -> String {
+    let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
+    let s = cwd.display().to_string();
+    if let Some(home) = dirs::home_dir() {
+        let h = home.display().to_string();
+        if let Some(rest) = s.strip_prefix(&h) {
+            return if rest.is_empty() { "~".to_string() } else { format!("~{}", rest) };
+        }
+    }
+    s
+}
+
+fn render_claude_box(model: &str, profile: &str, git_info: &str, progress: f64) -> (Vec<String>, usize) {
+    let term_w = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(92);
+    let w = term_w.saturating_sub(2).clamp(48, 92);
+    let ver = env!("CARGO_PKG_VERSION");
+    let title_plain = format!(" rs-agent v{} ", ver);
+    let title_colored = format!(" {ANSI_BRIGHT}rs-agent{ANSI_RESET} {ANSI_DIM}v{}{ANSI_RESET} ", ver);
+    let top_fill = w.saturating_sub(5 + title_plain.chars().count()).max(1);
+    let top = format!("{ANSI_MUTED}╭───{ANSI_RESET}{}{ANSI_MUTED}{}╮{ANSI_RESET}", title_colored, "─".repeat(top_fill));
+    let bot = format!("{ANSI_MUTED}╰{}╯{ANSI_RESET}", "─".repeat(w.saturating_sub(2)));
+
+    let (ch0, ch1) = model_initials(model);
+    let cwd = short_cwd();
+
+    let rows: Vec<String> = if w >= 74 {
+        let left_w = (w - 3) / 2;
+        let right_w = (w - 3) - left_w;
+        let lv = left_w.saturating_sub(11);
+
+        let m_c = clamp_chars(model, lv);
+        let p_c = clamp_chars(profile, lv);
+        let g_c = clamp_chars(git_info, lv);
+        let cwd_c = clamp_chars(&cwd, left_w.saturating_sub(3));
+
+        let left: [(String, usize); 4] = [
+            (format!("  {ANSI_BRIGHT}╭────╮{ANSI_RESET}  {ANSI_WHITE}{}{ANSI_RESET}", m_c), 10 + m_c.chars().count()),
+            (format!("  {ANSI_BRIGHT}│ {ANSI_WHITE}{}{}{ANSI_BRIGHT} │{ANSI_RESET}  {ANSI_ACCENT}{}{ANSI_RESET}", ch0, ch1, p_c), 10 + p_c.chars().count()),
+            (format!("  {ANSI_BRIGHT}╰────╯{ANSI_RESET}  {ANSI_MUTED}{}{ANSI_RESET}", g_c), 10 + g_c.chars().count()),
+            (format!("  {ANSI_DIM}{}{ANSI_RESET}", cwd_c), 2 + cwd_c.chars().count()),
+        ];
+
+        let r0 = clamp_chars("Shortcuts & Modes", right_w.saturating_sub(1));
+        let r1 = clamp_chars("• /p profile   /s skills   /t3 ADE", right_w.saturating_sub(1));
+        let r2 = clamp_chars("• /task loop   /box theme  /r reset", right_w.saturating_sub(1));
+        let r3 = clamp_chars("↑/↓ history · Ctrl+C exit", right_w.saturating_sub(1));
+
+        let right: [(String, usize); 4] = [
+            (format!("\x1b[38;5;215m{}\x1b[0m", r0), r0.chars().count()),
+            (format!("{ANSI_DIM}{}{ANSI_RESET}", r1), r1.chars().count()),
+            (format!("{ANSI_DIM}{}{ANSI_RESET}", r2), r2.chars().count()),
+            (format!("{ANSI_MUTED}{}{ANSI_RESET}", r3), r3.chars().count()),
+        ];
+
+        left.into_iter()
+            .zip(right)
+            .map(|((ls, l_vis), (rs, r_vis))| {
+                let l_pad = " ".repeat((left_w - 1).saturating_sub(l_vis));
+                let r_pad = " ".repeat((right_w - 1).saturating_sub(r_vis));
+                format!("{ANSI_MUTED}│{ANSI_RESET} {ls}{l_pad}{ANSI_MUTED}│{ANSI_RESET} {rs}{r_pad}{ANSI_MUTED}│{ANSI_RESET}")
+            })
+            .collect()
+    } else {
+        let inner = w.saturating_sub(3);
+        let lv = inner.saturating_sub(10);
+        let m_c = clamp_chars(model, lv);
+        let p_c = clamp_chars(profile, lv);
+        let g_c = clamp_chars(git_info, lv);
+        let cwd_c = clamp_chars(&cwd, inner.saturating_sub(2));
+        let items: [(String, usize); 4] = [
+            (format!(" {ANSI_BRIGHT}╭────╮{ANSI_RESET}  {ANSI_WHITE}{}{ANSI_RESET}", m_c), 9 + m_c.chars().count()),
+            (format!(" {ANSI_BRIGHT}│ {ANSI_WHITE}{}{}{ANSI_BRIGHT} │{ANSI_RESET}  {ANSI_ACCENT}{}{ANSI_RESET}", ch0, ch1, p_c), 9 + p_c.chars().count()),
+            (format!(" {ANSI_BRIGHT}╰────╯{ANSI_RESET}  {ANSI_MUTED}{}{ANSI_RESET}", g_c), 9 + g_c.chars().count()),
+            (format!(" {ANSI_DIM}{}{ANSI_RESET}", cwd_c), 1 + cwd_c.chars().count()),
+        ];
+        items
+            .into_iter()
+            .map(|(s, vis)| {
+                let pad = " ".repeat(inner.saturating_sub(vis));
+                format!("{ANSI_MUTED}│{ANSI_RESET} {s}{pad}{ANSI_MUTED}│{ANSI_RESET}")
+            })
+            .collect()
+    };
+
+    let mut all = Vec::with_capacity(6);
+    all.push(top);
+    all.extend(rows);
+    all.push(bot);
+    let total = all.len();
+    if progress >= 1.0 {
+        (all, total)
+    } else {
+        let visible = ((total as f64) * progress).ceil() as usize;
+        let out: Vec<String> = all
+            .into_iter()
+            .enumerate()
+            .map(|(i, l)| if i < visible { l } else { String::new() })
+            .collect();
+        (out, total)
+    }
 }
 
 fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, progress: f64) -> (Vec<String>, usize) {
@@ -647,6 +762,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             (lines, line_count)
         }
 
+        7 => render_claude_box(model, profile, git_info, progress),
         _ => render_frame_inner(model, profile, git_info, 1, progress),
     }
 }
@@ -676,7 +792,7 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
     let _ = stdout.flush();
 
     let duration = match style {
-        1 => Duration::from_millis(160),
+        1 | 7 => Duration::from_millis(150),
         2 | 3 => Duration::from_millis(200),
         4 | 5 | 6 => Duration::from_millis(550),
         _ => Duration::from_millis(200),
@@ -752,4 +868,329 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
     let _ = handle.flush();
 
     buffered_char
+}
+
+
+pub enum InputResult {
+    Line(String),
+    Eof,
+}
+
+struct InputGuard;
+
+impl Drop for InputGuard {
+    fn drop(&mut self) {
+        let mut stdout = io::stdout();
+        let _ = crossterm::execute!(stdout, DisableBracketedPaste, Show);
+        let _ = disable_raw_mode();
+        let _ = stdout.flush();
+    }
+}
+
+pub fn read_ruled_input(
+    status_line: &str,
+    history: &[String],
+    initial_char: Option<char>,
+    minimal: bool,
+) -> io::Result<InputResult> {
+    if !io::stdin().is_terminal() || enable_raw_mode().is_err() {
+        print!("\x1b[?25h❯ ");
+        if let Some(c) = initial_char {
+            print!("{}", c);
+        }
+        io::stdout().flush()?;
+        let mut line = String::new();
+        if io::stdin().read_line(&mut line)? == 0 {
+            return Ok(InputResult::Eof);
+        }
+        let full = if let Some(c) = initial_char {
+            format!("{}{}", c, line.trim_end_matches(['\r', '\n']))
+        } else {
+            line.trim_end_matches(['\r', '\n']).to_string()
+        };
+        return Ok(InputResult::Line(full));
+    }
+
+    let _guard = InputGuard;
+    let mut stdout = io::stdout();
+    let _ = crossterm::execute!(stdout, EnableBracketedPaste, Show);
+
+    let mut buf: Vec<char> = Vec::with_capacity(128);
+    if let Some(c) = initial_char {
+        if !c.is_control() {
+            buf.push(c);
+        }
+    }
+    let mut cur: usize = buf.len();
+    let mut view_start: usize = 0;
+    let mut hist_idx: Option<usize> = None;
+    let mut draft: Vec<char> = Vec::new();
+    let mut first_draw = true;
+
+    loop {
+        let term_w = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(96);
+        let w = term_w.clamp(40, 120);
+        let rule = "─".repeat(w);
+        let text_avail = w.saturating_sub(3).max(10);
+
+        if cur < view_start {
+            view_start = cur;
+        } else if cur > view_start + text_avail {
+            view_start = cur - text_avail;
+        }
+        let view_end = (view_start + text_avail).min(buf.len());
+        let visible_text: String = buf[view_start..view_end].iter().collect();
+        let show_hint = buf.first() == Some(&'/');
+
+        let status_clamped = clamp_chars(status_line, w.saturating_sub(2));
+        let hint_clamped = clamp_chars(
+            "  Commands: /p profile · /s skills · /task loop · /t3 ADE · /box theme · /pad · /r reset",
+            w.saturating_sub(1),
+        );
+
+        {
+            let mut handle = stdout.lock();
+            let col = 3 + (cur - view_start);
+            if minimal {
+                let _ = write!(handle, "\r\x1b[2K{ANSI_BRIGHT}❯{ANSI_RESET} {visible_text}\x1b[{col}G");
+                first_draw = false;
+            } else {
+                if !first_draw {
+                    let _ = write!(handle, "\x1b[1A\r");
+                }
+                first_draw = false;
+
+                let _ = write!(handle, "\x1b[2K{ANSI_MUTED}{rule}{ANSI_RESET}\r\n");
+                let _ = write!(handle, "\x1b[2K{ANSI_BRIGHT}❯{ANSI_RESET} {visible_text}\r\n");
+                let _ = write!(handle, "\x1b[2K{ANSI_MUTED}{rule}{ANSI_RESET}\r\n");
+                let _ = write!(handle, "\x1b[2K{ANSI_DIM}  {status_clamped}{ANSI_RESET}");
+
+                let up = if show_hint {
+                    let _ = write!(handle, "\r\n\x1b[2K{ANSI_MUTED}{hint_clamped}{ANSI_RESET}\x1b[J");
+                    3
+                } else {
+                    let _ = write!(handle, "\x1b[J");
+                    2
+                };
+
+                let _ = write!(handle, "\x1b[{up}A\x1b[{col}G");
+            }
+            let _ = handle.flush();
+        }
+
+        match event::read() {
+            Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => match key.code {
+                KeyCode::Enter => {
+                    let submitted: String = buf.iter().collect();
+                    {
+                        let mut handle = stdout.lock();
+                        let clear_seq = if minimal { "\r\x1b[2K" } else { "\x1b[1A\r\x1b[J" };
+                        let _ = write!(handle, "{clear_seq}");
+                        let _ = handle.flush();
+                    }
+                    drop(_guard);
+                    if !submitted.trim().is_empty() {
+                        println!("{ANSI_BRIGHT}❯{ANSI_RESET} {}", submitted);
+                    }
+                    return Ok(InputResult::Line(submitted));
+                }
+                KeyCode::Char('c') | KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    if key.code == KeyCode::Char('d') && !buf.is_empty() {
+                        if cur < buf.len() {
+                            buf.remove(cur);
+                        }
+                        continue;
+                    }
+                    let mut handle = stdout.lock();
+                    let clear_seq = if minimal { "\r\x1b[2K" } else { "\x1b[1A\r\x1b[J" };
+                    let _ = write!(handle, "{clear_seq}");
+                    let _ = handle.flush();
+                    return Ok(InputResult::Eof);
+                }
+                KeyCode::Char('a') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    cur = 0;
+                }
+                KeyCode::Char('e') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    cur = buf.len();
+                }
+                KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    buf.clear();
+                    cur = 0;
+                    view_start = 0;
+                }
+                KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    while cur > 0 && buf[cur - 1].is_whitespace() {
+                        cur -= 1;
+                        buf.remove(cur);
+                    }
+                    while cur > 0 && !buf[cur - 1].is_whitespace() {
+                        cur -= 1;
+                        buf.remove(cur);
+                    }
+                }
+                KeyCode::Backspace => {
+                    if cur > 0 {
+                        cur -= 1;
+                        buf.remove(cur);
+                    }
+                }
+                KeyCode::Delete => {
+                    if cur < buf.len() {
+                        buf.remove(cur);
+                    }
+                }
+                KeyCode::Left => {
+                    cur = cur.saturating_sub(1);
+                }
+                KeyCode::Right => {
+                    if cur < buf.len() {
+                        cur += 1;
+                    }
+                }
+                KeyCode::Home => {
+                    cur = 0;
+                }
+                KeyCode::End => {
+                    cur = buf.len();
+                }
+                KeyCode::Up if !history.is_empty() => {
+                    if hist_idx.is_none() {
+                        draft = buf.clone();
+                        hist_idx = Some(history.len() - 1);
+                    } else if let Some(idx) = hist_idx {
+                        if idx > 0 {
+                            hist_idx = Some(idx - 1);
+                        }
+                    }
+                    if let Some(idx) = hist_idx {
+                        buf = history[idx].chars().collect();
+                        cur = buf.len();
+                        view_start = 0;
+                    }
+                }
+                KeyCode::Down => {
+                    if let Some(idx) = hist_idx {
+                        if idx + 1 < history.len() {
+                            hist_idx = Some(idx + 1);
+                            buf = history[idx + 1].chars().collect();
+                        } else {
+                            hist_idx = None;
+                            buf = draft.clone();
+                        }
+                        cur = buf.len();
+                        view_start = 0;
+                    }
+                }
+                KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    buf.insert(cur, c);
+                    cur += 1;
+                }
+                _ => {}
+            },
+            Ok(Event::Paste(pasted)) => {
+                for c in pasted.chars() {
+                    if c == '\r' || c == '\n' {
+                        if buf.get(cur.saturating_sub(1)) != Some(&' ') {
+                            buf.insert(cur, ' ');
+                            cur += 1;
+                        }
+                    } else if !c.is_control() {
+                        buf.insert(cur, c);
+                        cur += 1;
+                    }
+                }
+            }
+            Ok(_) => {}
+            Err(_) => {
+                let mut handle = stdout.lock();
+                let clear_seq = if minimal { "\r\x1b[2K" } else { "\x1b[1A\r\x1b[J" };
+                let _ = write!(handle, "{clear_seq}");
+                let _ = handle.flush();
+                return Ok(InputResult::Eof);
+            }
+        }
+    }
+}
+
+pub fn authorize_prompt(violation: &str) -> bool {
+    if !io::stdin().is_terminal() || enable_raw_mode().is_err() {
+        return false;
+    }
+
+    let _guard = RawModeGuard;
+    let mut stdout = io::stdout();
+    let _ = crossterm::execute!(stdout, Hide);
+
+    let term_w = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(72);
+    let w = term_w.saturating_sub(4).clamp(42, 68);
+    let msg = clamp_chars(violation, w.saturating_sub(4));
+    let options = ["1. Yes, allow once", "2. No (Esc)"];
+    let mut sel: usize = 1; // Safe default: No
+    let mut first = true;
+
+    loop {
+        {
+            let mut handle = stdout.lock();
+            if !first {
+                let _ = write!(handle, "\x1b[6A\r");
+            }
+            first = false;
+
+            let title = " Security Gate ";
+            let fill = w.saturating_sub(4 + title.chars().count()).max(1);
+            let pad = " ".repeat(w.saturating_sub(4 + msg.chars().count()));
+            let _ = write!(handle, "\x1b[2K  {ANSI_MUTED}╭─{ANSI_RESET}\x1b[38;5;215m{title}{ANSI_RESET}{ANSI_MUTED}{}╮{ANSI_RESET}\r\n", "─".repeat(fill));
+            let _ = write!(handle, "\x1b[2K  {ANSI_MUTED}│{ANSI_RESET} {ANSI_WHITE}{msg}{ANSI_RESET}{pad} {ANSI_MUTED}│{ANSI_RESET}\r\n");
+            let _ = write!(handle, "\x1b[2K  {ANSI_MUTED}╰{}╯{ANSI_RESET}\r\n", "─".repeat(w.saturating_sub(2)));
+            let _ = write!(handle, "\x1b[2K  {ANSI_DIM}Do you want to proceed?{ANSI_RESET}\r\n");
+            for (i, opt) in options.iter().enumerate() {
+                if i == sel {
+                    let _ = write!(handle, "\x1b[2K  {ANSI_BRIGHT}❯ {ANSI_WHITE}{opt}{ANSI_RESET}\r\n");
+                } else {
+                    let _ = write!(handle, "\x1b[2K    {ANSI_DIM}{opt}{ANSI_RESET}\r\n");
+                }
+            }
+            let _ = handle.flush();
+        }
+
+        match event::read() {
+            Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => match key.code {
+                KeyCode::Up | KeyCode::Down => sel = 1 - sel,
+                KeyCode::Char('1') | KeyCode::Char('y') | KeyCode::Char('Y') => {
+                    sel = 0;
+                    break;
+                }
+                KeyCode::Char('2') | KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                    sel = 1;
+                    break;
+                }
+                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    sel = 1;
+                    break;
+                }
+                KeyCode::Enter => break,
+                _ => {}
+            },
+            Ok(_) => {}
+            Err(_) => {
+                sel = 1;
+                break;
+            }
+        }
+    }
+
+    {
+        let mut handle = stdout.lock();
+        let _ = write!(handle, "\x1b[6A\r\x1b[J");
+        let _ = handle.flush();
+    }
+    drop(_guard);
+
+    let approved = sel == 0;
+    if approved {
+        println!("  \x1b[1;32m✓\x1b[0m \x1b[2mAuthorized: {}\x1b[0m", msg);
+    } else {
+        println!("  \x1b[1;31m✗\x1b[0m \x1b[2mDenied: {}\x1b[0m", msg);
+    }
+    approved
 }

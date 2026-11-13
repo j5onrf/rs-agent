@@ -5,7 +5,7 @@ class Node:
         self.right = None
 
 
-class BST:
+class BinarySearchTree:
     def __init__(self):
         self.root = None
 
@@ -13,22 +13,22 @@ class BST:
         if self.root is None:
             self.root = Node(key)
         else:
-            self._insert(self.root, key)
+            _insert(self.root, key)
+
+    def search(self, key):
+        return _search(self.root, key)
 
     def _insert(self, node, key):
         if key < node.key:
             if node.left is None:
                 node.left = Node(key)
             else:
-                self._insert(node.left, key)
+                _insert(node.left, key)
         elif key > node.key:
             if node.right is None:
                 node.right = Node(key)
             else:
-                self._insert(node.right, key)
-
-    def search(self, key):
-        return self._search(self.root, key)
+                _insert(node.right, key)
 
     def _search(self, node, key):
         if node is None:
@@ -36,23 +36,42 @@ class BST:
         if key == node.key:
             return True
         elif key < node.key:
-            return self._search(node.left, key)
+            return _search(node.left, key)
         else:
-            return self._search(node.right, key)
+            return _search(node.right, key)
 
-    def __str__(self):
-        return self._inorder(self.root)
 
-    def _inorder(self, node):
-        if node is None:
-            return ""
-        return self._inorder(node.left) + str(node.key) + " " + self._inorder(node.right)
+def _insert(node, key):
+    if key < node.key:
+        if node.left is None:
+            node.left = Node(key)
+        else:
+            _insert(node.left, key)
+    elif key > node.key:
+        if node.right is None:
+            node.right = Node(key)
+        else:
+            _insert(node.right, key)
+
+
+def _search(node, key):
+    if node is None:
+        return False
+    if key == node.key:
+        return True
+    elif key < node.key:
+        return _search(node.left, key)
+    else:
+        return _search(node.right, key)
 
 
 if __name__ == "__main__":
-    bst = BST()
+    bst = BinarySearchTree()
     for key in [50, 30, 70, 20, 40, 60, 80]:
         bst.insert(key)
-    print("Inorder:", bst)
-    print("Search 40:", bst.search(40))
-    print("Search 90:", bst.search(90))
+
+    print("Search 40:", bst.search(40))  # True
+    print("Search 25:", bst.search(25))  # False
+    print("Search 50:", bst.search(50))  # True
+    print("Search 80:", bst.search(80))  # True
+    print("Search 10:", bst.search(10))  # False
