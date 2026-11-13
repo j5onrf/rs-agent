@@ -83,8 +83,8 @@
 
 ## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> CLI Box Styles (`/box [1-7]`)
 
-* **`/box 1–6`:** Compact headers with minimal single-line `❯ ` prompt, inline telemetry, and dense layout (`pad: false` by default).
-* **`/box 7`:** 2-column welcome header with live ruled `────` input bar, bottom status telemetry, `/` command hints, and spaced layout (`pad: true`).
+* **`/box 1–6`:** Compact headers with minimal single-line `❯ ` prompt, inline stats, and dense layout (`pad: false` by default).
+* **`/box 7`:** 2-column welcome header with live ruled `────` input bar, bottom status stats, `/` command hints, and spaced layout (`pad: true`).
 * **`/tk` / `/think`:** Cycle reasoning display between `rs-agent` `│ ` gutter (default), expanded `∴` italic, or collapsed `∴ Thought for Xs` (persisted via `"showThinkingSummaries"` in `state.json`).
 
 <details>
