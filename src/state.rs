@@ -32,6 +32,9 @@ fn load_state() -> AppState {
 
 fn save_state(state: &AppState) {
     let path = get_state_path();
+    if let Some(parent) = path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
     if let Ok(content) = serde_json::to_string_pretty(state) {
         let _ = fs::write(path, content);
     }

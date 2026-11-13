@@ -1,5 +1,5 @@
 use crossterm::cursor::{Hide, Show};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode, Clear, ClearType};
 use std::fs;
 use std::io::{self, Write};
@@ -292,10 +292,14 @@ fn save_to_env(
 
     if let Some(l_idx) = tokens_line_idx {
         lines[l_idx] = format!("AI_MAX_TOKENS=\"{}\"", max_tokens);
+    } else {
+        lines.push(format!("AI_MAX_TOKENS=\"{}\"", max_tokens));
     }
 
     if let Some(l_idx) = rounds_line_idx {
         lines[l_idx] = format!("AI_MAX_AGENT_ROUNDS=\"{}\"", max_rounds);
+    } else {
+        lines.push(format!("AI_MAX_AGENT_ROUNDS=\"{}\"", max_rounds));
     }
 
     let mut out_content = lines.join("\n");
@@ -462,6 +466,8 @@ fn main() -> std::io::Result<()> {
                             8192 => 16384,
                             16384 => 32768,
                             32768 => 65536,
+                            65536 => 131072,
+                            131072 => 1048576,
                             _ => 4096,
                         };
                         let save_res = save_to_env(
@@ -520,6 +526,9 @@ fn main() -> std::io::Result<()> {
                     }
                 }
                 KeyCode::Char('q') | KeyCode::Esc => {
+                    break;
+                }
+                KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     break;
                 }
                 _ => {}

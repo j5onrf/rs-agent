@@ -1,8 +1,9 @@
 [package]
 name = "test-agent"
-version = "0.5.4"
+version = "0.6.5"
 edition = "2021"
 
 [dependencies]
 dirs = "5.0"
 rs-agent = { path = "../../" }
+tokio = { version = "1", features = ["rt", "macros", "time", "process", "io-util"] }

@@ -7,6 +7,16 @@ const CYAN: &str = "\x1b[1;36m";
 const YELLOW: &str = "\x1b[1;33m";
 const RESET: &str = "\x1b[0m";
 
+fn prompt_line(prompt: &str) -> String {
+    print!("{}", prompt);
+    let _ = io::stdout().flush();
+    let mut input = String::new();
+    if io::stdin().read_line(&mut input).is_err() {
+        return String::new();
+    }
+    input.trim().to_string()
+}
+
 fn get_rs_agent_root() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
     PathBuf::from(home).join(".config/rs-agent")
@@ -99,11 +109,7 @@ fn main() {
     let name = if !args.is_empty() {
         args.remove(0)
     } else {
-        print!("{}Enter Project Name:{} ", GREEN, RESET);
-        io::stdout().flush().unwrap();
-        let mut input = String::new();
-        io::stdin().read_line(&mut input).unwrap();
-        input.trim().to_string()
+        prompt_line(&format!("{}Enter Project Name:{} ", GREEN, RESET))
     };
 
     if name.is_empty() {
@@ -130,35 +136,25 @@ fn main() {
 
     println!("\n{}Available profiles:{} {}", YELLOW, RESET, profiles.join(", "));
     println!("{}Tip:{} Choose an existing profile, enter 'new', or type a custom profile name.", CYAN, RESET);
-    print!("{}Choose profile [default: {}]:{} ", GREEN, default_prof, RESET);
-    io::stdout().flush().unwrap();
-
-    let mut prof_input = String::new();
-    io::stdin().read_line(&mut prof_input).unwrap();
-    let input_str = prof_input.trim();
+    let prof_input = prompt_line(&format!("{}Choose profile [default: {}]:{} ", GREEN, default_prof, RESET));
+    let input_str = prof_input.as_str();
 
     let chosen_prof = if input_str.is_empty() {
         default_prof.to_string()
     } else if input_str == "new" || input_str == "create" {
-        print!("{}Enter name for new profile [default: {}]:{} ", GREEN, clean_name, RESET);
-        io::stdout().flush().unwrap();
-        let mut new_prof_input = String::new();
-        io::stdin().read_line(&mut new_prof_input).unwrap();
-        let np = new_prof_input.trim();
+        let new_prof_input =
+            prompt_line(&format!("{}Enter name for new profile [default: {}]:{} ", GREEN, clean_name, RESET));
+        let np = new_prof_input.as_str();
         let target_name = if np.is_empty() { &clean_name } else { np };
         create_profile_file(&root, target_name)
     } else if let Some(found) = profiles.iter().find(|p| *p == input_str || p.ends_with(&format!("/{}", input_str))) {
         found.clone()
     } else {
-        // Name was entered that does not exist in profiles/
-        print!(
+        let conf_trim = prompt_line(&format!(
             "{}Profile '{}' does not exist. Create ~/.config/rs-agent/profiles/{}.md? [Y/n]:{} ",
             YELLOW, input_str, input_str, RESET
-        );
-        io::stdout().flush().unwrap();
-        let mut conf = String::new();
-        io::stdin().read_line(&mut conf).unwrap();
-        let conf_trim = conf.trim().to_lowercase();
+        ))
+        .to_lowercase();
         if conf_trim.is_empty() || conf_trim == "y" || conf_trim == "yes" {
             create_profile_file(&root, input_str)
         } else {

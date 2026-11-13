@@ -1265,10 +1265,11 @@ dependencies = [
 
 [[package]]
 name = "test-agent"
-version = "0.5.4"
+version = "0.6.5"
 dependencies = [
  "dirs",
  "rs-agent",
+ "tokio",
 ]
 
 [[package]]

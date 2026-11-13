@@ -32,7 +32,7 @@ impl ContextEntry {
         let aliases: Vec<String> =
             parts[1].split(',').map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()).collect();
 
-        if aliases.is_empty() {
+        if command.is_empty() || aliases.is_empty() {
             return None;
         }
 

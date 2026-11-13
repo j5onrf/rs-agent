@@ -17,6 +17,16 @@ pub enum SkillAction {
     DetachAll,
 }
 
+struct RawModeGuard;
+
+impl Drop for RawModeGuard {
+    fn drop(&mut self) {
+        let _ = disable_raw_mode();
+        print!("\x1b[?25h");
+        let _ = io::stdout().flush();
+    }
+}
+
 impl Skill {
     pub fn parse(name: &str, raw_content: &str) -> Self {
         let mut body = raw_content.to_string();
@@ -92,6 +102,7 @@ impl Skill {
         let mut last_rendered_lines: usize = 0;
 
         let _ = enable_raw_mode();
+        let _raw_guard = RawModeGuard;
         let mut stdout = io::stdout();
         print!("\x1b[?25l");
 
@@ -170,7 +181,11 @@ impl Skill {
 
             last_rendered_lines = item_lines + 4;
 
-            if let Ok(Event::Key(key_event)) = event::read() {
+            let ev = match event::read() {
+                Ok(e) => e,
+                Err(_) => return None,
+            };
+            if let Event::Key(key_event) = ev {
                 if key_event.kind != KeyEventKind::Press {
                     continue;
                 }
