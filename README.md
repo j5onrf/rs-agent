@@ -54,7 +54,7 @@
 
 ---
 
-## Execution Modes & Controls
+## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> Execution Modes & Controls
 
 | Invocation | Mode | Description |
 | :--- | :--- | :--- |
@@ -70,7 +70,7 @@
 
 ---
 
-## Client Surface: T3 Code ADE
+## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> Client Surface: T3 Code ADE
 
 **[T3 Code](https://t3.codes)** is the official agent developer environment for `rs-agent`, connected directly to `ai --bridge` over stdio JSON-RPC 2.0 (ACP).
 
@@ -82,7 +82,7 @@
 
 ---
 
-## CLI Box Styles (`/box [1-6]`)
+## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> CLI Box Styles (`/box [1-6]`)
 
 <details>
 <summary><b>Preview all 6 box themes (halftone skeleton dither, dot slabs, wake-on-key animations)</b></summary>
@@ -125,7 +125,7 @@
 
 ---
 
-## Runtime Architecture
+## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> Runtime Architecture
 
 ```text
 Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─▶ Workspace Teleport
@@ -144,7 +144,7 @@ Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─�
 
 ---
 
-## Efficiency & Context Scaling
+## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> Efficiency & Context Scaling
 
 ### Tool Schema Footprint
 
@@ -170,7 +170,7 @@ File reads and shell outputs adapt dynamically to `AI_MAX_TOKENS`, offloading ov
 
 ---
 
-## Workspace Profiles & Skills
+## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> Workspace Profiles & Skills
 
 Configure agent personas, tool tiers, MCP servers, and reasoning behavior in `profiles/*.md` frontmatter:
 
@@ -184,7 +184,7 @@ reasoning_effort: high  # Explicit cloud tier: low, medium, high, xhigh (e.g. ge
 memory: true            # Inject project-isolated rules from .rs/memory.md
 purebash: true          # Single run_command tool (~95t). Omit for Core 4 / Native 6
 delegate: true          # Attach isolated delegate_task sub-agent (+~100t)
-mcp: photocraft         # Attach stdio MCP server(s) from plugins/mcp/servers.json
+mcp: photocraft         # Attach stdio MCP server(s) (e.g. photocraft, blender, mailcraft).
 ---
 ```
 
@@ -193,7 +193,7 @@ mcp: photocraft         # Attach stdio MCP server(s) from plugins/mcp/servers.js
 
 ---
 
-## Agent Evaluation (`eval-stack`)
+## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> Agent Evaluation (`eval-stack`)
 
 5-stage autonomous benchmark measuring par efficiency, tool resilience, and token economy via `eva`:
 
@@ -208,7 +208,7 @@ mcp: photocraft         # Attach stdio MCP server(s) from plugins/mcp/servers.js
 
 ---
 
-## Developer Tools (`tools/`)
+## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> Developer Tools (`tools/`)
 
 | Binary | Tool | Purpose |
 | :--- | :--- | :--- |
@@ -220,7 +220,7 @@ mcp: photocraft         # Attach stdio MCP server(s) from plugins/mcp/servers.js
 
 ---
 
-## Setup & Configuration
+## <img alt="rs-agent" src="logo.svg?v=2" height="50" /> Setup & Configuration
 
 ### 👤 Quick Start (Linux x86_64)
 
