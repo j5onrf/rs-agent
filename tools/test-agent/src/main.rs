@@ -43,7 +43,7 @@ impl TestRunner {
 
     async fn run_all(&mut self) {
         println!("\n======================================================================");
-        println!("       RS-AGENT ALL-IN-ONE Live Diagnostic & Verification Suite       ");
+        println!("       RS-AGENT ALL-IN-ONE Live Diagnostic & Verification        ");
         println!("======================================================================\n");
 
         let bin_path = if self.base_dir.join("target/release/ai").exists() {
