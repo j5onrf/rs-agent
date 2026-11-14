@@ -3,7 +3,7 @@
   <h1>Rs-Agent</h1>
 
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.7.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.8.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -121,11 +121,11 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
-╭─── rs-agent v0.6.7 ──────────────────────────────────────────────────────────────────────╮
-│   ╭────╮  LFM3-1.7B                        │ Shortcuts & Modes                           │
-│   │ LF │  chat                             │ • /p profile   /s skills   /t3 ADE          │
-│   ╰────╯  git: main · 11 modified          │ • /task loop   /box theme  /r reset         │
-│   ~/.config/rs-agent/projects/chat         │ ↑/↓ history · Ctrl+C exit                   │
+╭─── rs-agent v0.6.8 ──────────────────────────────────────────────────────────────────────╮
+│   ╭────╮  Ling-3.0-tiny                    │ Tips for getting started                    │
+│   │ Li │  lingtiny                         │ Type / for commands · Tab completes         │
+│   ╰────╯  git: main · 11 modified          │ ─────────────────────────────────────────── │
+│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · max 10 steps · ↑/↓ history       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 
 ❯ █

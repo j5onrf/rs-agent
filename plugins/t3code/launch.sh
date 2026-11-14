@@ -30,6 +30,9 @@ if [[ -z "$T3_BIN" ]]; then
     exit 1
 fi
 
+T3_CLI="$HOME/.t3/bin/t3"
+[[ -x "$T3_CLI" ]] || T3_CLI="$(command -v t3 || true)"
+
 MODE="desktop"
 WORKSPACE_ARG=""
 
@@ -72,10 +75,14 @@ if [[ "$MODE" == "web" ]]; then
     fi
 fi
 
+is_t3_running() {
+    pgrep -x "t3code" >/dev/null 2>&1 \
+        || pgrep -f "(^|/)T3[- ]?Code(\.AppImage)?(\s|$)" 2>/dev/null | grep -vw -e "$$" -e "$PPID" >/dev/null 2>&1
+}
+
 # IPC handover if window is already active
-if pgrep -f "(^|/)(t3code|T3 Code|T3-Code)(\s|$)" 2>/dev/null | grep -vw -e "$$" -e "$PPID" &>/dev/null; then
-    T3_CLI="$HOME/.t3/bin/t3"
-    if [[ -x "$T3_CLI" ]] && "$T3_CLI" app "$TARGET_WORKSPACE" &>/dev/null; then
+if is_t3_running; then
+    if [[ -n "$T3_CLI" && -x "$T3_CLI" ]] && "$T3_CLI" app "$TARGET_WORKSPACE" >/dev/null 2>&1; then
         echo -e "\033[1;32m[t3code]\033[0m Handed workspace '$TARGET_WORKSPACE' to active T3 Code window."
         exit 0
     fi
@@ -99,5 +106,20 @@ launch_detached() {
 }
 
 launch_detached "$T3_BIN" "$TARGET_WORKSPACE"
+
+# Wait for cold-started T3 Code IPC server, then switch it to TARGET_WORKSPACE
+if [[ -n "$T3_CLI" && -x "$T3_CLI" ]]; then
+    for _ in $(seq 1 30); do
+        pgrep -x "t3code" >/dev/null 2>&1 && break
+        sleep 0.15
+    done
+    for _ in $(seq 1 12); do
+        if "$T3_CLI" app "$TARGET_WORKSPACE" >/dev/null 2>&1; then
+            break
+        fi
+        sleep 0.15
+    done
+fi
+
 echo -e "\033[1;32m[t3code]\033[0m Launched T3 Code desktop window for '$TARGET_WORKSPACE'."
 exit 0

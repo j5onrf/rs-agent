@@ -286,15 +286,30 @@ fn render_claude_box(model: &str, profile: &str, git_info: &str, progress: f64) 
             (format!("  {ANSI_DIM}{}{ANSI_RESET}", cwd_c), 2 + cwd_c.chars().count()),
         ];
 
-        let r0 = clamp_chars("Shortcuts & Modes", right_w.saturating_sub(1));
-        let r1 = clamp_chars("• /p profile   /s skills   /t3 ADE", right_w.saturating_sub(1));
-        let r2 = clamp_chars("• /task loop   /box theme  /r reset", right_w.saturating_sub(1));
-        let r3 = clamp_chars("↑/↓ history · Ctrl+C exit", right_w.saturating_sub(1));
+        let max_tok = crate::config::get_max_tokens();
+        let tok_s = if max_tok >= 1_000_000 {
+            format!("{:.1}M", max_tok as f64 / 1_000_000.0)
+        } else if max_tok >= 1_000 {
+            format!("{:.1}k", max_tok as f64 / 1000.0)
+        } else {
+            format!("{}", max_tok)
+        };
+        let has_task = Path::new("TASK.md").is_file() || Path::new("task.md").is_file();
+        let status_info = if has_task {
+            format!("TASK.md ready · ctx {} · {} steps", tok_s, crate::config::get_max_rounds())
+        } else {
+            format!("ctx {} · max {} steps · ↑/↓ history", tok_s, crate::config::get_max_rounds())
+        };
+
+        let r0 = clamp_chars("Tips for getting started", right_w.saturating_sub(1));
+        let r1 = clamp_chars("Type / for commands · Tab completes", right_w.saturating_sub(1));
+        let r2 = "─".repeat(right_w.saturating_sub(2));
+        let r3 = clamp_chars(&status_info, right_w.saturating_sub(1));
 
         let right: [(String, usize); 4] = [
             (format!("\x1b[38;5;215m{}\x1b[0m", r0), r0.chars().count()),
             (format!("{ANSI_DIM}{}{ANSI_RESET}", r1), r1.chars().count()),
-            (format!("{ANSI_DIM}{}{ANSI_RESET}", r2), r2.chars().count()),
+            (format!("{ANSI_MUTED}{}{ANSI_RESET}", r2), r2.chars().count()),
             (format!("{ANSI_MUTED}{}{ANSI_RESET}", r3), r3.chars().count()),
         ];
 
@@ -873,6 +888,35 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
 }
 
 
+const SLASH_COMMANDS: &[(&str, &str)] = &[
+    ("/p", "Select agent profile"),
+    ("/s", "Attach or detach skills"),
+    ("/task", "Run autonomous goal loop"),
+    ("/t3", "Launch T3 Code ADE"),
+    ("/box", "Cycle box theme (1-7)"),
+    ("/pad", "Toggle spaced layout"),
+    ("/tk", "Cycle thinking view"),
+    ("/r", "Reset session"),
+    ("/clear", "Clear screen"),
+];
+
+fn slash_matches(buf: &[char]) -> Vec<(&'static str, &'static str)> {
+    if buf.first() != Some(&'/') || buf.contains(&' ') {
+        return Vec::new();
+    }
+    let q: String = buf.iter().collect::<String>().to_lowercase();
+    let needle = &q[1..];
+    let max_rows = crossterm::terminal::size()
+        .map(|(_, h)| (h as usize).saturating_sub(6).max(3))
+        .unwrap_or(SLASH_COMMANDS.len());
+    SLASH_COMMANDS
+        .iter()
+        .copied()
+        .filter(|(cmd, desc)| cmd.starts_with(&q) || desc.to_lowercase().contains(needle))
+        .take(max_rows)
+        .collect()
+}
+
 pub enum InputResult {
     Line(String),
     Eof,
@@ -927,6 +971,7 @@ pub fn read_ruled_input(
     let mut view_start: usize = 0;
     let mut hist_idx: Option<usize> = None;
     let mut draft: Vec<char> = Vec::new();
+    let mut menu_sel: usize = 0;
     let mut first_draw = true;
 
     loop {
@@ -942,19 +987,31 @@ pub fn read_ruled_input(
         }
         let view_end = (view_start + text_avail).min(buf.len());
         let visible_text: String = buf[view_start..view_end].iter().collect();
-        let show_hint = buf.first() == Some(&'/');
 
+        let matches = slash_matches(&buf);
+        if !matches.is_empty() && menu_sel >= matches.len() {
+            menu_sel = matches.len() - 1;
+        }
         let status_clamped = clamp_chars(status_line, w.saturating_sub(2));
-        let hint_clamped = clamp_chars(
-            "  Commands: /p profile · /s skills · /task loop · /t3 ADE · /box theme · /pad · /r reset",
-            w.saturating_sub(1),
-        );
 
         {
             let mut handle = stdout.lock();
             let col = 3 + (cur - view_start);
             if minimal {
-                let _ = write!(handle, "\r\x1b[2K{ANSI_BRIGHT}❯{ANSI_RESET} {visible_text}\x1b[{col}G");
+                let _ = write!(handle, "\r\x1b[2K{ANSI_BRIGHT}❯{ANSI_RESET} {visible_text}");
+                for (i, (cmd, desc)) in matches.iter().enumerate() {
+                    let row = clamp_chars(&format!("{cmd:<7} {desc}"), w.saturating_sub(5));
+                    if i == menu_sel {
+                        let _ = write!(handle, "\r\n\x1b[2K  {ANSI_BRIGHT}❯ {row}{ANSI_RESET}");
+                    } else {
+                        let _ = write!(handle, "\r\n\x1b[2K    {ANSI_DIM}{row}{ANSI_RESET}");
+                    }
+                }
+                let _ = write!(handle, "\x1b[J");
+                if !matches.is_empty() {
+                    let _ = write!(handle, "\x1b[{}A", matches.len());
+                }
+                let _ = write!(handle, "\x1b[{col}G");
                 first_draw = false;
             } else {
                 if !first_draw {
@@ -967,14 +1024,16 @@ pub fn read_ruled_input(
                 let _ = write!(handle, "\x1b[2K{ANSI_MUTED}{rule}{ANSI_RESET}\r\n");
                 let _ = write!(handle, "\x1b[2K{ANSI_DIM}  {status_clamped}{ANSI_RESET}");
 
-                let up = if show_hint {
-                    let _ = write!(handle, "\r\n\x1b[2K{ANSI_MUTED}{hint_clamped}{ANSI_RESET}\x1b[J");
-                    3
-                } else {
-                    let _ = write!(handle, "\x1b[J");
-                    2
-                };
-
+                for (i, (cmd, desc)) in matches.iter().enumerate() {
+                    let row = clamp_chars(&format!("{cmd:<7} {desc}"), w.saturating_sub(5));
+                    if i == menu_sel {
+                        let _ = write!(handle, "\r\n\x1b[2K  {ANSI_BRIGHT}❯ {row}{ANSI_RESET}");
+                    } else {
+                        let _ = write!(handle, "\r\n\x1b[2K    {ANSI_DIM}{row}{ANSI_RESET}");
+                    }
+                }
+                let _ = write!(handle, "\x1b[J");
+                let up = 2 + matches.len();
                 let _ = write!(handle, "\x1b[{up}A\x1b[{col}G");
             }
             let _ = handle.flush();
@@ -983,10 +1042,14 @@ pub fn read_ruled_input(
         match event::read() {
             Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => match key.code {
                 KeyCode::Enter => {
-                    let submitted: String = buf.iter().collect();
+                    let submitted: String = if !matches.is_empty() {
+                        matches[menu_sel].0.to_string()
+                    } else {
+                        buf.iter().collect()
+                    };
                     {
                         let mut handle = stdout.lock();
-                        let clear_seq = if minimal { "\r\x1b[2K" } else { "\x1b[1A\r\x1b[J" };
+                        let clear_seq = if minimal { "\r\x1b[2K\x1b[J" } else { "\x1b[1A\r\x1b[J" };
                         let _ = write!(handle, "{clear_seq}");
                         let _ = handle.flush();
                     }
@@ -996,6 +1059,22 @@ pub fn read_ruled_input(
                     }
                     return Ok(InputResult::Line(submitted));
                 }
+                KeyCode::Tab if !matches.is_empty() => {
+                    let cmd = matches[menu_sel].0;
+                    buf = cmd.chars().collect();
+                    if cmd == "/task" || cmd == "/box" {
+                        buf.push(' ');
+                    }
+                    cur = buf.len();
+                    view_start = 0;
+                    menu_sel = 0;
+                }
+                KeyCode::Esc if !matches.is_empty() => {
+                    buf.clear();
+                    cur = 0;
+                    view_start = 0;
+                    menu_sel = 0;
+                }
                 KeyCode::Char('c') | KeyCode::Char('d') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     if key.code == KeyCode::Char('d') && !buf.is_empty() {
                         if cur < buf.len() {
@@ -1004,7 +1083,7 @@ pub fn read_ruled_input(
                         continue;
                     }
                     let mut handle = stdout.lock();
-                    let clear_seq = if minimal { "\r\x1b[2K" } else { "\x1b[1A\r\x1b[J" };
+                    let clear_seq = if minimal { "\r\x1b[2K\x1b[J" } else { "\x1b[1A\r\x1b[J" };
                     let _ = write!(handle, "{clear_seq}");
                     let _ = handle.flush();
                     return Ok(InputResult::Eof);
@@ -1019,6 +1098,7 @@ pub fn read_ruled_input(
                     buf.clear();
                     cur = 0;
                     view_start = 0;
+                    menu_sel = 0;
                 }
                 KeyCode::Char('w') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                     while cur > 0 && buf[cur - 1].is_whitespace() {
@@ -1029,13 +1109,16 @@ pub fn read_ruled_input(
                         cur -= 1;
                         buf.remove(cur);
                     }
+                    menu_sel = 0;
                 }
                 KeyCode::Backspace if cur > 0 => {
                     cur -= 1;
                     buf.remove(cur);
+                    menu_sel = 0;
                 }
                 KeyCode::Delete if cur < buf.len() => {
                     buf.remove(cur);
+                    menu_sel = 0;
                 }
                 KeyCode::Left => {
                     cur = cur.saturating_sub(1);
@@ -1048,6 +1131,12 @@ pub fn read_ruled_input(
                 }
                 KeyCode::End => {
                     cur = buf.len();
+                }
+                KeyCode::Up if !matches.is_empty() => {
+                    menu_sel = (menu_sel + matches.len() - 1) % matches.len();
+                }
+                KeyCode::Down if !matches.is_empty() => {
+                    menu_sel = (menu_sel + 1) % matches.len();
                 }
                 KeyCode::Up if !history.is_empty() => {
                     if hist_idx.is_none() {
@@ -1080,6 +1169,7 @@ pub fn read_ruled_input(
                 KeyCode::Char(c) if !key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
                     buf.insert(cur, c);
                     cur += 1;
+                    menu_sel = 0;
                 }
                 _ => {}
             },
@@ -1099,7 +1189,7 @@ pub fn read_ruled_input(
             Ok(_) => {}
             Err(_) => {
                 let mut handle = stdout.lock();
-                let clear_seq = if minimal { "\r\x1b[2K" } else { "\x1b[1A\r\x1b[J" };
+                let clear_seq = if minimal { "\r\x1b[2K\x1b[J" } else { "\x1b[1A\r\x1b[J" };
                 let _ = write!(handle, "{clear_seq}");
                 let _ = handle.flush();
                 return Ok(InputResult::Eof);

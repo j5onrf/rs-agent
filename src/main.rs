@@ -1044,7 +1044,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             assistant_msg.tool_calls = Some(serde_json::Value::Array(calls.clone()));
             history.push(assistant_msg);
 
-            println!();
+            if !(renderer.pad && renderer.thinking_started && renderer.answer_chars == 0) {
+                println!();
+            }
             execute_tool_batch(&calls, target_dir, &boundary, cfg.adapters, &mut history, &mut spinner).await;
         }
     }

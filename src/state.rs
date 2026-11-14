@@ -17,8 +17,8 @@ pub struct AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self {
-            box_style: 5,
-            pad: false, // Default: Box 5 dense layout (/box non-5 enables pad; /pad overrides)
+            box_style: 7,
+            pad: true, // Default: Box 7 spaced layout (/box 1-6 disables pad; /pad overrides)
             show_thinking_summaries: None,
         }
     }
