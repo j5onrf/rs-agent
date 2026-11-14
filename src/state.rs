@@ -19,7 +19,7 @@ impl Default for AppState {
         Self {
             box_style: 7,
             pad: true, // Default: Box 7 spaced layout (/box 1-6 disables pad; /pad overrides)
-            show_thinking_summaries: None,
+            show_thinking_summaries: Some(true),
         }
     }
 }
@@ -52,11 +52,15 @@ pub fn get_box_style() -> usize {
     }
 }
 
-pub fn set_box_style(style: usize) {
-    let mut state = load_state();
+fn apply_box_style(state: &mut AppState, style: usize) {
     state.box_style = style;
     state.pad = style == 7;
     state.show_thinking_summaries = if style == 7 { Some(true) } else { None };
+}
+
+pub fn set_box_style(style: usize) {
+    let mut state = load_state();
+    apply_box_style(&mut state, style);
     save_state(&state);
 }
 
@@ -78,4 +82,25 @@ pub fn set_show_thinking_summaries(val: Option<bool>) {
     let mut state = load_state();
     state.show_thinking_summaries = val;
     save_state(&state);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_box7_and_compact_defaults() {
+        let mut s = AppState::default();
+        assert_eq!(s.box_style, 7);
+        assert!(s.pad);
+        assert_eq!(s.show_thinking_summaries, Some(true));
+
+        apply_box_style(&mut s, 4);
+        assert!(!s.pad);
+        assert_eq!(s.show_thinking_summaries, None);
+
+        apply_box_style(&mut s, 7);
+        assert!(s.pad);
+        assert_eq!(s.show_thinking_summaries, Some(true));
+    }
 }

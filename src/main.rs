@@ -949,7 +949,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             continue;
         }
 
-        if input.starts_with("/box") {
+        if input == "/b" || input.starts_with("/b ") || input == "/box" || input.starts_with("/box ") {
             let parts: Vec<&str> = input.split_whitespace().collect();
             current_box_style = if parts.len() > 1 {
                 let parsed = parts[1].parse::<usize>().unwrap_or((current_box_style % 7) + 1);

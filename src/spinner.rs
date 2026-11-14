@@ -35,6 +35,11 @@ impl InlineSpinner {
             m.push_str(msg);
         }
 
+        let indent = if msg == "Prefilling..." && crate::state::get_show_thinking_summaries().is_none() {
+            ""
+        } else {
+            "  "
+        };
         let running = Arc::clone(&self.running);
         let message = Arc::clone(&self.message);
 
@@ -50,7 +55,7 @@ impl InlineSpinner {
                         let stdout = io::stdout();
                         let mut lock = stdout.lock();
                         if let Ok(m) = message.lock() {
-                            let _ = write!(lock, "\r\x1b[2K  {} \x1b[2m{:.1}s\x1b[0m", &*m, elapsed);
+                            let _ = write!(lock, "\r\x1b[2K{}{} \x1b[2m{:.1}s\x1b[0m", indent, &*m, elapsed);
                         }
                         let _ = lock.flush();
                     }

@@ -64,6 +64,9 @@ impl StreamRenderer {
                 } else {
                     "    \x1b[2;3m"
                 }
+            } else if self.glyph_emitted {
+                self.glyph_emitted = false;
+                ""
             } else {
                 "\x1b[2m│ \x1b[0m\x1b[2m"
             };
@@ -128,6 +131,10 @@ impl StreamRenderer {
                 if self.show_thinking == Some(false) {
                     print!("  \x1b[2;3m∴ …\x1b[0m");
                     let _ = io::stdout().flush();
+                } else if self.show_thinking.is_none() {
+                    self.glyph_emitted = true;
+                    print!("\x1b[2m│ \x1b[0m\x1b[2m");
+                    let _ = io::stdout().flush();
                 }
             }
 
@@ -145,6 +152,9 @@ impl StreamRenderer {
                         if self.at_line_start {
                             if self.show_thinking == Some(true) {
                                 let _ = writeln!(handle);
+                            } else if self.glyph_emitted {
+                                self.glyph_emitted = false;
+                                let _ = writeln!(handle, "\x1b[0m");
                             } else {
                                 let _ = writeln!(handle, "\x1b[2m│\x1b[0m");
                             }

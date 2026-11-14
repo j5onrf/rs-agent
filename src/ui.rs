@@ -894,7 +894,7 @@ const SLASH_COMMANDS: &[(&str, &str)] = &[
     ("/s", "Attach or detach skills"),
     ("/task", "Run autonomous goal loop"),
     ("/t3", "Launch T3 Code ADE"),
-    ("/box", "Cycle box theme (1-7)"),
+    ("/b", "Cycle box theme (1-7)"),
     ("/pad", "Toggle spaced layout"),
     ("/tk", "Cycle thinking view"),
     ("/r", "Reset session"),
@@ -905,17 +905,16 @@ fn slash_matches(buf: &[char]) -> Vec<(&'static str, &'static str)> {
     if buf.first() != Some(&'/') || buf.contains(&' ') {
         return Vec::new();
     }
-    let q: String = buf.iter().collect::<String>().to_lowercase();
-    let needle = &q[1..];
+    let q: String = buf.iter().collect::<String>().to_ascii_lowercase();
     let max_rows = crossterm::terminal::size()
         .map(|(_, h)| (h as usize).saturating_sub(6).max(3))
         .unwrap_or(SLASH_COMMANDS.len());
-    SLASH_COMMANDS
-        .iter()
-        .copied()
-        .filter(|(cmd, desc)| cmd.starts_with(&q) || desc.to_lowercase().contains(needle))
-        .take(max_rows)
-        .collect()
+    let mut out: Vec<_> = SLASH_COMMANDS.iter().copied().filter(|(cmd, _)| cmd.starts_with(&q)).collect();
+    if let Some(pos) = out.iter().position(|(cmd, _)| *cmd == q) {
+        out[..=pos].rotate_right(1);
+    }
+    out.truncate(max_rows);
+    out
 }
 
 pub enum InputResult {
@@ -1063,7 +1062,7 @@ pub fn read_ruled_input(
                 KeyCode::Tab if !matches.is_empty() => {
                     let cmd = matches[menu_sel].0;
                     buf = cmd.chars().collect();
-                    if cmd == "/task" || cmd == "/box" {
+                    if cmd == "/task" || cmd == "/b" || cmd == "/box" {
                         buf.push(' ');
                     }
                     cur = buf.len();
@@ -1280,4 +1279,22 @@ pub fn authorize_prompt(violation: &str) -> bool {
         println!("  \x1b[1;31m✗\x1b[0m \x1b[2mDenied: {}\x1b[0m", msg);
     }
     approved
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_slash_matches_prefix_and_exact_first() {
+        let b: Vec<char> = "/b".chars().collect();
+        assert_eq!(slash_matches(&b).first().map(|x| x.0), Some("/b"));
+
+        let t: Vec<char> = "/t".chars().collect();
+        let t_cmds: Vec<&str> = slash_matches(&t).into_iter().map(|x| x.0).collect();
+        assert_eq!(t_cmds, vec!["/task", "/t3", "/tk"]);
+
+        let box_q: Vec<char> = "/box".chars().collect();
+        assert!(slash_matches(&box_q).is_empty());
+    }
 }

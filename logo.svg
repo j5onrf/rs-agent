@@ -1,20 +1,11 @@
-<svg id="svg-7" xmlns="http://www.w3.org/2000/svg" viewBox="35 35 230 230">
-          <defs>
-            <linearGradient id="tor-a" x1="0%" y1="0%" x2="100%" y2="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <defs>
+            <linearGradient id="rs-logo-a" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#00F2FE"/>
               <stop offset="100%" stop-color="#3A7BD5"/>
             </linearGradient>
-            <linearGradient id="tor-b" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#3A7BD5"/>
-              <stop offset="100%" stop-color="#4FACFE"/>
-            </linearGradient>
           </defs>
-          <g>
-            <!-- Loop A -->
-            <path d="M 150 55 A 75 75 0 1 0 225 130" fill="none" stroke="url(#tor-a)" stroke-width="36" stroke-linecap="round"/>
-            <!-- Loop B (Interweaving) -->
-            <path d="M 150 245 A 75 75 0 1 0 75 170" fill="none" stroke="url(#tor-b)" stroke-width="36" stroke-opacity="0.88" stroke-linecap="round"/>
-            <circle cx="150" cy="55" r="15" fill="#00F2FE"/>
-            <circle cx="150" cy="245" r="15" fill="#3A7BD5"/>
-          </g>
-        </svg>
+          <path d="M 120 34 A 86 86 0 0 1 206 120" fill="none" stroke="#3A7BD5" stroke-width="20" stroke-linecap="round"/>
+          <path d="M 120 206 A 86 86 0 0 1 34 120" fill="none" stroke="#4FACFE" stroke-width="20" stroke-linecap="round"/>
+          <path d="M 120 52 Q 128 112 188 120 Q 128 128 120 188 Q 112 128 52 120 Q 112 112 120 52 Z" fill="url(#rs-logo-a)"/>
+</svg>
