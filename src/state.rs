@@ -56,6 +56,7 @@ pub fn set_box_style(style: usize) {
     let mut state = load_state();
     state.box_style = style;
     state.pad = style == 7;
+    state.show_thinking_summaries = if style == 7 { Some(true) } else { None };
     save_state(&state);
 }
 
