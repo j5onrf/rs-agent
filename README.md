@@ -221,11 +221,11 @@ mcp: photocraft         # Attach stdio MCP server(s) (e.g. photocraft, blender, 
 
 | Binary | Tool | Purpose |
 | :--- | :--- | :--- |
-| 👤 `ms` | **Model Selector** | Interactive TUI for switching active providers, `AI_MAX_TOKENS` (`4k`–`1M`), and loop limits |
-| `newp` | **Project Creator** | Scaffolds workspace, `.rs/config.json`, profile, and `rs-context.md` aliases |
-| `idx` | **Codebase Indexer** | Generates token-dense Rust AST architecture maps (`index-map.txt`) |
-| `ta` | **System Diagnostics** | 10-pass live verification suite checking tools, security boundary, UI, and `--bridge` ACP |
-| `eva` | **Agentic Benchmark** | Full-stack `eval-stack` evaluation runner |
+| 👤 `ms` | **Model Select** | Interactive TUI for switching active providers, `AI_MAX_TOKENS` (`4k`–`1M`), and loop limits |
+| `newp` | **New Project** | Scaffolds workspace, `.rs/config.json`, profile, and `rs-context.md` aliases |
+| `idx` | **Index Map** | Generates token-dense Rust AST codebase maps (`index-map.txt`) |
+| `ta` | **Test Agent** | 10-pass live verification suite checking tools, security boundary, UI, and `--bridge` ACP |
+| `eva` | **Eval Benchmark** | Full-stack `eval-stack` model evaluation runner |
 
 ---
 
