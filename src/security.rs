@@ -55,42 +55,65 @@ fn get_python_pip_re() -> &'static regex::Regex {
     })
 }
 
-/// Zero-allocation detection of destructive rm commands (rm -rf, rm -fr, rm --recursive --force, rm -r -f)
+#[inline]
+fn is_shell_boundary(b: u8) -> bool {
+    b.is_ascii_whitespace()
+        || matches!(
+            b,
+            b'=' | b':' | b'"' | b'\'' | b'`' | b';' | b'(' | b')' | b'<' | b'>' | b'&' | b'|' | b'{' | b',' | b'*'
+        )
+}
+
+fn contains_sys_dir_token(lower: &str, sys_dir: &str) -> bool {
+    let bytes = lower.as_bytes();
+    for (idx, _) in lower.match_indices(sys_dir) {
+        let before_ok = idx == 0 || is_shell_boundary(bytes[idx - 1]);
+        let after_idx = idx + sys_dir.len();
+        let after_ok = after_idx == bytes.len() || bytes[after_idx] == b'/' || is_shell_boundary(bytes[after_idx]);
+        if before_ok && after_ok {
+            return true;
+        }
+    }
+    false
+}
+
+/// Detection of destructive rm commands across shell separators
 fn is_destructive_rm(cmd: &str) -> bool {
-    let tokens: Vec<&str> = cmd.split_whitespace().collect();
-    for (i, &t) in tokens.iter().enumerate() {
-        if t == "rm" {
-            let rest = &tokens[i + 1..];
-            let mut has_r = false;
-            let mut has_f = false;
-            let mut has_dangerous_target = false;
+    for segment in cmd.split([';', '|', '&', '\n', '(', ')']) {
+        let mut iter = segment.split_whitespace();
+        while let Some(t) = iter.next() {
+            if t == "rm" {
+                let mut has_r = false;
+                let mut has_f = false;
+                let mut has_dangerous_target = false;
 
-            for &arg in rest {
-                if arg == "--recursive" || arg == "-r" || arg == "-R" {
-                    has_r = true;
-                } else if arg == "--force" || arg == "-f" || arg == "-F" {
-                    has_f = true;
-                } else if arg.starts_with('-') && !arg.starts_with("--") {
-                    let flags = &arg[1..];
-                    if flags.contains('r') || flags.contains('R') {
+                for arg in iter.by_ref() {
+                    if arg == "--recursive" || arg == "-r" || arg == "-R" {
                         has_r = true;
-                    }
-                    if flags.contains('f') || flags.contains('F') {
+                    } else if arg == "--force" || arg == "-f" || arg == "-F" {
                         has_f = true;
+                    } else if arg.starts_with('-') && !arg.starts_with("--") {
+                        let flags = &arg[1..];
+                        if flags.contains('r') || flags.contains('R') {
+                            has_r = true;
+                        }
+                        if flags.contains('f') || flags.contains('F') {
+                            has_f = true;
+                        }
+                    } else if arg == "/"
+                        || arg == "~"
+                        || arg == "*"
+                        || arg.starts_with("/etc")
+                        || arg.starts_with("/home")
+                        || arg.contains("..")
+                    {
+                        has_dangerous_target = true;
                     }
-                } else if arg == "/"
-                    || arg == "~"
-                    || arg == "*"
-                    || arg.starts_with("/etc")
-                    || arg.starts_with("/home")
-                    || arg.contains("..")
-                {
-                    has_dangerous_target = true;
                 }
-            }
 
-            if has_dangerous_target || (has_r && has_f) {
-                return true;
+                if has_dangerous_target || (has_r && has_f) {
+                    return true;
+                }
             }
         }
     }
@@ -99,12 +122,25 @@ fn is_destructive_rm(cmd: &str) -> bool {
 
 pub struct SecurityBoundary {
     pub root: PathBuf,
+    pub headless: bool,
 }
 
 impl SecurityBoundary {
     pub fn new<P: AsRef<Path>>(workspace: P) -> Self {
         let root = workspace.as_ref().canonicalize().unwrap_or_else(|_| workspace.as_ref().to_path_buf());
-        Self { root }
+        Self { root, headless: false }
+    }
+
+    pub fn new_headless<P: AsRef<Path>>(workspace: P) -> Self {
+        let mut b = Self::new(workspace);
+        b.headless = true;
+        b
+    }
+
+    pub fn child<P: AsRef<Path>>(&self, workspace: P) -> Self {
+        let mut b = Self::new(workspace);
+        b.headless = self.headless;
+        b
     }
 
     pub fn resolve_path(&self, target: &str) -> PathBuf {
@@ -198,7 +234,7 @@ impl SecurityBoundary {
 
         // 1. Intercept shell commands targeting protected system trees outside workspace
         for &sys_dir in FORBIDDEN_SYS_DIRS {
-            if lower.contains(sys_dir) {
+            if contains_sys_dir_token(&lower, sys_dir) {
                 return Some("system directory access attempt");
             }
         }
@@ -270,6 +306,9 @@ impl SecurityBoundary {
     }
 
     pub fn authorize(&self, violation: &str) -> bool {
+        if self.headless || !io::stdout().is_terminal() {
+            return false;
+        }
         if io::stdin().is_terminal() {
             return crate::ui::authorize_prompt(violation);
         }
@@ -285,5 +324,23 @@ impl SecurityBoundary {
             }
         }
         false
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_check_command_avoids_workspace_false_positives_and_catches_real_escapes() {
+        let b = SecurityBoundary::new_headless(".");
+        assert_eq!(b.check_command("./.venv/bin/pytest -q"), None);
+        assert_eq!(b.check_command("cargo test --manifest-path src/sys/Cargo.toml"), None);
+        assert_eq!(b.check_command("node_modules/.bin/tsc --noEmit"), None);
+        assert!(b.check_command("cat /etc/passwd").is_some());
+        assert!(b.check_command("PATH=/usr/bin:/bin ls").is_some());
+        assert!(b.check_command("echo ok;rm -rf .").is_some());
+        assert!(!b.authorize("test"));
     }
 }

@@ -119,7 +119,7 @@ fn get_base_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
                     "type": "function",
                     "function": {
                         "name": "write_file",
-                        "description": "Create a new file or completely overwrite an existing file. Confirms disk write without needing read_file. If file exists, pass overwrite=true.",
+                        "description": "Create a new file or overwrite an existing file. Confirms disk write without needing read_file.",
                         "parameters": {
                             "type": "object",
                             "properties": {
@@ -201,7 +201,52 @@ fn get_base_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
     }
 }
 
-/// Computes Levenshtein distance similarity ratio (0.0 to 1.0)
+struct SubagentDepthGuard;
+
+impl SubagentDepthGuard {
+    fn enter() -> Option<Self> {
+        SUBAGENT_DEPTH
+            .fetch_update(
+                std::sync::atomic::Ordering::SeqCst,
+                std::sync::atomic::Ordering::SeqCst,
+                |d| if d < 1 { Some(d + 1) } else { None },
+            )
+            .ok()
+            .map(|_| Self)
+    }
+}
+
+impl Drop for SubagentDepthGuard {
+    fn drop(&mut self) {
+        SUBAGENT_DEPTH.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+pub fn read_task_spec(target_dir: &Path) -> Option<String> {
+    for fname in &["TASK.md", "task.md", "TODO.md"] {
+        let p = target_dir.join(fname);
+        if p.is_file() {
+            if let Ok(c) = fs::read_to_string(&p) {
+                let t = c.trim().to_string();
+                if !t.is_empty() {
+                    return Some(t);
+                }
+            }
+        }
+    }
+    None
+}
+
+pub fn is_task_complete(text: &str) -> bool {
+    let lower = text.to_lowercase();
+    lower.contains("✓ task complete")
+        || lower.contains("task complete")
+        || lower.contains("task completed")
+        || lower.contains("goal complete")
+        || lower.contains("goal completed")
+}
+
+/// Computes Levenshtein distance similarity ratio (0.0 to 1.0) in O(m) space
 fn levenshtein_similarity(a: &str, b: &str) -> f64 {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
@@ -214,29 +259,23 @@ fn levenshtein_similarity(a: &str, b: &str) -> f64 {
         return 0.0;
     }
 
-    let mut dp = vec![vec![0usize; m + 1]; n + 1];
-    #[allow(clippy::needless_range_loop)]
-    for i in 0..=n {
-        dp[i][0] = i;
-    }
-    #[allow(clippy::needless_range_loop)]
-    for j in 0..=m {
-        dp[0][j] = j;
-    }
+    let mut prev: Vec<usize> = (0..=m).collect();
+    let mut curr = vec![0usize; m + 1];
 
     for i in 1..=n {
+        curr[0] = i;
         for j in 1..=m {
-            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
-            dp[i][j] = (dp[i - 1][j] + 1).min(dp[i][j - 1] + 1).min(dp[i - 1][j - 1] + cost);
+            let cost = usize::from(a_chars[i - 1] != b_chars[j - 1]);
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
         }
+        std::mem::swap(&mut prev, &mut curr);
     }
 
-    let dist = dp[n][m];
-    let max_len = n.max(m);
-    1.0 - (dist as f64 / max_len as f64)
+    let dist = prev[m];
+    1.0 - (dist as f64 / n.max(m) as f64)
 }
 
-/// 3-Stage Resilient Replacer ported from py-agent (Exact -> Indent-Delta Whitespace -> Fuzzy)
+/// 3-Stage Resilient Replacer (Exact -> Indent-Delta Whitespace -> Fuzzy)
 pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result<String, String> {
     if original.contains(old_str) {
         if original.matches(old_str).count() > 1 {
@@ -273,6 +312,8 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
         return Err("Parameter 'old_str' contains no non-whitespace content.".into());
     }
 
+    let old_first_non_blank = old_lines.iter().copied().find(|l| !l.trim().is_empty()).unwrap_or(old_lines[0]);
+
     let mut matches = Vec::new();
     if non_blank_orig.len() >= old_len {
         for i in 0..=(non_blank_orig.len() - old_len) {
@@ -290,41 +331,48 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
         end_idx: usize,
         old_first_line: &str,
         clean_new: &str,
+        preserve_trailing_nl: bool,
     ) -> String {
         let orig_first_line = orig_lines[start_idx];
         let orig_indent = orig_first_line.len() - orig_first_line.trim_start().len();
         let old_indent = old_first_line.len() - old_first_line.trim_start().len();
         let indent_delta = orig_indent as isize - old_indent as isize;
 
-        let mut adjusted_new_lines = Vec::new();
+        let mut parts: Vec<String> = orig_lines[..start_idx].iter().map(|s| (*s).to_string()).collect();
         for nl in clean_new.lines() {
             if nl.trim().is_empty() {
-                adjusted_new_lines.push(String::new());
+                parts.push(String::new());
             } else if indent_delta > 0 {
-                adjusted_new_lines.push(format!("{}{}", " ".repeat(indent_delta as usize), nl));
+                parts.push(format!("{}{}", " ".repeat(indent_delta as usize), nl));
             } else if indent_delta < 0 && nl.starts_with(&" ".repeat(indent_delta.unsigned_abs())) {
-                adjusted_new_lines.push(nl[indent_delta.unsigned_abs()..].to_string());
+                parts.push(nl[indent_delta.unsigned_abs()..].to_string());
             } else {
-                adjusted_new_lines.push(nl.to_string());
+                parts.push(nl.to_string());
             }
         }
-
-        let mut reconstructed = String::new();
-        if start_idx > 0 {
-            reconstructed.push_str(&orig_lines[..start_idx].join("\n"));
-            reconstructed.push('\n');
+        for l in &orig_lines[end_idx..] {
+            parts.push((*l).to_string());
         }
-        reconstructed.push_str(&adjusted_new_lines.join("\n"));
-        if end_idx < orig_lines.len() {
+
+        let mut reconstructed = parts.join("\n");
+        if preserve_trailing_nl && !reconstructed.is_empty() && !reconstructed.ends_with('\n') {
             reconstructed.push('\n');
-            reconstructed.push_str(&orig_lines[end_idx..].join("\n"));
         }
         reconstructed
     }
 
+    let had_trailing_nl = original.ends_with('\n');
+
     if matches.len() == 1 {
         let (start_idx, end_idx) = matches[0];
-        return Ok(reconstruct_with_indent(&orig_lines, start_idx, end_idx, old_lines[0], &clean_new));
+        return Ok(reconstruct_with_indent(
+            &orig_lines,
+            start_idx,
+            end_idx,
+            old_first_non_blank,
+            &clean_new,
+            had_trailing_nl,
+        ));
     } else if matches.len() > 1 {
         return Err(format!(
             "Whitespace-normalized old_str matched {} locations. Include more surrounding lines to make it unique.",
@@ -333,12 +381,18 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
     }
 
     let old_block_str = norm_old.join("\n");
+    let old_char_len = old_block_str.chars().count();
     let mut best_ratio = 0.0;
     let mut best_window = None;
 
     if non_blank_orig.len() >= old_len {
         for i in 0..=(non_blank_orig.len() - old_len) {
             let cand_block_str = non_blank_orig[i..i + old_len].join("\n");
+            let cand_char_len = cand_block_str.chars().count();
+            let max_c = old_char_len.max(cand_char_len);
+            if max_c > 0 && (old_char_len.min(cand_char_len) as f64 / max_c as f64) < 0.85 {
+                continue;
+            }
             let ratio = levenshtein_similarity(&old_block_str, &cand_block_str);
             if ratio > best_ratio {
                 best_ratio = ratio;
@@ -348,7 +402,14 @@ pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result
     }
 
     if let Some((start_idx, end_idx)) = best_window.filter(|_| best_ratio >= 0.85) {
-        return Ok(reconstruct_with_indent(&orig_lines, start_idx, end_idx, old_lines[0], &clean_new));
+        return Ok(reconstruct_with_indent(
+            &orig_lines,
+            start_idx,
+            end_idx,
+            old_first_non_blank,
+            &clean_new,
+            had_trailing_nl,
+        ));
     }
 
     Err("Target 'old_str' not found in file (even with whitespace tolerance and fuzzy matching). Use read_file to inspect exact lines.".into())
@@ -360,28 +421,48 @@ pub async fn execute_tool(
     workspace: &Path,
     boundary: &SecurityBoundary,
 ) -> Result<String, String> {
+    execute_tool_with_auth(name, raw_args, workspace, boundary, false).await
+}
+
+pub async fn execute_tool_with_auth(
+    name: &str,
+    raw_args: &str,
+    workspace: &Path,
+    boundary: &SecurityBoundary,
+    preauthorized_cmd: bool,
+) -> Result<String, String> {
     let args = heal_json_args(raw_args);
     let ceilings = get_context_ceilings();
 
     if let Some(rest) = name.strip_prefix("mcp_") {
+        let servers = crate::mcp::load_servers_config();
+        let mut best: Option<(&str, &str)> = None;
+        for srv in servers.keys() {
+            if let Some(tool_part) = rest.strip_prefix(srv.as_str()).and_then(|r| r.strip_prefix('_')) {
+                if best.map(|(b, _)| srv.len() > b.len()).unwrap_or(true) {
+                    best = Some((srv.as_str(), tool_part));
+                }
+            }
+        }
+        if let Some((server, tool_name)) = best {
+            return crate::mcp::call_tool(server, tool_name, &args).await;
+        }
         if let Some((server, tool_name)) = rest.split_once('_') {
             return crate::mcp::call_tool(server, tool_name, &args).await;
-        } else {
-            return Err(format!("Malformed MCP tool name '{}'. Expected mcp_<server>_<tool>", name));
         }
+        return Err(format!("Malformed MCP tool name '{}'. Expected mcp_<server>_<tool>", name));
     }
 
     match name {
         "delegate_task" => {
             let goal = args["goal"].as_str().ok_or("Missing 'goal' parameter")?;
-            if SUBAGENT_DEPTH.load(std::sync::atomic::Ordering::SeqCst) >= 1 {
-                return Err("[error] Sub-agents cannot recursively delegate tasks. Execute direct tools.".into());
-            }
+            let _depth_guard = SubagentDepthGuard::enter().ok_or_else(|| {
+                "[error] Sub-agents cannot recursively delegate tasks. Execute direct tools.".to_string()
+            })?;
 
-            SUBAGENT_DEPTH.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             let provider = crate::config::ProviderConfig::load().await;
             let client = crate::client::LlmClient::new(provider);
-            let sub_boundary = SecurityBoundary::new(workspace);
+            let sub_boundary = boundary.child(workspace);
 
             let sub_tools = get_base_tools_schema(&ToolTier::Smol, false);
             let sys_prompt = format!(
@@ -434,7 +515,7 @@ pub async fn execute_tool(
                                         let ws = workspace;
                                         let bnd = &sub_boundary;
                                         futs.push(async move {
-                                            let res = Box::pin(execute_tool(&c_name, &c_args, ws, bnd)).await;
+                                            let res = Box::pin(execute_tool_with_auth(&c_name, &c_args, ws, bnd, false)).await;
                                             (c_id, res)
                                         });
                                     }
@@ -450,7 +531,14 @@ pub async fn execute_tool(
                                         fn_name,
                                         call["function"]["arguments"].as_str().unwrap_or("{}"),
                                     );
-                                    let res = Box::pin(execute_tool(fn_name, &c_args, workspace, &sub_boundary)).await;
+                                    let res = Box::pin(execute_tool_with_auth(
+                                        fn_name,
+                                        &c_args,
+                                        workspace,
+                                        &sub_boundary,
+                                        false,
+                                    ))
+                                    .await;
                                     let res_str = res.unwrap_or_else(|e| format!("[error] {}", e));
                                     sub_history.push(crate::client::ChatMessage::tool_response(c_id, res_str));
                                     idx += 1;
@@ -466,7 +554,6 @@ pub async fn execute_tool(
                     }
                 }
             }
-            SUBAGENT_DEPTH.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
             Ok(if final_report.is_empty() { "Sub-agent completed task with no output.".into() } else { final_report })
         }
 
@@ -620,9 +707,15 @@ pub async fn execute_tool(
                         if fname.starts_with('.') || fname == "target" || fname == "node_modules" {
                             continue;
                         }
-                        if path.is_dir() {
+                        let Ok(meta) = fs::symlink_metadata(&path) else {
+                            continue;
+                        };
+                        if meta.file_type().is_symlink() {
+                            continue;
+                        }
+                        if meta.is_dir() {
                             walk_search(&path, re, root, matches, limit);
-                        } else if path.is_file() {
+                        } else if meta.is_file() && meta.len() <= 2 * 1024 * 1024 {
                             if let Ok(c) = fs::read_to_string(&path) {
                                 for (idx, line) in c.lines().enumerate() {
                                     if re.is_match(line) {
@@ -655,9 +748,14 @@ pub async fn execute_tool(
         "run_command" => {
             let cmd = args["command"].as_str().ok_or("Missing 'command' parameter")?;
 
-            if let Some(forbidden) = boundary.check_command(cmd) {
-                if !boundary.authorize(&format!("MUTATING SYSTEM COMMAND: '{}' ({})", cmd, forbidden)) {
-                    return Err(format!("[denied] Execution of forbidden command '{}' cancelled by user.", forbidden));
+            if !preauthorized_cmd {
+                if let Some(forbidden) = boundary.check_command(cmd) {
+                    if !boundary.authorize(&format!("MUTATING SYSTEM COMMAND: '{}' ({})", cmd, forbidden)) {
+                        return Err(format!(
+                            "[denied] Execution of forbidden command '{}' cancelled by user.",
+                            forbidden
+                        ));
+                    }
                 }
             }
 
@@ -734,5 +832,30 @@ pub async fn execute_tool(
         }
 
         _ => Err(format!("Unknown tool '{}'", name)),
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_resilient_replace_preserves_trailing_newline_and_leading_blank_indent() {
+        let orig = "fn demo() {\n    let a = 1;\n    let b = 2;\n}\n";
+        let old = "\n  let a = 1;\n  let b = 2;";
+        let new = "  let a = 10;\n  let b = 20;";
+        let out = resilient_replace(orig, old, new).unwrap();
+        assert_eq!(out, "fn demo() {\n    let a = 10;\n    let b = 20;\n}\n");
+    }
+
+    #[test]
+    fn test_resilient_replace_fuzzy_stage3() {
+        let orig = "fn calc(val: i32) -> i32 {\n    let result = val * 2 + 1;\n    result\n}\n";
+        let old = "let result = val * 2 + 0;\nresult";
+        let new = "let result = val * 3;\nresult";
+        let out = resilient_replace(orig, old, new).unwrap();
+        assert!(out.contains("    let result = val * 3;"));
+        assert!(out.ends_with("\n"));
     }
 }

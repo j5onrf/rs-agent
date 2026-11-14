@@ -86,6 +86,20 @@ impl Skill {
                     return Some(Self::parse(skill_name, &content));
                 }
             }
+            if let Ok(entries) = fs::read_dir(&dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("md") {
+                        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                            if stem.eq_ignore_ascii_case(skill_name) {
+                                if let Ok(content) = fs::read_to_string(&path) {
+                                    return Some(Self::parse(stem, &content));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
         None
     }
@@ -176,7 +190,7 @@ impl Skill {
             };
 
             print!("\r\x1b[2K\r\n");
-            print!("\r\x1b[2K  \x1b[2m:: Enter: toggle/select | ↑/↓: navigate | Type: filter | Esc: cancel\x1b[0m");
+            print!("\r\x1b[2K  \x1b[2m:: Enter: toggle/select | ↑/↓: navigate | Type: filter | Esc: cancel\x1b[0m\x1b[J");
             let _ = stdout.flush();
 
             last_rendered_lines = item_lines + 4;

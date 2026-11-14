@@ -22,12 +22,13 @@
 #   ├── plugins/t3code/Readme.md         - A native Rust Agent Client Protocol (ACP) stdio bridge connecting the `rs-agent`
 #   ├── plugins/t3code/launch.sh         - #!/usr/bin/env bash
 #   ├── plugins/t3code/src/main.rs       - CLI Entrypoint & Runtime Loop
-#   ├── plugins/t3code/t3code-bridge     - #!/usr/bin/env bash
+#   ├── plugins/t3code/t3code-bridge
 #   ├── profiles/artcraft/photocraft-c.md - PhotoCraft Visual Engine & Automation Specialist (Gemini Flash Lite)
 #   ├── profiles/artcraft/photocraft-l.md - LFM3 PhotoCraft Automation Engineer (Native MCP)
 #   ├── profiles/chat.md                 - Adaptive, high-signal conversational partner
 #   ├── profiles/flint.md                - Recursive Flint 40B-A2.5B Autonomous Systems Architect
 #   ├── profiles/gem35.md                - description: "Google Gemini 3.5 Flash Lite High-Speed Conversational & Systems E
+#   ├── profiles/gem4.md                 - Google Gemini 4 Hydrogen High-Speed Systems & Coding Engineer
 #   ├── profiles/groot/groot.md          - Groot-19B-A3B Autonomous Systems Engineer
 #   ├── profiles/groot/groot2.md         - Groot-19B-A3B APEX-I-MiniPlus-V2.1 Autonomous Systems Engineer
 #   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer
@@ -53,14 +54,14 @@
 #   ├── src/main.rs                      - CLI Entrypoint & Runtime Loop
 #   ├── src/matcher.rs                   - types: ContextEntry, ContextRouter
 #   ├── src/mcp.rs                       - types: McpServerConfig, McpSession
-#   ├── src/profile.rs                   - types: Profile
+#   ├── src/profile.rs                   - types: ReasoningSetting, Profile
 #   ├── src/security.rs                  - types: SecurityBoundary
 #   ├── src/skill.rs                     - types: Skill, SkillAction
 #   ├── src/spinner.rs                   - types: InlineSpinner
 #   ├── src/state.rs                     - types: AppState
 #   ├── src/stream.rs                    - types: UsageStats, StreamRenderer
-#   ├── src/tools.rs                     - fn: get_tools_schema, get_tools_schema_with_mcp, resilient_replace
-#   ├── src/ui.rs                        - fn: render_frame, draw_box
+#   ├── src/tools.rs                     - fn: is_read_only_tool, get_tools_schema, get_tools_schema_with_mcp
+#   ├── src/ui.rs                        - types: InputResult
 #   ├── system_instructions.md           - Global System Instructions (identical to .cursorrules or CLAUDE.md):
 #   ├── tools/eval-stack/eval-stack      - #!/usr/bin/env python3
 #   ├── tools/git-backup/Readme.md       - # Git Snapshot Backup (`git-backup`)
@@ -110,86 +111,93 @@
   L039: impl Drop for InstanceLockGuard {
     L040: fn drop(&mut self);
   }
-  L111: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
-  L128: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff, Mcp { .. } }
-  L907: async fn main() -> anyhow :: Result<()>;
+  L054: impl Drop for CursorHideGuard {
+    L055: fn drop(&mut self);
+  }
+  L139: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
+  L156: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff, Mcp { .. } }
+  L1055: async fn main() -> anyhow :: Result<()>;
 ```
 
 ### `tools/model-select/src/main.rs`
 ```rust
-  L044: impl Drop for RawModeGuard {
-    L045: fn drop(&mut self);
+  L010: impl Drop for RawModeGuard {
+    L011: fn drop(&mut self);
   }
-  L373: fn main() -> std :: io :: Result<()>;
+  L331: fn main() -> std :: io :: Result<()>;
 ```
 
 ### `tools/new-project/src/main.rs`
 ```rust
-  L091: fn main();
+  L137: fn main();
 ```
 
 ### `tools/test-agent/src/main.rs`
 ```rust
-  L301: fn main();
+  L393: async fn main();
 ```
 
 ### `src/adapter.rs`
 ```rust
   L001: pub fn strip_line_gutters(text: &str) -> String; // Strips copied line gutters (e.g. "12: ", " 42 | ") while preserving timestamps (12:30:00) and code literals.
   L049: pub fn normalize_params(map: &mut serde_json :: Map<String, serde_json :: Value>);
-  L134: pub fn heal_json_args(raw_args: &str) -> serde_json :: Value;
-  L271: pub fn repair_tool_args(_fn_name: &str, raw_args: &str) -> String;
-  L279: mod tests;
+  L139: pub fn heal_json_args(raw_args: &str) -> serde_json :: Value;
+  L276: pub fn repair_tool_args(_fn_name: &str, raw_args: &str) -> String;
+  L284: mod tests;
 ```
 
 ### `src/bridge.rs`
 ```rust
-  L275: pub async fn run_bridge() -> Result<()>;
+  L571: pub async fn run_bridge() -> Result<()>;
 ```
 
 ### `src/client.rs`
 ```rust
-  L019: pub enum StreamEvent { Chunk(&'a str, bool), ToolStart }
-  L024: pub struct ChatMessage { pub role: String, pub content: Value, pub reasoning_content: Option<String>, ... (5 fields) }
-  L036: impl ChatMessage {
-    L037: pub fn system(content: impl Into<String>) -> Self;
-    L047: pub fn user(content: impl Into<String>) -> Self;
-    L057: pub fn assistant(content: impl Into<String>) -> Self;
-    L067: pub fn assistant_with_reasoning(content: impl Into<String>, reasoning: Option<String>) -> Self;
-    L077: pub fn tool_response(tool_call_id: String, content: String) -> Self;
-    L087: pub fn content_as_str(&self) -> &str;
+  L020: pub enum StreamEvent { Chunk(&'a str, bool), ToolStart }
+  L025: pub struct ChatMessage { pub role: String, pub content: Value, pub reasoning_content: Option<String>, ... (5 fields) }
+  L037: impl ChatMessage {
+    L038: pub fn system(content: impl Into<String>) -> Self;
+    L048: pub fn user(content: impl Into<String>) -> Self;
+    L058: pub fn assistant(content: impl Into<String>) -> Self;
+    L068: pub fn assistant_with_reasoning(content: impl Into<String>, reasoning: Option<String>) -> Self;
+    L078: pub fn tool_response(tool_call_id: String, content: String) -> Self;
+    L088: pub fn content_as_str(&self) -> &str;
   }
-  L092: pub struct LlmClient { pub reasoning_budget: std :: sync :: atomic :: AtomicI64 }
-  L373: impl LlmClient {
-    L374: pub fn set_reasoning_budget(&self, budget: Option<usize>);
-    L379: pub fn new(config: ProviderConfig) -> Self;
-    L666: pub async fn stream_chat_raw<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, mut on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
-    L684: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>;
+  L093: pub struct LlmClient
+  L099: pub fn is_local_endpoint(url: &str) -> bool;
+  L374: impl LlmClient {
+    L375: pub fn set_reasoning(&self, setting: Option<ReasoningSetting>);
+    L385: pub fn new(config: ProviderConfig) -> Self;
+    L686: pub async fn stream_chat_raw_with_reasoning<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, reasoning_override: Option<Option<ReasoningSetting>>, mut on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
+    L705: pub async fn stream_chat_raw<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
+    L718: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>;
   }
-  L713: mod tests;
+  L809: mod tests;
 ```
 
 ### `src/config.rs`
 ```rust
-  L032: pub enum ToolTier { PureBash, Core4, Smol }
-  L039: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, ... (5 fields) }
-  L049: impl Default for WorkspaceConfig {
-    L050: fn default() -> Self;
+  L006: pub fn strip_inline_comment(s: &str) -> &str;
+  L049: pub enum ToolTier { PureBash, Core4, Smol }
+  L056: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, ... (5 fields) }
+  L066: impl Default for WorkspaceConfig {
+    L067: fn default() -> Self;
   }
-  L055: impl WorkspaceConfig {
-    L056: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
-    L066: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
+  L072: impl WorkspaceConfig {
+    L073: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
+    L083: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
   }
-  L075: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
-  L119: pub fn get_env_path() -> PathBuf;
-  L123: pub fn ensure_env_file();
-  L138: pub fn get_max_tokens() -> usize;
-  L159: pub fn get_context_ceilings() -> ContextCeilings;
-  L172: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, pub max_tokens: usize }
-  L193: impl ProviderConfig {
-    L194: pub async fn load() -> Self;
+  L092: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
+  L101: pub fn get_env_path() -> PathBuf;
+  L105: pub fn get_max_tokens() -> usize;
+  L114: pub fn get_max_rounds() -> usize;
+  L123: pub fn get_context_ceilings() -> ContextCeilings;
+  L136: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, pub max_tokens: usize }
+  L157: impl ProviderConfig {
+    L158: pub async fn load() -> Self;
   }
-  L269: pub fn load_global_instructions() -> Option<String>;
+  L232: pub fn load_global_instructions() -> Option<String>;
+  L254: mod tests;
 ```
 
 ### `src/matcher.rs`
@@ -214,50 +222,67 @@
   L108: pub struct McpSession
   L114: impl McpSession {
     L115: pub async fn spawn(cfg: &McpServerConfig) -> Result<Self>;
-    L201: pub async fn list_tools(&mut self) -> Result<Vec<Value>>;
-    L207: pub async fn call_tool(&mut self, tool_name: &str, arguments: &Value) -> Result<String>;
+    L210: pub async fn list_tools(&mut self) -> Result<Vec<Value>>;
+    L216: pub async fn call_tool(&mut self, tool_name: &str, arguments: &Value) -> Result<String>;
   }
-  L260: pub async fn get_server_tools_schema(server_name: &str) -> Result<Vec<Value>, String>;
-  L298: pub async fn call_tool(server_name: &str, tool_name: &str, arguments: &Value) -> Result<String, String>;
+  L269: pub async fn get_server_tools_schema(server_name: &str) -> Result<Vec<Value>, String>;
+  L307: pub async fn call_tool(server_name: &str, tool_name: &str, arguments: &Value) -> Result<String, String>;
 ```
 
 ### `src/profile.rs`
 ```rust
-  L009: pub struct Profile { pub reasoning_budget: Option<usize>, pub tier: ToolTier, pub adapters: bool, ... (7 fields) }
-  L037: impl Profile {
-    L038: pub fn parse(raw_content: &str) -> Self;
-    L106: pub fn profile_dirs() -> Vec<PathBuf>;
-    L115: pub fn load(profile_name: &str) -> Option<Self>;
-    L186: pub fn list_available() -> Vec<String>;
-    L247: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
-    L275: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
-    L317: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
-    L360: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
+  L009: pub enum ReasoningSetting { Tokens(usize), Tier(String) }
+  L015: impl ReasoningSetting {
+    L016: pub fn parse(raw: &str) -> Option<Self>;
+    L028: pub fn to_local_tokens(&self) -> usize;
+    L042: pub fn to_cloud_tier(&self, is_google: bool, model: &str) -> String;
   }
+  L081: pub struct Profile { pub reasoning_budget: Option<ReasoningSetting>, pub tier: ToolTier, pub adapters: bool, ... (7 fields) }
+  L094: impl Drop for RawModeGuard {
+    L095: fn drop(&mut self);
+  }
+  L119: impl Profile {
+    L120: pub fn parse(raw_content: &str) -> Self;
+    L204: pub fn profile_dirs() -> Vec<PathBuf>;
+    L213: pub fn load(profile_name: &str) -> Option<Self>;
+    L284: pub fn list_available() -> Vec<String>;
+    L342: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
+    L370: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
+    L412: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
+    L455: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
+  }
+  L690: pub fn build_system_prompt(profile: &Profile, workspace: &Path, is_agent: bool, active_skills: &[String]) -> String;
+  L720: mod tests;
 ```
 
 ### `src/security.rs`
 ```rust
-  L100: pub struct SecurityBoundary { pub root: PathBuf }
-  L104: impl SecurityBoundary {
-    L105: pub fn new<P: AsRef<Path>>(workspace: P) -> Self;
-    L110: pub fn resolve_path(&self, target: &str) -> PathBuf;
-    L121: pub fn is_outside(&self, path: &Path) -> bool; // Walk up to closest existing ancestor to canonicalize.
-    L195: pub fn check_command(&self, cmd: &str) -> Option<&'static str>;
-    L272: pub fn authorize(&self, violation: &str) -> bool;
+  L123: pub struct SecurityBoundary { pub root: PathBuf, pub headless: bool }
+  L128: impl SecurityBoundary {
+    L129: pub fn new<P: AsRef<Path>>(workspace: P) -> Self;
+    L134: pub fn new_headless<P: AsRef<Path>>(workspace: P) -> Self;
+    L140: pub fn child<P: AsRef<Path>>(&self, workspace: P) -> Self;
+    L146: pub fn resolve_path(&self, target: &str) -> PathBuf;
+    L157: pub fn is_outside(&self, path: &Path) -> bool; // Walk up to closest existing ancestor to canonicalize.
+    L231: pub fn check_command(&self, cmd: &str) -> Option<&'static str>;
+    L308: pub fn authorize(&self, violation: &str) -> bool;
   }
+  L331: mod tests;
 ```
 
 ### `src/skill.rs`
 ```rust
   L007: pub struct Skill { pub name: String, pub content: String }
   L013: pub enum SkillAction { Attach(String), Detach(String), DetachAll }
-  L020: impl Skill {
-    L021: pub fn parse(name: &str, raw_content: &str) -> Self;
-    L035: pub fn skill_dirs() -> Vec<PathBuf>;
-    L044: pub fn list_available() -> Vec<String>;
-    L071: pub fn load(skill_name: &str) -> Option<Self>;
-    L083: pub fn select_interactive(active_skills: &[String]) -> Option<SkillAction>;
+  L022: impl Drop for RawModeGuard {
+    L023: fn drop(&mut self);
+  }
+  L030: impl Skill {
+    L031: pub fn parse(name: &str, raw_content: &str) -> Self;
+    L045: pub fn skill_dirs() -> Vec<PathBuf>;
+    L054: pub fn list_available() -> Vec<String>;
+    L081: pub fn load(skill_name: &str) -> Option<Self>;
+    L107: pub fn select_interactive(active_skills: &[String]) -> Option<SkillAction>;
   }
 ```
 
@@ -280,41 +305,58 @@
 
 ### `src/state.rs`
 ```rust
-  L005: pub struct AppState { pub box_style: usize, pub pad: bool }
-  L015: impl Default for AppState {
-    L016: fn default() -> Self;
+  L005: pub struct AppState { pub box_style: usize, pub pad: bool, pub show_thinking_summaries: Option<bool> }
+  L017: impl Default for AppState {
+    L018: fn default() -> Self;
   }
-  L040: pub fn get_box_style() -> usize;
-  L049: pub fn set_box_style(style: usize);
-  L055: pub fn get_pad() -> bool;
-  L059: pub fn set_pad(pad: bool);
+  L046: pub fn get_box_style() -> usize;
+  L055: pub fn set_box_style(style: usize);
+  L062: pub fn get_pad() -> bool;
+  L066: pub fn set_pad(pad: bool);
+  L072: pub fn get_show_thinking_summaries() -> Option<bool>;
+  L076: pub fn set_show_thinking_summaries(val: Option<bool>);
 ```
 
 ### `src/stream.rs`
 ```rust
   L004: pub struct UsageStats { pub prompt_tokens: usize, pub completion_tokens: usize, pub reasoning_tokens: usize, pub cached_tokens: usize }
-  L012: pub struct StreamRenderer { pub pad: bool, pub thinking_started: bool, pub answer_started: bool, ... (10 fields) }
-  L025: impl StreamRenderer {
-    L026: pub fn new(pad: bool) -> Self;
-    L070: pub fn close_thinking(&mut self); // Closes thinking gutter; emits spacer line only when pad is true
-    L085: pub fn on_chunk(&mut self, chunk: &str, is_thinking: bool);
-    L146: pub fn finish(&mut self, stats: &UsageStats, prompt_chars: usize);
+  L012: pub struct StreamRenderer { pub pad: bool, pub show_thinking: Option<bool>, pub thinking_started: bool, ... (13 fields) }
+  L028: impl StreamRenderer {
+    L029: pub fn new(pad: bool) -> Self;
+    L086: pub fn close_thinking(&mut self); // Closes thinking block; emits spacer line only when pad is true
+    L113: pub fn on_chunk(&mut self, chunk: &str, is_thinking: bool);
+    L196: pub fn finish(&mut self, stats: &UsageStats, prompt_chars: usize);
+    L200: pub fn finish_with_print(&mut self, stats: &UsageStats, prompt_chars: usize, print_line: bool) -> String;
   }
 ```
 
 ### `src/tools.rs`
 ```rust
-  L038: pub fn get_tools_schema(tier: &ToolTier, delegate: bool) -> Value;
-  L042: pub async fn get_tools_schema_with_mcp(tier: &ToolTier, delegate: bool, mcp_servers: &[String]) -> Value;
-  L234: pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result<String, String>; // 3-Stage Resilient Replacer ported from py-agent (Exact -> Indent-Delta Whitespace -> Fuzzy)
-  L372: pub async fn execute_tool(name: &str, raw_args: &str, workspace: &Path, boundary: &SecurityBoundary ,) -> Result<String, String>;
+  L038: pub fn is_read_only_tool(name: &str) -> bool;
+  L043: pub fn get_tools_schema(tier: &ToolTier, delegate: bool) -> Value;
+  L047: pub async fn get_tools_schema_with_mcp(tier: &ToolTier, delegate: bool, mcp_servers: &[String]) -> Value;
+  L219: impl Drop for SubagentDepthGuard {
+    L220: fn drop(&mut self);
+  }
+  L225: pub fn read_task_spec(target_dir: &Path) -> Option<String>;
+  L240: pub fn is_task_complete(text: &str) -> bool;
+  L278: pub fn resilient_replace(original: &str, old_str: &str, new_str: &str) -> Result<String, String>; // 3-Stage Resilient Replacer (Exact -> Indent-Delta Whitespace -> Fuzzy)
+  L418: pub async fn execute_tool(name: &str, raw_args: &str, workspace: &Path, boundary: &SecurityBoundary ,) -> Result<String, String>;
+  L427: pub async fn execute_tool_with_auth(name: &str, raw_args: &str, workspace: &Path, boundary: &SecurityBoundary, preauthorized_cmd: bool ,) -> Result<String, String>;
+  L839: mod tests;
 ```
 
 ### `src/ui.rs`
 ```rust
-  L019: impl Drop for RawModeGuard {
-    L020: fn drop(&mut self);
+  L020: impl Drop for RawModeGuard {
+    L021: fn drop(&mut self);
   }
-  L229: pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) ->(Vec<String>, usize);
-  L654: pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Option<char>;
+  L230: pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) ->(Vec<String>, usize);
+  L772: pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Option<char>;
+  L876: pub enum InputResult { Line(String), Eof }
+  L883: impl Drop for InputGuard {
+    L884: fn drop(&mut self);
+  }
+  L892: pub fn read_ruled_input(status_line: &str, history: &[String], initial_char: Option<char>, minimal: bool ,) -> io :: Result<InputResult>;
+  L1111: pub fn authorize_prompt(violation: &str) -> bool;
 ```

@@ -6,10 +6,81 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReasoningSetting {
+    Tokens(usize),
+    Tier(String),
+}
+
+impl ReasoningSetting {
+    pub fn parse(raw: &str) -> Option<Self> {
+        let clean = raw.trim().trim_matches('"').trim_matches('\'').trim();
+        if let Ok(n) = clean.parse::<usize>() {
+            return Some(Self::Tokens(n));
+        }
+        let lower = clean.to_ascii_lowercase();
+        if matches!(lower.as_str(), "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") {
+            return Some(Self::Tier(lower));
+        }
+        None
+    }
+
+    pub fn to_local_tokens(&self) -> usize {
+        match self {
+            Self::Tokens(n) => *n,
+            Self::Tier(t) => match t.as_str() {
+                "none" | "minimal" => 0,
+                "low" => 250,
+                "medium" => 500,
+                "high" => 1000,
+                "xhigh" | "max" => 4000,
+                _ => 500,
+            },
+        }
+    }
+
+    pub fn to_cloud_tier(&self, is_google: bool, model: &str) -> String {
+        let raw = match self {
+            Self::Tier(t) => t.as_str(),
+            Self::Tokens(n) => {
+                if *n == 0 {
+                    "none"
+                } else if *n <= 350 {
+                    "low"
+                } else if *n <= 750 {
+                    "medium"
+                } else if *n <= 2000 {
+                    "high"
+                } else {
+                    "xhigh"
+                }
+            }
+        };
+
+        if is_google {
+            let m = model.to_lowercase();
+            let no_minimal =
+                m.contains("gemini-4") || m.contains("gemini-3.8") || m.contains("gemini-3.7") || m.contains("-pro");
+            let no_none = m.contains("gemini-3") || m.contains("gemini-4") || m.contains("pro");
+            if no_minimal && matches!(raw, "none" | "minimal") {
+                return "low".to_string();
+            }
+            if no_none && raw == "none" {
+                return "minimal".to_string();
+            }
+            if matches!(raw, "xhigh" | "max") {
+                return if m.contains("gemini-4-hydrogen") { "xhigh" } else { "high" }.to_string();
+            }
+        }
+        raw.to_string()
+    }
+}
+
+use crate::config::strip_inline_comment;
+
 #[derive(Debug, Clone)]
 pub struct Profile {
-    pub reasoning_budget: Option<usize>,
-    pub reasoning_effort: Option<String>,
+    pub reasoning_budget: Option<ReasoningSetting>,
     pub tier: ToolTier,
     pub adapters: bool,
     pub memory: bool,
@@ -48,7 +119,6 @@ impl MenuRow {
 impl Profile {
     pub fn parse(raw_content: &str) -> Self {
         let mut reasoning_budget = None;
-        let mut reasoning_effort = None;
         let mut tier = ToolTier::Smol;
         let mut adapters = false;
         let mut memory = false;
@@ -74,22 +144,11 @@ impl Profile {
             if in_frontmatter {
                 if let Some((k, v)) = trimmed.split_once(':') {
                     let key = k.trim();
-                    let val = v.trim();
+                    let val = strip_inline_comment(v.trim());
                     match key {
                         "reasoning_budget" => {
-                            if let Ok(n) = val.parse::<usize>() {
-                                reasoning_budget = Some(n);
-                            } else {
-                                let eff = val.trim_matches('"').trim_matches('\'').trim().to_ascii_lowercase();
-                                if matches!(eff.as_str(), "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") {
-                                    reasoning_effort = Some(eff);
-                                }
-                            }
-                        }
-                        "reasoning_effort" => {
-                            let eff = val.trim_matches('"').trim_matches('\'').trim().to_ascii_lowercase();
-                            if matches!(eff.as_str(), "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max") {
-                                reasoning_effort = Some(eff);
+                            if let Some(rs) = ReasoningSetting::parse(val) {
+                                reasoning_budget = Some(rs);
                             }
                         }
                         "tier" if val.eq_ignore_ascii_case("purebash") => {
@@ -133,7 +192,6 @@ impl Profile {
 
         Self {
             reasoning_budget,
-            reasoning_effort,
             tier,
             adapters,
             memory,
@@ -629,17 +687,62 @@ impl Profile {
 }
 
 
+pub fn build_system_prompt(profile: &Profile, workspace: &Path, is_agent: bool, active_skills: &[String]) -> String {
+    let mut prompt = if is_agent {
+        format!("{}\n\nWorkspace Path: {}", profile.system_prompt, workspace.display())
+    } else {
+        profile.system_prompt.clone()
+    };
+
+    if let Some(global_rules) = crate::config::load_global_instructions() {
+        prompt.push_str(&format!("\n\n---\nGLOBAL SYSTEM INSTRUCTIONS:\n{}", global_rules));
+    }
+
+    if is_agent && profile.memory {
+        let mem_path = workspace.join(".rs/memory.md");
+        if let Ok(c) = fs::read_to_string(mem_path) {
+            let trimmed = c.trim();
+            if !trimmed.is_empty() {
+                prompt.push_str(&format!("\n\n---\nWORKSPACE MEMORY (.rs/memory.md):\n{}", trimmed));
+            }
+        }
+    }
+
+    for sk_name in active_skills {
+        if let Some(sk) = crate::skill::Skill::load(sk_name) {
+            prompt.push_str(&format!("\n\n---\nSKILL DIRECTIVE [{}]:\n{}", sk.name, sk.content));
+        }
+    }
+
+    prompt
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_profile_parses_cloud_effort_and_core4() {
-        let raw = "---\ncore4: true\nreasoning_budget: xhigh\nadapters: true\n---\nSystem prompt";
+        let raw = "---\ncore4: true # minimal tools\nreasoning_budget: xhigh # cloud tier\nadapters: true\n---\nSystem prompt";
         let prof = Profile::parse(raw);
         assert!(matches!(prof.tier, ToolTier::Core4));
-        assert_eq!(prof.reasoning_budget, None);
-        assert_eq!(prof.reasoning_effort.as_deref(), Some("xhigh"));
+        assert_eq!(prof.reasoning_budget, Some(ReasoningSetting::Tier("xhigh".into())));
         assert!(prof.adapters);
+    }
+
+    #[test]
+    fn test_google_cloud_tier_clamping() {
+        assert_eq!(ReasoningSetting::Tokens(0).to_cloud_tier(true, "gemini-3.5-flash-lite"), "minimal");
+        assert_eq!(ReasoningSetting::Tier("xhigh".into()).to_cloud_tier(true, "gemini-3.5-flash-lite"), "high");
+        assert_eq!(ReasoningSetting::Tier("xhigh".into()).to_cloud_tier(true, "gemini-4-hydrogen"), "xhigh");
+        assert_eq!(ReasoningSetting::Tier("none".into()).to_cloud_tier(true, "gemini-4-hydrogen"), "low");
+    }
+
+    #[test]
+    fn test_reasoning_budget_parses_tokens_and_tiers() {
+        let local = Profile::parse("---\nreasoning_budget: 500\n---\nhi");
+        assert_eq!(local.reasoning_budget, Some(ReasoningSetting::Tokens(500)));
+        let cloud = Profile::parse("---\nreasoning_budget: high\n---\nhi");
+        assert_eq!(cloud.reasoning_budget, Some(ReasoningSetting::Tier("high".into())));
     }
 }

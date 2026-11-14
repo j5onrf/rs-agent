@@ -3,7 +3,7 @@
   <h1>Rs-Agent</h1>
 
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.6.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.7.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -121,7 +121,7 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
-╭─── rs-agent v0.6.6 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.6.7 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  LFM3-1.7B                        │ Shortcuts & Modes                           │
 │   │ LF │  chat                             │ • /p profile   /s skills   /t3 ADE          │
 │   ╰────╯  git: main · 11 modified          │ • /task loop   /box theme  /r reset         │
@@ -190,7 +190,6 @@ description: "High-Speed Coding & Systems Engineer"
 adapters: true          # Strip line gutters, normalize aliases, heal malformed JSON
 core4: true             # Minimal 4-tool schema (~480t) for 27B+ / cloud (omit for 6-tool)
 reasoning_budget: 500   # Local: 0-10000 tokens (0 = off) | Cloud: low, medium, high, xhigh
-reasoning_effort: high  # Explicit cloud tier: low, medium, high, xhigh
 memory: true            # Inject project-isolated rules from .rs/memory.md
 purebash: true          # Single run_command tool (~95t). Omit for Core 4 / Native 6
 delegate: true          # Attach isolated delegate_task sub-agent (+~100t)

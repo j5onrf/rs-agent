@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::config::ProviderConfig;
+use crate::profile::ReasoningSetting;
 use crate::spinner::InlineSpinner;
 use crate::stream::{StreamRenderer, UsageStats};
 
@@ -90,8 +91,7 @@ impl ChatMessage {
 }
 
 pub struct LlmClient {
-    pub reasoning_budget: std::sync::atomic::AtomicI64,
-    reasoning_effort: std::sync::Mutex<Option<String>>,
+    reasoning: std::sync::Mutex<Option<ReasoningSetting>>,
     http: Client,
     config: ProviderConfig,
 }
@@ -372,67 +372,14 @@ fn extract_stream_error(json: &Value) -> Option<String> {
 }
 
 impl LlmClient {
-    pub fn set_reasoning_budget(&self, budget: Option<usize>) {
-        let val = budget.map(|b| b as i64).unwrap_or(-1);
-        self.reasoning_budget.store(val, Ordering::Relaxed);
-    }
-
-    pub fn set_reasoning_effort(&self, effort: Option<&str>) {
-        if let Ok(mut guard) = self.reasoning_effort.lock() {
-            *guard = effort.map(|s| s.trim().to_ascii_lowercase()).filter(|s| !s.is_empty());
+    pub fn set_reasoning(&self, setting: Option<ReasoningSetting>) {
+        if let Ok(mut guard) = self.reasoning.lock() {
+            *guard = setting;
         }
     }
 
-    fn resolve_cloud_reasoning_effort(&self, is_google: bool) -> Option<String> {
-        let explicit = self.reasoning_effort.lock().ok().and_then(|g| g.clone());
-        let raw_effort = if let Some(eff) = explicit {
-            eff
-        } else {
-            let rb = self.reasoning_budget.load(Ordering::Relaxed);
-            if rb < 0 {
-                return None;
-            } else if rb == 0 {
-                if is_google { "low".to_string() } else { "none".to_string() }
-            } else if rb <= 350 {
-                "low".to_string()
-            } else if rb <= 750 {
-                "medium".to_string()
-            } else if rb <= 2000 {
-                "high".to_string()
-            } else {
-                "xhigh".to_string()
-            }
-        };
-
-        if is_google {
-            let m = self.config.model.to_lowercase();
-            // Gemini 4 Hydrogen and 3.8 Flash reject "none" / "minimal" with HTTP 400
-            if (m.contains("gemini-4") || m.contains("gemini-3.8"))
-                && matches!(raw_effort.as_str(), "none" | "minimal")
-            {
-                return Some("low".to_string());
-            }
-            if raw_effort == "max" {
-                return Some("xhigh".to_string());
-            }
-        }
-        Some(raw_effort)
-    }
-
-    fn resolve_local_reasoning_budget(&self) -> i64 {
-        let rb = self.reasoning_budget.load(Ordering::Relaxed);
-        if rb >= 0 {
-            return rb;
-        }
-        let effort = self.reasoning_effort.lock().ok().and_then(|g| g.clone());
-        match effort.as_deref() {
-            Some("none") | Some("minimal") => 0,
-            Some("low") => 250,
-            Some("medium") => 500,
-            Some("high") => 1000,
-            Some("xhigh") | Some("max") => 4000,
-            _ => -1,
-        }
+    fn current_reasoning(&self) -> Option<ReasoningSetting> {
+        self.reasoning.lock().ok().and_then(|g| g.clone())
     }
 
     pub fn new(config: ProviderConfig) -> Self {
@@ -445,14 +392,24 @@ impl LlmClient {
             .unwrap_or_default();
 
         Self {
-            reasoning_budget: std::sync::atomic::AtomicI64::new(-1),
-            reasoning_effort: std::sync::Mutex::new(None),
+            reasoning: std::sync::Mutex::new(None),
             http,
             config,
         }
     }
 
+    #[cfg(test)]
     fn build_request_body(&self, messages: &[ChatMessage], tools: Option<Value>) -> Value {
+        self.build_request_body_with_reasoning(messages, tools, None)
+    }
+
+    fn build_request_body_with_reasoning(
+        &self,
+        messages: &[ChatMessage],
+        tools: Option<Value>,
+        reasoning_override: Option<Option<ReasoningSetting>>,
+    ) -> Value {
+        let active_reasoning = reasoning_override.unwrap_or_else(|| self.current_reasoning());
         let is_local = is_local_endpoint(&self.config.base_url);
         let is_google =
             self.config.base_url.contains("googleapis.com") || self.config.model.to_lowercase().contains("gemini");
@@ -510,8 +467,8 @@ impl LlmClient {
         if is_local {
             body["cache_prompt"] = serde_json::json!(true);
 
-            let rb = self.resolve_local_reasoning_budget();
-            if rb >= 0 {
+            if let Some(setting) = active_reasoning {
+                let rb = setting.to_local_tokens();
                 if let Some(obj) = body.as_object_mut() {
                     obj.insert("reasoning_budget".to_string(), serde_json::json!(rb));
                     obj.insert("reasoning_budget_tokens".to_string(), serde_json::json!(rb));
@@ -521,7 +478,8 @@ impl LlmClient {
                     }
                 }
             }
-        } else if let Some(effort) = self.resolve_cloud_reasoning_effort(is_google) {
+        } else if let Some(setting) = active_reasoning {
+            let effort = setting.to_cloud_tier(is_google, &self.config.model);
             body["reasoning_effort"] = serde_json::json!(effort);
         }
 
@@ -549,15 +507,16 @@ impl LlmClient {
         messages: &[ChatMessage],
         tools: Option<Value>,
         cancel_flag: Option<Arc<AtomicBool>>,
+        reasoning_override: Option<Option<ReasoningSetting>>,
         mut on_event: F,
     ) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>
     where
         F: FnMut(StreamEvent<'_>) + Send,
     {
-        let body = self.build_request_body(messages, tools);
+        let body = self.build_request_body_with_reasoning(messages, tools, reasoning_override);
         let req = self.prepare_request(&body);
 
-        let send_res = tokio::time::timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS), req.send()).await;
+        let send_res = tokio::time::timeout(Duration::from_secs(STREAM_IDLE_TIMEOUT_SECS), req.send()).await;
         let response = match send_res {
             Ok(Ok(res)) => res,
             Ok(Err(e)) => return Err(e).context("Failed to connect to LLM endpoint"),
@@ -576,7 +535,7 @@ impl LlmClient {
         let mut stream = response.bytes_stream().eventsource();
         let mut full_response = String::new();
         let mut full_reasoning = String::new();
-        let mut in_thinking = false;
+        let mut think_parser = ThinkTagParser::new();
         let mut saw_done = false;
         let mut saw_finish = false;
         let mut stats = UsageStats::default();
@@ -654,32 +613,16 @@ impl LlmClient {
 
                         if let Some(content) = delta.get("content").and_then(|c| c.as_str()) {
                             if !content.is_empty() {
-                                let mut chunk_slice = content;
-                                if chunk_slice.contains("<think>") || chunk_slice.contains("<thought>") {
-                                    in_thinking = true;
-                                    chunk_slice =
-                                        chunk_slice.trim_start_matches("<think>").trim_start_matches("<thought>");
-                                }
-
-                                if chunk_slice.contains("</think>") || chunk_slice.contains("</thought>") {
-                                    let delimiter =
-                                        if chunk_slice.contains("</think>") { "</think>" } else { "</thought>" };
-                                    let parts: Vec<&str> = chunk_slice.splitn(2, delimiter).collect();
-                                    on_event(StreamEvent::Chunk(parts[0], true));
-                                    full_reasoning.push_str(parts[0]);
-                                    in_thinking = false;
-                                    if parts.len() > 1 && !parts[1].is_empty() {
-                                        on_event(StreamEvent::Chunk(parts[1], false));
-                                        full_response.push_str(parts[1]);
+                                think_parser.feed(content, |slice, is_thinking| {
+                                    if !slice.is_empty() {
+                                        on_event(StreamEvent::Chunk(slice, is_thinking));
+                                        if is_thinking {
+                                            full_reasoning.push_str(slice);
+                                        } else {
+                                            full_response.push_str(slice);
+                                        }
                                     }
-                                } else {
-                                    on_event(StreamEvent::Chunk(chunk_slice, in_thinking));
-                                    if in_thinking {
-                                        full_reasoning.push_str(chunk_slice);
-                                    } else {
-                                        full_response.push_str(chunk_slice);
-                                    }
-                                }
+                                });
                             }
                         }
 
@@ -691,6 +634,17 @@ impl LlmClient {
                 }
             }
         }
+
+        think_parser.flush(|slice, is_thinking| {
+            if !slice.is_empty() {
+                on_event(StreamEvent::Chunk(slice, is_thinking));
+                if is_thinking {
+                    full_reasoning.push_str(slice);
+                } else {
+                    full_response.push_str(slice);
+                }
+            }
+        });
 
         if let Some(err) = stream_err {
             return Err(err);
@@ -729,22 +683,36 @@ impl LlmClient {
         Ok((full_response, opt_reasoning, tool_calls, stats))
     }
 
-    pub async fn stream_chat_raw<F>(
+    pub async fn stream_chat_raw_with_reasoning<F>(
         &self,
         messages: &[ChatMessage],
         tools: Option<Value>,
         cancel_flag: Option<Arc<AtomicBool>>,
+        reasoning_override: Option<Option<ReasoningSetting>>,
         mut on_chunk: F,
     ) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>
     where
         F: FnMut(&str, bool) + Send,
     {
-        self.execute_stream(messages, tools, cancel_flag, |ev| {
+        self.execute_stream(messages, tools, cancel_flag, reasoning_override, |ev| {
             if let StreamEvent::Chunk(chunk, is_thinking) = ev {
                 on_chunk(chunk, is_thinking);
             }
         })
         .await
+    }
+
+    pub async fn stream_chat_raw<F>(
+        &self,
+        messages: &[ChatMessage],
+        tools: Option<Value>,
+        cancel_flag: Option<Arc<AtomicBool>>,
+        on_chunk: F,
+    ) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>
+    where
+        F: FnMut(&str, bool) + Send,
+    {
+        self.stream_chat_raw_with_reasoning(messages, tools, cancel_flag, None, on_chunk).await
     }
 
     pub async fn stream_chat(
@@ -769,10 +737,72 @@ impl LlmClient {
             }
         };
 
-        let res = self.execute_stream(messages, tools, None, on_event).await;
+        let res = self.execute_stream(messages, tools, None, None, on_event).await;
         renderer.close_thinking();
         spinner.stop();
         res
+    }
+}
+
+struct ThinkTagParser {
+    in_thinking: bool,
+    pending: String,
+}
+
+impl ThinkTagParser {
+    fn new() -> Self {
+        Self { in_thinking: false, pending: String::new() }
+    }
+
+    fn find_earliest<'a>(haystack: &str, tags: &[&'a str]) -> Option<(usize, &'a str)> {
+        tags.iter().filter_map(|&t| haystack.find(t).map(|pos| (pos, t))).min_by_key(|(pos, _)| *pos)
+    }
+
+    fn partial_suffix_len(haystack: &str, tags: &[&str]) -> usize {
+        let max_tag = tags.iter().map(|t| t.len()).max().unwrap_or(0);
+        let start = haystack.len().saturating_sub(max_tag.saturating_sub(1));
+        for i in start..haystack.len() {
+            if !haystack.is_char_boundary(i) {
+                continue;
+            }
+            let suffix = &haystack[i..];
+            if tags.iter().any(|t| t.starts_with(suffix)) {
+                return suffix.len();
+            }
+        }
+        0
+    }
+
+    fn feed<F: FnMut(&str, bool)>(&mut self, chunk: &str, mut emit: F) {
+        const OPEN_TAGS: &[&str] = &["<think>", "<thought>"];
+        const CLOSE_TAGS: &[&str] = &["</think>", "</thought>"];
+
+        self.pending.push_str(chunk);
+        loop {
+            let tags = if self.in_thinking { CLOSE_TAGS } else { OPEN_TAGS };
+            if let Some((pos, tag)) = Self::find_earliest(&self.pending, tags) {
+                if pos > 0 {
+                    emit(&self.pending[..pos], self.in_thinking);
+                }
+                self.pending.drain(..pos + tag.len());
+                self.in_thinking = !self.in_thinking;
+            } else {
+                let keep = Self::partial_suffix_len(&self.pending, tags);
+                let emit_len = self.pending.len() - keep;
+                if emit_len > 0 {
+                    emit(&self.pending[..emit_len], self.in_thinking);
+                    self.pending.drain(..emit_len);
+                }
+                break;
+            }
+        }
+    }
+
+    fn flush<F: FnMut(&str, bool)>(&mut self, mut emit: F) {
+        if !self.pending.is_empty() {
+            emit(&self.pending, self.in_thinking);
+            self.pending.clear();
+        }
     }
 }
 
@@ -826,7 +856,7 @@ mod tests {
             max_tokens: 65536,
         };
         let client = LlmClient::new(cfg);
-        client.set_reasoning_effort(Some("xhigh"));
+        client.set_reasoning(Some(ReasoningSetting::Tier("xhigh".into())));
 
         let mut assistant = ChatMessage::assistant("");
         assistant.tool_calls = Some(serde_json::json!([
@@ -856,8 +886,30 @@ mod tests {
         assert_eq!(tcs[0]["extra_content"]["google"]["thought_signature"], "sig_abc");
         assert!(tcs[1].get("extra_content").is_none());
 
-        client.set_reasoning_effort(Some("none"));
+        client.set_reasoning(Some(ReasoningSetting::Tier("none".into())));
         let body_clamped = client.build_request_body(&[ChatMessage::user("hi")], None);
         assert_eq!(body_clamped["reasoning_effort"], "low");
+    }
+
+    #[test]
+    fn test_think_tag_parser_handles_split_sse_chunks_and_leading_text() {
+        let mut parser = ThinkTagParser::new();
+        let mut thinking = String::new();
+        let mut answer = String::new();
+        let mut collect = |s: &str, is_t: bool| {
+            if is_t {
+                thinking.push_str(s);
+            } else {
+                answer.push_str(s);
+            }
+        };
+
+        for part in ["Hi <th", "ink>step 1", "</thi", "nk>Done! a < b"] {
+            parser.feed(part, &mut collect);
+        }
+        parser.flush(&mut collect);
+
+        assert_eq!(thinking, "step 1");
+        assert_eq!(answer, "Hi Done! a < b");
     }
 }

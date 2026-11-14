@@ -237,7 +237,7 @@ impl McpSession {
                 .and_then(|item| item.get("text"))
                 .and_then(|t| t.as_str())
                 .unwrap_or("Execution failed");
-            return Ok(format!("[mcp tool error] {}", err_text));
+            anyhow::bail!("{}", err_text);
         }
 
         let content_arr = res_val.get("content").and_then(|c| c.as_array());

@@ -49,6 +49,30 @@ impl Drop for InstanceLockGuard {
     }
 }
 
+struct CursorHideGuard;
+
+impl Drop for CursorHideGuard {
+    fn drop(&mut self) {
+        print!("\x1b[?25h");
+        let _ = io::stdout().flush();
+    }
+}
+
+fn history_char_count(history: &[ChatMessage]) -> usize {
+    history.iter().map(|m| m.content_as_str().chars().count()).sum()
+}
+
+fn instance_lock_dir() -> PathBuf {
+    #[cfg(target_os = "linux")]
+    {
+        PathBuf::from("/dev/shm/rs-agent-instances")
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        std::env::temp_dir().join("rs-agent-instances")
+    }
+}
+
 fn is_rs_agent_process(pid: i32) -> bool {
     #[cfg(target_os = "linux")]
     {
@@ -62,8 +86,12 @@ fn is_rs_agent_process(pid: i32) -> bool {
             }
         }
         if let Ok(cmdline) = fs::read_to_string(format!("/proc/{}/cmdline", pid)) {
-            if cmdline.contains("ai") || cmdline.contains("rs-agent") {
-                return true;
+            if let Some(arg0) = cmdline.split('\0').next() {
+                if let Some(exe_name) = Path::new(arg0).file_name().and_then(|n| n.to_str()) {
+                    if exe_name == "ai" || exe_name == "rs-agent" {
+                        return true;
+                    }
+                }
             }
         }
         false
@@ -75,7 +103,7 @@ fn is_rs_agent_process(pid: i32) -> bool {
 }
 
 fn resolve_instance_number(profile: &str) -> (usize, InstanceLockGuard) {
-    let shm_dir = PathBuf::from("/dev/shm/rs-agent-instances");
+    let shm_dir = instance_lock_dir();
     let _ = fs::create_dir_all(&shm_dir);
 
     let mut active_count = 0;
@@ -411,30 +439,7 @@ async fn execute_tool_batch(
     executed
 }
 
-fn read_task_spec(target_dir: &Path) -> Option<String> {
-    for fname in &["TASK.md", "task.md", "TODO.md"] {
-        let p = target_dir.join(fname);
-        if p.is_file() {
-            if let Ok(c) = fs::read_to_string(&p) {
-                let t = c.trim().to_string();
-                if !t.is_empty() {
-                    return Some(t);
-                }
-            }
-        }
-    }
-    None
-}
 
-fn is_task_complete(text: &str) -> bool {
-    let lower = text.to_lowercase();
-    lower.contains("task complete")
-        || lower.contains("task completed")
-        || lower.contains("goal complete")
-        || lower.contains("goal completed")
-        || lower.contains("all tests pass")
-        || lower.contains("✓ task complete")
-}
 
 fn handle_new_project(name: &str, intents_arg: Option<&str>) -> anyhow::Result<()> {
     let slug = name.trim().to_lowercase().replace(' ', "-");
@@ -479,22 +484,6 @@ fn handle_new_project(name: &str, intents_arg: Option<&str>) -> anyhow::Result<(
     Ok(())
 }
 
-fn build_system_prompt(active_profile: &Profile, active_skills: &[String]) -> String {
-    let mut prompt = active_profile.system_prompt.clone();
-
-    if let Some(global_rules) = rs_agent::config::load_global_instructions() {
-        prompt.push_str(&format!("\n\n---\nGLOBAL SYSTEM INSTRUCTIONS:\n{}", global_rules));
-    }
-
-    for sk_name in active_skills {
-        if let Some(sk) = Skill::load(sk_name) {
-            prompt.push_str(&format!("\n\n---\nSKILL DIRECTIVE [{}]:\n{}", sk.name, sk.content));
-        }
-    }
-
-    prompt
-}
-
 #[allow(clippy::too_many_arguments)]
 async fn execute_task_loop(
     target_dir: &Path,
@@ -516,7 +505,6 @@ async fn execute_task_loop(
     history.push(ChatMessage::user(goal.to_string()));
 
     let mut total_tools_run = 0;
-    let mut last_total_tokens = 0;
 
     for turn in 0..max_rounds {
         println!("  \x1b[1;34m─── Step {}/{} ───\x1b[0m", turn + 1, max_rounds);
@@ -526,21 +514,19 @@ async fn execute_task_loop(
 
         print!("\x1b[?25l");
         let _ = io::stdout().flush();
+        let cursor_guard = CursorHideGuard;
 
         let stream_res = client.stream_chat(history, active_tools.clone(), &mut renderer, spinner).await;
-        if stream_res.is_err() {
-            spinner.stop();
-            print!("\x1b[?25h");
-            let _ = io::stdout().flush();
-        }
+        spinner.stop();
+        drop(cursor_guard);
         let (reply, reasoning, tool_calls, stats) = stream_res?;
 
-        spinner.stop();
-        renderer.finish(&stats, last_total_tokens);
-        last_total_tokens = stats.prompt_tokens + stats.completion_tokens;
+        renderer.finish(&stats, history_char_count(history));
 
+        let mut ran_tools = false;
         if let Some(calls) = tool_calls {
             if !calls.is_empty() {
+                ran_tools = true;
                 let mut assistant_msg = ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone());
                 assistant_msg.tool_calls = Some(serde_json::Value::Array(calls.clone()));
                 history.push(assistant_msg);
@@ -554,7 +540,7 @@ async fn execute_task_loop(
             history.push(ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone()));
         }
 
-        if is_task_complete(&reply) {
+        if !ran_tools && tools::is_task_complete(&reply) {
             println!(
                 "\n  \x1b[1;32m✓ [Task Loop] Goal completed in {} step(s) ({} tool action(s) executed)!\x1b[0m\n",
                 turn + 1,
@@ -563,8 +549,7 @@ async fn execute_task_loop(
             return Ok(true);
         }
 
-        let last_is_tool = history.last().map(|m| m.role == "tool").unwrap_or(false);
-        if !last_is_tool {
+        if !ran_tools {
             history.push(ChatMessage::user("Continue with the next action."));
         }
     }
@@ -623,10 +608,10 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
     let mut active_profile = Profile::load(&cfg.profile_name)
         .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found in ~/.config/rs-agent/profiles/", cfg.profile_name))?;
-    client.set_reasoning_budget(active_profile.reasoning_budget);
-    client.set_reasoning_effort(active_profile.reasoning_effort.as_deref());
+    client.set_reasoning(active_profile.reasoning_budget.clone());
 
-    let (instance_num, _lock_guard) = resolve_instance_number(&cfg.profile_name);
+    let (mut instance_num, first_guard) = resolve_instance_number(&cfg.profile_name);
+    let mut lock_guard = Some(first_guard);
     let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
 
     print!("\x1b]0;rs-agent: {}\x07", second_line);
@@ -636,7 +621,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     let mut current_box_style = state::get_box_style();
     let mut buffered_char = ui::draw_box(&provider.model, &second_line, current_box_style, true);
 
-    let mut system_prompt = build_system_prompt(&active_profile, &active_skills);
+    let mut system_prompt =
+        rs_agent::profile::build_system_prompt(&active_profile, target_dir, cfg.is_agent, &active_skills);
     let mut history = vec![ChatMessage::system(&system_prompt)];
     let mcp_servers = active_profile.mcp_servers.clone();
     let mut active_tools = if cfg.is_agent {
@@ -646,7 +632,6 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     };
 
     let mut spinner = InlineSpinner::new();
-    let mut last_total_tokens = 0;
     let mut last_stat_line: Option<String> = None;
     let mut input_history: Vec<String> = Vec::new();
     let mut router = matcher::ContextRouter::load();
@@ -705,7 +690,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         println!("  \x1b[1;33m▲\x1b[0m \x1b[2mTerminal window is safe to close. Exiting rs-agent...\x1b[0m\n");
                         print!("\x1b[?25h");
                         let _ = io::stdout().flush();
-                        let _ = fs::remove_file(&_lock_guard);
+                        if let Some(ref guard) = lock_guard {
+                            let _ = fs::remove_file(guard);
+                        }
                         std::process::exit(0);
                     }
                     Ok(status) => {
@@ -739,7 +726,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             };
 
             let effective_goal =
-                if !direct_arg.is_empty() { Some(direct_arg.to_string()) } else { read_task_spec(target_dir) };
+                if !direct_arg.is_empty() { Some(direct_arg.to_string()) } else { tools::read_task_spec(target_dir) };
 
             if let Some(goal) = effective_goal {
                 if let Err(e) = execute_task_loop(
@@ -797,17 +784,26 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     cfg.tier = loaded.tier.clone();
                     cfg.adapters = loaded.adapters;
                     cfg.delegate = loaded.delegate;
-                    client.set_reasoning_budget(loaded.reasoning_budget);
-                    client.set_reasoning_effort(loaded.reasoning_effort.as_deref());
+                    client.set_reasoning(loaded.reasoning_budget.clone());
                     let new_mcp = loaded.mcp_servers.clone();
                     active_profile = loaded;
 
-                    system_prompt = build_system_prompt(&active_profile, &active_skills);
+                    system_prompt = rs_agent::profile::build_system_prompt(
+                        &active_profile,
+                        target_dir,
+                        cfg.is_agent,
+                        &active_skills,
+                    );
                     let _ = cfg.save(target_dir);
                     router = matcher::ContextRouter::load();
 
+                    lock_guard.take();
+                    let (new_num, new_guard) = resolve_instance_number(&cfg.profile_name);
+                    instance_num = new_num;
+                    lock_guard = Some(new_guard);
+                    let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
+
                     history.clear();
-                    last_total_tokens = 0;
                     last_stat_line = None;
                     history.push(ChatMessage::system(&system_prompt));
                     active_tools = if cfg.is_agent {
@@ -816,13 +812,14 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         None
                     };
 
+                    print!("\x1b]0;rs-agent: {}\x07", second_line);
                     print!("\x1b[H\x1b[2J");
                     println!();
                     println!(
                         "  \x1b[1;32m✓\x1b[0m \x1b[2mProfile set to:\x1b[0m \x1b[1;36m{}\x1b[0m",
                         cfg.profile_name
                     );
-                    ui::draw_box(&provider.model, &cfg.profile_name, current_box_style, false);
+                    ui::draw_box(&provider.model, &second_line, current_box_style, false);
                     let _ = io::stdout().flush();
                 } else {
                     println!("  \x1b[1;31m✗\x1b[0m \x1b[2mProfile '{}' not found in profiles/\x1b[0m\n", new_prof);
@@ -885,7 +882,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     }
                 }
 
-                system_prompt = build_system_prompt(&active_profile, &active_skills);
+                system_prompt =
+                    rs_agent::profile::build_system_prompt(&active_profile, target_dir, cfg.is_agent, &active_skills);
                 if let Some(first) = history.first_mut() {
                     first.content = serde_json::Value::String(system_prompt.clone());
                 }
@@ -945,16 +943,16 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             let _ = io::stdout().flush();
 
             history.clear();
-            last_total_tokens = 0;
             last_stat_line = None;
-            system_prompt = build_system_prompt(&active_profile, &active_skills);
+            system_prompt =
+                rs_agent::profile::build_system_prompt(&active_profile, target_dir, cfg.is_agent, &active_skills);
             history.push(ChatMessage::system(&system_prompt));
 
             print!("\x1b[H\x1b[2J");
             println!();
             println!("\x1b[1;32m✓\x1b[0m \x1b[2mSession reset\x1b[0m");
-            let second_line = if cfg.is_agent { &cfg.profile_name } else { "chat" };
-            ui::draw_box(&provider.model, second_line, current_box_style, false);
+            let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
+            ui::draw_box(&provider.model, &second_line, current_box_style, false);
             let _ = io::stdout().flush();
             continue;
         }
@@ -963,8 +961,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             print!("\x1b[H\x1b[2J");
             println!();
             println!("\x1b[1;32m✓\x1b[0m \x1b[2mSession reset\x1b[0m");
-            let second_line = if cfg.is_agent { &cfg.profile_name } else { "chat" };
-            ui::draw_box(&provider.model, second_line, current_box_style, false);
+            let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
+            ui::draw_box(&provider.model, &second_line, current_box_style, false);
             let _ = io::stdout().flush();
             continue;
         }
@@ -1021,21 +1019,16 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
             print!("\x1b[?25l");
             let _ = io::stdout().flush();
+            let cursor_guard = CursorHideGuard;
 
             let stream_res = client.stream_chat(&history, active_tools.clone(), &mut renderer, &mut spinner).await;
-            if stream_res.is_err() {
-                spinner.stop();
-                print!("\x1b[?25h");
-                let _ = io::stdout().flush();
-            }
+            spinner.stop();
+            drop(cursor_guard);
             let (reply, reasoning, tool_calls, stats) = stream_res?;
 
-            spinner.stop();
-
             if tool_calls.is_none() || tool_calls.as_ref().map(|v| v.is_empty()).unwrap_or(true) {
-                let stat_str = renderer.finish_with_print(&stats, last_total_tokens, current_box_style != 7);
+                let stat_str = renderer.finish_with_print(&stats, history_char_count(&history), current_box_style != 7);
                 last_stat_line = Some(stat_str);
-                last_total_tokens = stats.prompt_tokens + stats.completion_tokens;
 
                 if !active_skills.is_empty() {
                     let formatted_skills = active_skills.join(" · ");

@@ -106,16 +106,21 @@ pub fn normalize_params(map: &mut serde_json::Map<String, serde_json::Value>) {
         }
     }
 
-    // Heal container path hallucinations
+    // Heal container path hallucinations without corrupting real repo subdirs or system boundary probes
+    const PRESERVED_ROOTS: &[&str] = &[
+        "/tmp", "/home", "/dev", "/etc", "/usr", "/var", "/bin", "/sbin", "/opt", "/root", "/boot", "/sys", "/proc",
+    ];
     if let Some(serde_json::Value::String(p)) = map.get_mut("path") {
         let mut s = p.as_str();
-        for prefix in &["/workspace/", "workspace/", "/app/", "app/", "/project/", "project/"] {
+        for prefix in &["/workspace/", "/app/", "/project/"] {
             if let Some(stripped) = s.strip_prefix(prefix) {
                 s = stripped;
                 break;
             }
         }
-        if s.starts_with('/') && !s.starts_with("/tmp") && !s.starts_with("/home") && !s.starts_with("/dev") {
+        if s.starts_with('/')
+            && !PRESERVED_ROOTS.iter().any(|r| s == *r || s.strip_prefix(r).is_some_and(|rest| rest.starts_with('/')))
+        {
             s = s.trim_start_matches('/');
         }
         if s != p.as_str() {
@@ -334,5 +339,18 @@ mod tests {
         let malformed = "{\"path\": \"src\\";
         let healed = heal_json_args(malformed);
         assert_eq!(healed["path"], "src\\");
+    }
+
+    #[test]
+    fn test_normalize_params_preserves_real_subdirs_and_system_roots() {
+        let mut map = serde_json::Map::new();
+        map.insert("path".to_string(), serde_json::Value::String("app/page.tsx".to_string()));
+        normalize_params(&mut map);
+        assert_eq!(map["path"], "app/page.tsx");
+
+        let mut sys_map = serde_json::Map::new();
+        sys_map.insert("path".to_string(), serde_json::Value::String("/etc/passwd".to_string()));
+        normalize_params(&mut sys_map);
+        assert_eq!(sys_map["path"], "/etc/passwd");
     }
 }

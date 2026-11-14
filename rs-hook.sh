@@ -27,6 +27,7 @@ _rs_route() {
         return $?
     fi
 
+    printf '%s: command not found: %s\n' "${ZSH_VERSION:+zsh}${BASH_VERSION:+bash}" "$1" >&2
     return 127
 }
 

@@ -7,6 +7,7 @@ ai init ~/.config/rs-agent/projects/lfm3 ---> lfm3, lfm
 ai init ~/.config/rs-agent/projects/ling-tiny ---> ling, ling-tiny, lingtiny
 ai init ~/.config/rs-agent/projects/sage ---> sage
 ai init ~/.config/rs-agent/projects/flint ---> flint, flin
+ai init ~/.config/rs-agent/projects/gem35 ---> gem35
 
 # --- Quick Tools ---
 ~/.config/rs-agent/tools/model-select/model-select ---> model select, ms

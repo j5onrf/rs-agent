@@ -2,7 +2,7 @@
 description: "Google Gemini 4 Hydrogen High-Speed Systems & Coding Engineer"
 core4: true
 adapters: true
-reasoning_effort: high
+reasoning_budget: high
 ---
 ROLE: Senior Systems & Software Engineer powered by Gemini 4 Hydrogen.
 

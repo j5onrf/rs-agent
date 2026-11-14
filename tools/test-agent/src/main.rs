@@ -269,9 +269,9 @@ impl TestRunner {
             "is_agent=false · Pure Conversational",
         );
 
-        let prof = Profile::parse("---\ncore4: true\nreasoning_effort: xhigh\nadapters: true\ndelegate: true\n---\nSys");
+        let prof = Profile::parse("---\ncore4: true\nreasoning_budget: xhigh # cloud tier\nadapters: true\ndelegate: true\n---\nSys");
         let prof_ok = matches!(prof.tier, ToolTier::Core4)
-            && prof.reasoning_effort.as_deref() == Some("xhigh")
+            && prof.reasoning_budget == Some(rs_agent::profile::ReasoningSetting::Tier("xhigh".into()))
             && prof.adapters
             && prof.delegate
             && prof.system_prompt == "Sys";

@@ -3,6 +3,23 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+pub fn strip_inline_comment(s: &str) -> &str {
+    let mut in_single = false;
+    let mut in_double = false;
+    let bytes = s.as_bytes();
+    for (i, &b) in bytes.iter().enumerate() {
+        match b {
+            b'"' if !in_single => in_double = !in_double,
+            b'\'' if !in_double => in_single = !in_single,
+            b'#' if !in_single && !in_double && (i == 0 || bytes[i - 1].is_ascii_whitespace()) => {
+                return s[..i].trim();
+            }
+            _ => {}
+        }
+    }
+    s.trim()
+}
+
 fn get_env_val(content: &str, key: &str) -> Option<String> {
     for line in content.lines() {
         let trimmed = line.trim();
@@ -12,7 +29,7 @@ fn get_env_val(content: &str, key: &str) -> Option<String> {
         if let Some(rest) = trimmed.strip_prefix(key) {
             let rest = rest.trim_start();
             if let Some(val_part) = rest.strip_prefix('=') {
-                let val = val_part.trim().split('#').next().unwrap_or(val_part).trim();
+                let val = strip_inline_comment(val_part.trim());
                 let clean = val.trim_matches('"').trim_matches('\'').trim();
                 if !clean.is_empty() {
                     return Some(clean.to_string());
@@ -81,62 +98,11 @@ pub struct ContextCeilings {
     pub search_cap: usize,
 }
 
-pub const DEFAULT_ENV: &str = r#"# Rs-Agent Provider Cascade (.env) — Priority: First active key | Switch with: ms
-# Fallback: Local llama-server (:8080) when all cloud keys are commented with '#'.
-
-# ── 1. Google Gemini ──────────────────────────────────────────────────────────
-#GEMINI_API_KEY="AQ.your-key-here"
-GEMINI_MODEL="gemini-3.5-flash-lite"
-
-# ── 2. OpenRouter ─────────────────────────────────────────────────────────────
-#OPENROUTER_API_KEY="sk-or-v1-your-key-here"
-OPENROUTER_MODEL="openrouter/free"
-
-# ── 3. TokenHarbor ────────────────────────────────────────────────────────────
-#TOKENHARBOR_API_KEY="thk_live_your-key-here"
-TOKENHARBOR_MODEL="deepseek-v4.1-flash:free"
-
-# ── More Direct Providers e.g. ────────────────────────────────────────────────
-# OPENAI_API_KEY="sk-your-key-here"
-# ANTHROPIC_API_KEY="sk-ant-your-key-here"
-
-# ── 4. Custom Direct Endpoint ─────────────────────────────────────────────────
-# Add: Define CUSTOM1_*, CUSTOM2_*, up to CUSTOM9_*
-# CUSTOM1_NAME="Custom Provider"
-# CUSTOM1_API_KEY="sk-your-key-here"
-CUSTOM1_URL="https://api.deepseek.com/chat/completions"
-CUSTOM1_MODEL="deepseek-flash"
-
-# ── MCP Server Keys (Optional) ────────────────────────────────────────────────
-# API keys for tools configured in plugins/mcp/servers.json
-# FIRECRAWL_API_KEY="fc-your-actual-api-key"
-
-# ── Runtime Governors ─────────────────────────────────────────────────────────
-AI_MAX_TOKENS="8192"
-AI_MAX_AGENT_ROUNDS="10"
-"#;
-
 pub fn get_env_path() -> PathBuf {
     dirs::home_dir().map(|h| h.join(".config/rs-agent/.env")).unwrap_or_else(|| PathBuf::from(".env"))
 }
 
-pub fn ensure_env_file() {
-    let env_path = get_env_path();
-    if !env_path.exists() {
-        if let Some(parent) = env_path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-        let _ = fs::write(&env_path, DEFAULT_ENV);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(&env_path, fs::Permissions::from_mode(0o600));
-        }
-    }
-}
-
 pub fn get_max_tokens() -> usize {
-    ensure_env_file();
     if let Ok(content) = fs::read_to_string(get_env_path()) {
         if let Some(n) = get_env_val(&content, "AI_MAX_TOKENS").and_then(|v| v.parse::<usize>().ok()) {
             return n;
@@ -146,7 +112,6 @@ pub fn get_max_tokens() -> usize {
 }
 
 pub fn get_max_rounds() -> usize {
-    ensure_env_file();
     if let Ok(content) = fs::read_to_string(get_env_path()) {
         if let Some(n) = get_env_val(&content, "AI_MAX_AGENT_ROUNDS").and_then(|v| v.parse::<usize>().ok()) {
             return n;
@@ -191,7 +156,6 @@ async fn probe_local_model() -> String {
 
 impl ProviderConfig {
     pub async fn load() -> Self {
-        ensure_env_file();
         let env_path = get_env_path();
         let env_content = fs::read_to_string(&env_path).unwrap_or_default();
         let max_tokens = get_max_tokens();
@@ -211,7 +175,7 @@ impl ProviderConfig {
             ("OPENROUTER", "https://openrouter.ai/api/v1/chat/completions", "openrouter/free"),
             ("TOKENHARBOR", "https://tokenharbor.ai/v1/chat/completions", "deepseek-v4.1-flash:free"),
             ("OPENAI", "https://api.openai.com/v1/chat/completions", "gpt-4o"),
-            ("ANTHROPIC", "https://api.anthropic.com/v1/messages", "claude-3-5-sonnet-20241022"),
+            ("ANTHROPIC", "https://api.anthropic.com/v1/chat/completions", "claude-3-5-sonnet-20241022"),
             ("DEEPSEEK", "https://api.deepseek.com/chat/completions", "deepseek-chat"),
             ("GROQ", "https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile"),
         ];
@@ -284,4 +248,17 @@ pub fn load_global_instructions() -> Option<String> {
         }
     }
     None
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_env_val_preserves_quoted_hash_and_strips_comments() {
+        let env = "API_KEY=\"sk#123\" # trailing note\nMODEL='gemini-4-hydrogen' # free\n";
+        assert_eq!(get_env_val(env, "API_KEY").as_deref(), Some("sk#123"));
+        assert_eq!(get_env_val(env, "MODEL").as_deref(), Some("gemini-4-hydrogen"));
+    }
 }

@@ -5,42 +5,8 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-const DEFAULT_ENV: &str = r#"# Rs-Agent Provider Cascade (.env) — Priority: First active key | Switch with: ms
-# Fallback: Local llama-server (:8080) when all cloud keys are commented with '#'.
-
-# ── 1. Google Gemini ──────────────────────────────────────────────────────────
-#GEMINI_API_KEY="AQ.your-key-here"
-GEMINI_MODEL="gemini-3.5-flash-lite"
-
-# ── 2. OpenRouter ─────────────────────────────────────────────────────────────
-#OPENROUTER_API_KEY="sk-or-v1-your-key-here"
-OPENROUTER_MODEL="openrouter/free"
-
-# ── 3. TokenHarbor ────────────────────────────────────────────────────────────
-#TOKENHARBOR_API_KEY="thk_live_your-key-here"
-TOKENHARBOR_MODEL="deepseek-v4.1-flash:free"
-
-# ── More Direct Providers e.g. ────────────────────────────────────────────────
-# OPENAI_API_KEY="sk-your-key-here"
-# ANTHROPIC_API_KEY="sk-ant-your-key-here"
-
-# ── 4. Custom Direct Endpoint ─────────────────────────────────────────────────
-# Add: Define CUSTOM1_*, CUSTOM2_*, up to CUSTOM9_*
-# CUSTOM1_NAME="Custom Provider"
-# CUSTOM1_API_KEY="sk-your-key-here"
-CUSTOM1_URL="https://api.deepseek.com/chat/completions"
-CUSTOM1_MODEL="deepseek-flash"
-
-# ── MCP Server Keys (Optional) ────────────────────────────────────────────────
-# API keys for tools configured in plugins/mcp/servers.json
-# FIRECRAWL_API_KEY="fc-your-actual-api-key"
-
-# ── Runtime Governors ─────────────────────────────────────────────────────────
-AI_MAX_TOKENS="8192"
-AI_MAX_AGENT_ROUNDS="10"
-"#;
-
 struct RawModeGuard;
+
 impl Drop for RawModeGuard {
     fn drop(&mut self) {
         let _ = disable_raw_mode();
@@ -83,19 +49,7 @@ fn get_env_path() -> PathBuf {
     dirs::home_dir().map(|h| h.join(".config/rs-agent/.env")).unwrap_or_else(|| PathBuf::from(".env"))
 }
 
-fn ensure_env_file(env_path: &Path) {
-    if !env_path.exists() {
-        if let Some(parent) = env_path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-        let _ = fs::write(env_path, DEFAULT_ENV);
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            let _ = fs::set_permissions(env_path, fs::Permissions::from_mode(0o600));
-        }
-    }
-}
+
 
 /// Quote-aware value extractor. Preserves '#' within quotes.
 fn extract_quoted_val(line: &str) -> &str {
@@ -376,7 +330,6 @@ fn render_tui(
 
 fn main() -> std::io::Result<()> {
     let env_path = get_env_path();
-    ensure_env_file(&env_path);
 
     // Fail loudly if .env cannot be read; never proceed with empty defaults
     let raw_env = match fs::read_to_string(&env_path) {

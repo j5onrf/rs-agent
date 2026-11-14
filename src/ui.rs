@@ -352,15 +352,17 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
     match style {
         1 => {
             // Style 1: Clean Rounded (Snappy laser wipe)
+            let model_c = clamp_chars(model, box_w - 4);
+            let prof_c = clamp_chars(profile, box_w - 4);
             let top_border = format!("{ANSI_BRIGHT}╭─ ○ {:─<w$}╮{ANSI_RESET}", "", w = box_w - 6);
             let model_line = format!(
                 "{ANSI_BRIGHT}│{ANSI_RESET}  {ANSI_WHITE}{:<w$}{ANSI_RESET}{ANSI_BRIGHT}│{ANSI_RESET}",
-                model,
+                model_c,
                 w = box_w - 4
             );
             let prof_line = format!(
                 "{ANSI_BRIGHT}│{ANSI_RESET}  {ANSI_MUTED}{:<w$}{ANSI_RESET}{ANSI_BRIGHT}│{ANSI_RESET}",
-                profile,
+                prof_c,
                 w = box_w - 4
             );
             let bot_border = format!("{ANSI_BRIGHT}╰{:─<w$}╯{ANSI_RESET}", "", w = box_w - 2);
@@ -395,7 +397,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                     model_line
                 } else {
                     let inner = col.saturating_sub(3);
-                    let txt: String = model.chars().take(inner).collect();
+                    let txt: String = model_c.chars().take(inner).collect();
                     format!("{ANSI_BRIGHT}│{ANSI_RESET}  {ANSI_WHITE}{}{ANSI_RESET}", txt)
                 };
 
@@ -405,7 +407,7 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
                     prof_line
                 } else {
                     let inner = col.saturating_sub(3);
-                    let txt: String = profile.chars().take(inner).collect();
+                    let txt: String = prof_c.chars().take(inner).collect();
                     format!("{ANSI_BRIGHT}│{ANSI_RESET}  {ANSI_MUTED}{}{ANSI_RESET}", txt)
                 };
 
@@ -1075,7 +1077,7 @@ pub fn read_ruled_input(
                         view_start = 0;
                     }
                 }
-                KeyCode::Char(c) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                KeyCode::Char(c) if !key.modifiers.intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) => {
                     buf.insert(cur, c);
                     cur += 1;
                 }
@@ -1131,7 +1133,7 @@ pub fn authorize_prompt(violation: &str) -> bool {
             first = false;
 
             let title = " Security Gate ";
-            let fill = w.saturating_sub(4 + title.chars().count()).max(1);
+            let fill = w.saturating_sub(3 + title.chars().count()).max(1);
             let pad = " ".repeat(w.saturating_sub(4 + msg.chars().count()));
             let _ = write!(handle, "\x1b[2K  {ANSI_MUTED}╭─{ANSI_RESET}\x1b[38;5;215m{title}{ANSI_RESET}{ANSI_MUTED}{}╮{ANSI_RESET}\r\n", "─".repeat(fill));
             let _ = write!(handle, "\x1b[2K  {ANSI_MUTED}│{ANSI_RESET} {ANSI_WHITE}{msg}{ANSI_RESET}{pad} {ANSI_MUTED}│{ANSI_RESET}\r\n");
