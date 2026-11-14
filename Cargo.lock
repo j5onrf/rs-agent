@@ -1002,7 +1002,7 @@ dependencies = [
 
 [[package]]
 name = "rs-agent"
-version = "0.6.8"
+version = "0.6.9"
 dependencies = [
  "anyhow",
  "clap",
@@ -1011,6 +1011,7 @@ dependencies = [
  "eventsource-stream",
  "futures-util",
  "mimalloc",
+ "model-select",
  "regex",
  "reqwest",
  "serde",

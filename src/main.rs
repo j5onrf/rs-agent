@@ -564,8 +564,8 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     }
     let _ = env::set_current_dir(target_dir);
 
-    let provider = ProviderConfig::load().await;
-    let client = LlmClient::new(provider.clone());
+    let mut provider = ProviderConfig::load().await;
+    let mut client = LlmClient::new(provider.clone());
     let boundary = SecurityBoundary::new(target_dir);
 
     let mut cfg = if is_agent_init {
@@ -635,7 +635,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     let mut last_stat_line: Option<String> = None;
     let mut input_history: Vec<String> = Vec::new();
     let mut router = matcher::ContextRouter::load();
-    let max_rounds = rs_agent::config::get_max_rounds();
+    let mut max_rounds = rs_agent::config::get_max_rounds();
 
     loop {
         let minimal_ui = current_box_style != 7;
@@ -747,6 +747,37 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 println!("  \x1b[1;33m[task]\x1b[0m No objective provided and no TASK.md found.");
                 println!("         \x1b[2m• Usage:  /task <describe goal>\x1b[0m");
                 println!("         \x1b[2m• Or:     Create TASK.md in project root with markdown checkboxes.\x1b[0m\n");
+            }
+            continue;
+        }
+
+        if input == "/ms" || input == "/model" {
+            match model_select::run_selector(true) {
+                Ok(outcome) => {
+                    if outcome.changed {
+                        provider = ProviderConfig::load().await;
+                        client = LlmClient::new(provider.clone());
+                        client.set_reasoning(active_profile.reasoning_budget.clone());
+                        max_rounds = rs_agent::config::get_max_rounds();
+                        last_stat_line = None;
+
+                        print!("\x1b]0;rs-agent: {}\x07", second_line);
+                        print!("\x1b[H\x1b[2J");
+                        println!();
+                        if history.len() > 1 {
+                            println!("  {} \x1b[2m(history kept · /r to reset)\x1b[0m", outcome.summary);
+                        } else {
+                            println!("  {}", outcome.summary);
+                        }
+                        ui::draw_box(&provider.model, &second_line, current_box_style, false);
+                        let _ = io::stdout().flush();
+                    } else {
+                        println!("  \x1b[2mModel unchanged.\x1b[0m\n");
+                    }
+                }
+                Err(e) => {
+                    println!("  \x1b[1;31m✗\x1b[0m \x1b[2m{}\x1b[0m\n", e);
+                }
             }
             continue;
         }

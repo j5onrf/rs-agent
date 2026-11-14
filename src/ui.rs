@@ -890,6 +890,7 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
 
 const SLASH_COMMANDS: &[(&str, &str)] = &[
     ("/p", "Select agent profile"),
+    ("/ms", "Model select & context budget"),
     ("/s", "Attach or detach skills"),
     ("/task", "Run autonomous goal loop"),
     ("/t3", "Launch T3 Code ADE"),

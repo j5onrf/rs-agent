@@ -3,7 +3,7 @@
   <h1>Rs-Agent</h1>
 
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.8.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.9.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -65,7 +65,7 @@
 | `ai --bridge` | **Headless ACP** | Embedded stdio JSON-RPC 2.0 server for ADEs and desktop surfaces |
 
 **In-Session Slash Commands:**
-`/p` profile select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/box [1-7]` box themes • `/pad` spacing • `/tk` thinking view • `/r` reset
+`/p` profile select • `/ms` model select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/box [1-7]` box themes • `/pad` spacing • `/tk` thinking view • `/r` reset
 
 ---
 
@@ -121,7 +121,7 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
-╭─── rs-agent v0.6.8 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.6.9 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ Tips for getting started                    │
 │   │ Li │  lingtiny                         │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · 11 modified          │ ─────────────────────────────────────────── │

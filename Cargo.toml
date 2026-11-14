@@ -1,6 +1,6 @@
 [package]
 name = "rs-agent"
-version = "0.6.8"
+version = "0.6.9"
 edition = "2021"
 
 [workspace]
@@ -21,6 +21,7 @@ name = "ai"
 path = "src/main.rs"
 
 [dependencies]
+model-select = { path = "tools/model-select" }
 mimalloc = { version = "0.1", default-features = false }
 anyhow = "1.0"
 clap = { version = "4.4", features = ["derive"] }
