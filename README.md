@@ -14,7 +14,7 @@
   </p>
 
   <p>
-    <code>gguf</code> &nbsp; <code>llama.cpp</code> &nbsp; <code>t3code</code> &nbsp; <code>omarchy</code> &nbsp; <code>local-first</code>
+    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>t3code</code> &nbsp;•&nbsp; <code>omarchy</code> &nbsp;•&nbsp; <code>local-first</code>
   </p>
 </div>
 
@@ -27,19 +27,19 @@
     <td width="50%" valign="top">
       <strong><img alt="" src="assets/prompt.svg" width="16" height="16" /> Sub-27B (SLM)</strong><br />
       <em>Tool calling, fast refactoring, single-turn edits</em><br /><br />
-      <code>LFM3-1.7B</code> &nbsp; <code>Ling-3.0-tiny*</code><br />
-      <code>MiniCPM5-2B</code> &nbsp; <code>Qwen3.5-2B+</code><br />
-      <code>MiniCPM-V-4.7-1B</code> &nbsp; <code>LFM2.5-24B-A2B</code>
+      <code>LFM3-1.7B</code> &nbsp;•&nbsp; <code>Ling-3.0-tiny*</code><br />
+      <code>MiniCPM5-2B</code> &nbsp;•&nbsp; <code>Qwen3.5-2B+</code><br />
+      <code>MiniCPM-V-4.7-1B</code> &nbsp;•&nbsp; <code>LFM2.5-24B-A2B</code>
     </td>
     <td width="50%" valign="top">
       <strong><img alt="" src="assets/prompt.svg" width="16" height="16" /> 27B+ (LLM)</strong><br />
       <em>Deep reasoning, complex logic, multi-turn loops</em><br /><br />
-      <code>Groot-19B-A3B</code> &nbsp; <code>Clover-35B-A3B</code><br />
-      <code>Sage-A1.5-35B</code> &nbsp; <code>Flint-40B-A2.5B*</code><br />
-      <code>Qwen3.8-35B-D</code> &nbsp; <code>KAT-Coder-V2.5</code><br />
-      <code>Ornith-1.5-35B</code> &nbsp; <code>Tiel-Coder-35B</code><br />
-      <code>Qwen3.8-27B</code> &nbsp; <code>Qwen4.0-27B</code><br />
-      <code>Qwen3.8-Flash</code> &nbsp; <code>DeepSeek-V4.1</code>
+      <code>Groot-19B-A3B</code> &nbsp;•&nbsp; <code>Clover-35B-A3B</code><br />
+      <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br />
+      <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br />
+      <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br />
+      <code>Qwen3.8-27B</code> &nbsp;•&nbsp; <code>Qwen4.0-27B</code><br />
+      <code>Qwen3.8-Flash</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code>
     </td>
   </tr>
 </table>
