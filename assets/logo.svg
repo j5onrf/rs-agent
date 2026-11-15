@@ -1,16 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="rs-agent logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Rs-Agent logo">
   <defs>
-    <linearGradient id="g2" gradientUnits="userSpaceOnUse" x1="20" y1="24" x2="108" y2="104">
-      <stop offset="0%" stop-color="#00e5ff" />
-      <stop offset="55%" stop-color="#00a8e8" />
-      <stop offset="100%" stop-color="#0969da" />
+    <linearGradient id="armA" gradientUnits="userSpaceOnUse" x1="20" y1="16" x2="96" y2="108">
+      <stop offset="0%" stop-color="#00f0ff" />
+      <stop offset="55%" stop-color="#00a8ff" />
+      <stop offset="100%" stop-color="#1d6fe8" />
+    </linearGradient>
+    <linearGradient id="armB" gradientUnits="userSpaceOnUse" x1="20" y1="16" x2="96" y2="108">
+      <stop offset="0%" stop-color="#00d4ff" />
+      <stop offset="60%" stop-color="#0969da" />
+      <stop offset="100%" stop-color="#1e40af" />
     </linearGradient>
   </defs>
 
-  <g fill="none" stroke="url(#g2)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
-    <!-- r stem + shoulder -->
-    <path d="M 28 96 L 28 48 Q 28 32 44 32 L 62 32" />
-    <!-- >_ prompt chevron -->
-    <path d="M 76 42 L 100 66 L 76 90 L 52 90" />
+  <g fill="none" stroke-width="19" stroke-linecap="round">
+    <path stroke="url(#armB)" opacity="0.90" transform="rotate(180 64 64)"
+      d="M 68 21 C 34 21, 20 48, 23 74 C 26 98, 52 108, 75 98 C 92 91, 97 70, 86 55" />
+    <path stroke="url(#armA)" opacity="0.88"
+      d="M 68 21 C 34 21, 20 48, 23 74 C 26 98, 52 108, 75 98 C 92 91, 97 70, 86 55" />
   </g>
 </svg>
