@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="rs-agent" src="/assests/logo.svg?v=2" height="110" />
+  <img alt="rs-agent" src="/assets/logo.svg?v=2" height="110" />
   <h1>Rs-Agent</h1>
 
   <p>
