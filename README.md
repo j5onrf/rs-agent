@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="rs-agent" src="assets/logo.svg" width="120" height="120" />
+  <img alt="rs-agent" src="assets/logo.svg" width="110" height="110" />
   <h1>Rs-Agent</h1>
 
   <p>
@@ -11,45 +11,45 @@
   </p>
 
   <p>
-    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>t3code</code> &nbsp;•&nbsp; <code>omarchy</code> &nbsp;•&nbsp; <code>local-first</code>
-  </p>
-
-  <p>
     <strong>Sub-millisecond native Rust AI harness for local <code>llama-server</code> GGUF backends and cloud reasoning models.</strong><br />
     Parallel 6-tool kernel &nbsp;•&nbsp; 3-stage resilient edits &nbsp;•&nbsp; Zero-trust path sandbox &nbsp;•&nbsp; Native T3 Code ACP bridge
   </p>
 
-  <table>
-    <tr>
-      <td align="center" width="320" valign="top">
-        <h3>👤 Sub-27B (SLM)</h3>
-        <p><em>Tool calling, fast refactoring, single-turn edits</em></p>
-        <code>LFM3-1.7B</code> &nbsp;•&nbsp; <code>Ling-3.0-tiny*</code><br />
-        <code>MiniCPM5-2B</code> &nbsp;•&nbsp; <code>Qwen3.5-2B+</code><br />
-        <code>MiniCPM-V-4.7-1B</code> &nbsp;•&nbsp; <code>LFM2.5-24B-A2B</code>
-      </td>
-      <td align="center" width="320" valign="top">
-        <h3>👤 27B+ (LLM)</h3>
-        <p><em>Deep reasoning, complex logic, multi-turn loops</em></p>
-        <code>Groot-19B-A3B</code> &nbsp;•&nbsp; <code>Clover-35B-A3B</code><br />
-        <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br />
-        <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br />
-        <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br />
-        <code>Qwen3.8-27B</code> &nbsp;•&nbsp; <code>Qwen4.0-27B</code><br />
-        <code>Qwen3.8-Flash</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code>
-      </td>
-    </tr>
-  </table>
-
   <p>
-    <em>* Primary edge baselines &nbsp;•&nbsp; Auto-discovers local models on <code>http://127.0.0.1:8080</code></em>
-  </p>
-
-  <p>
-    <strong>Cloud Endpoints:</strong> <a href="https://ai.google.dev">Google Gemini</a> (<code>gemini-4-hydrogen</code>) &nbsp;•&nbsp; <a href="https://openrouter.ai">OpenRouter</a> &nbsp;•&nbsp; <a href="https://tokenharbor.ai">TokenHarbor</a><br />
-    <strong>Free Endpoints:</strong> <a href="https://ai.google.dev"><code>gemini-3.5-flash-lite</code></a> &nbsp;•&nbsp; <a href="https://openrouter.ai/models?variant=free"><code>openrouter/free</code></a> &nbsp;•&nbsp; <a href="https://tokenharbor.ai"><code>deepseek-v4.1-flash:free</code></a>
+    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>t3code</code> &nbsp;•&nbsp; <code>omarchy</code> &nbsp;•&nbsp; <code>local-first</code>
   </p>
 </div>
+
+---
+
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Supported Models & Endpoints
+
+<table>
+  <tr>
+    <td width="400" valign="top">
+      <strong>👤 Sub-27B (SLM)</strong><br />
+      <em>Tool calling, fast refactoring, single-turn edits</em><br /><br />
+      <code>LFM3-1.7B</code> &nbsp;•&nbsp; <code>Ling-3.0-tiny*</code><br />
+      <code>MiniCPM5-2B</code> &nbsp;•&nbsp; <code>Qwen3.5-2B+</code><br />
+      <code>MiniCPM-V-4.7-1B</code> &nbsp;•&nbsp; <code>LFM2.5-24B-A2B</code>
+    </td>
+    <td width="400" valign="top">
+      <strong>👤 27B+ (LLM)</strong><br />
+      <em>Deep reasoning, complex logic, multi-turn loops</em><br /><br />
+      <code>Groot-19B-A3B</code> &nbsp;•&nbsp; <code>Clover-35B-A3B</code><br />
+      <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br />
+      <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br />
+      <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br />
+      <code>Qwen3.8-27B</code> &nbsp;•&nbsp; <code>Qwen4.0-27B</code><br />
+      <code>Qwen3.8-Flash</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code>
+    </td>
+  </tr>
+</table>
+
+*Primary edge baselines • Auto-discovers local models on `http://127.0.0.1:8080`*
+
+* **Cloud Endpoints:** [Google Gemini](https://ai.google.dev) (`gemini-4-hydrogen`) • [OpenRouter](https://openrouter.ai) • [TokenHarbor](https://tokenharbor.ai)
+* **Free Endpoints:** [`gemini-3.5-flash-lite`](https://ai.google.dev) • [`openrouter/free`](https://openrouter.ai/models?variant=free) • [`deepseek-v4.1-flash:free`](https://tokenharbor.ai)
 
 ---
 
@@ -301,3 +301,4 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <em>Built for speed, clarity, and terminal minimalism. Licensed under the <strong><a href="LICENSE">MIT License</a></strong>.</em>
 </div>
+
