@@ -22,7 +22,7 @@
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Supported Models & Endpoints
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Model Tiers & Endpoints
 
 <table>
   <tr>
