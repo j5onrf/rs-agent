@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="rs-agent" src="assets/logo.svg" width="110" height="110" />
+  <img alt="rs-agent" src="assets/logo.svg" width="46" height="46" />
   <h1>Rs-Agent</h1>
 
   <p>
@@ -87,11 +87,22 @@
 * **`/box 7`:** 2-column welcome header with live ruled `────` input bar, bottom status stats, `/` command hints, and spaced layout (`pad: true`).
 * **`/tk` / `/think`:** Cycle reasoning display between `rs-agent` `│ ` gutter (default), expanded `∴` italic, or collapsed `∴ Thought for Xs` (persisted via `"showThinkingSummaries"` in `state.json`).
 
+```console
+~ ❯ ai
+╭─── rs-agent v0.7.1 ──────────────────────────────────────────────────────────────────────╮
+│   ╭────╮  Ling-3.0-tiny                    │ 6-tool · t350 · adp                         │
+│   │ Li │  lingtiny                         │ Type / for commands · Tab completes         │
+│   ╰────╯  git: main · 11 modified          │ ─────────────────────────────────────────── │
+│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · max 10 steps · ↑/↓ history       │
+╰──────────────────────────────────────────────────────────────────────────────────────────╯
+
+❯ █
+```
+
 <details>
 <summary><b>Preview all 7 box themes (halftone skeleton dither, dot slabs, 2-column header)</b></summary>
 
 ```console
-~ ❯ ai
 ╭─ ○ ────────────────────────────────────────╮
 │  LFM3-1.7B                                 │
 │  chat                                      │
@@ -122,13 +133,11 @@
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
 ╭─── rs-agent v0.7.1 ──────────────────────────────────────────────────────────────────────╮
-│   ╭────╮  Ling-3.0-tiny                    │ 6-tool · t350 · adp                         │
-│   │ Li │  lingtiny                         │ Type / for commands · Tab completes         │
-│   ╰────╯  git: main · 11 modified          │ ─────────────────────────────────────────── │
-│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · max 10 steps · ↑/↓ history       │
+│   ╭────╮  Ling-3.0-tiny                    │ purebash · t256 · adp · mcp:photocraft(7)   │
+│   │ Li │  artcraft/photocraft-l            │ Type / for commands · Tab completes         │
+│   ╰────╯  git: main · clean                │ ─────────────────────────────────────────── │
+│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · max 15 steps · ↑/↓ history       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
-
-❯ █
 ```
 
 </details>
