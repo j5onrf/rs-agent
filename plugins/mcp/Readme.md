@@ -11,6 +11,13 @@ Add server definitions to `~/.config/rs-agent/plugins/mcp/servers.json`. Support
 ```json
 {
   "servers": {
+    "photocraft": {
+      "command": "${HOME}/.config/rs-agent/plugins/mcp/photocraft/mcp-bridge.sh",
+      "args": [],
+      "env": {
+        "PHOTOCRAFT_AUTOSTART": "1"
+      }
+    },
     "blender": {
       "command": "python3",
       "args": ["-m", "blender_mcp", "--addon-port", "9876"],
@@ -29,18 +36,24 @@ Add server definitions to `~/.config/rs-agent/plugins/mcp/servers.json`. Support
 
 ## 2. Attaching to Profiles (Opt-In Token Hygiene)
 
-To prevent overwhelming small models with 40+ tool definitions, MCP servers are **opt-in per profile** via Markdown frontmatter (`profiles/*.md`):
+To prevent overwhelming models with dozens of external tool definitions, MCP servers are **opt-in per profile** via Markdown frontmatter (`profiles/*.md`):
 
 ```yaml
 ---
 description: "Blender 3D Automation Specialist"
-mcp: blender                # Clean string: no brackets required!
-# or multiple: mcp: blender, sqlite
+mcp: blender                # Attach server (comma-separated for multiple: blender, sqlite)
+# Optional tool allowlist (keeps prefill small for local SLMs):
+mcp_tools: create_mesh, run_script
 ---
-ROLE: Blender 3D Automation Specialist. Use mcp_blender_* tools to build meshes and run Python scripts.
+ROLE: Blender 3D Automation Specialist.
 ```
 
-When you select this profile via `/p` in the terminal or launch `/t3`, the engine dynamically discovers the tools exported by the server (`mcp_<server>_<tool>`) and attaches them to the session.
+### Selective Tool Filtering (`mcp_tools:`)
+When an MCP server exports dozens of tools (e.g. PhotoCraft with 26 tools), raw schemas can consume 7,000+ tokens of prompt space. Use `mcp_tools:` to selectively load only the tools you need:
+
+- **Omitted (Cloud/Large Models):** Attaches all exported server tools in full detail.
+- **Filtered (`mcp_tools: tool_a, tool_b`):** Loads only the specified tools and compacts verbose descriptions to the first sentence (`<= 120` chars), slashing prompt overhead down to < 2k tokens.
+- **Box 7 Status Display:** Shows `mcp:<server>` when full, or `mcp:<server>(count)` when filtered (e.g., `mcp:photocraft(7)`).
 
 ---
 
@@ -52,5 +65,5 @@ Inspect and test connected MCP servers directly from your terminal:
 ai mcp list                 # List all configured servers and status
 ai mcp list photocraft      # List tools exported by a specific server
 ai mcp call photocraft doc_inspect '{"document_id": 1}'
-ai mcp schema               # Export OpenAI-compatible tool schemas for active servers
+ai mcp schema photocraft    # Export OpenAI-compatible tool schemas for inspection
 ```
