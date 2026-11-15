@@ -58,9 +58,6 @@
 | `[shortcut]` | **Shell Teleport** | Sub-`0.2ms` router via `rs-context.md` (`lfm`, `ling`, etc.) |
 | <img alt="" src="assets/prompt.svg" width="14" height="14" /> `ai` | **Interactive Chat** | Pure conversational REPL (`~180t` profile, thinking gutters, `/pad`) |
 | <img alt="" src="assets/prompt.svg" width="14" height="14" /> `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security sandbox |
-| `/task [goal]` | **Task Loop** | Multi-step autonomous loop; auto-loads `TASK.md` if goal is omitted |
-| `/t3` / `/t3 web` | **T3 Code ADE** | Compositor handover to official T3 Code GUI with live diffs & permission gates |
-| `ai --bridge` | **Headless ACP** | Embedded stdio JSON-RPC 2.0 server for ADEs and desktop surfaces |
 
 **In-Session Slash Commands:**
 `/p` profile select • `/ms` model select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/box [1-7]` box themes • `/pad` spacing • `/tk` thinking view • `/r` reset
@@ -217,7 +214,6 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 | **1** | **Flint-40B-A2.5B** | **185.7%** | **100.0 (A+)** |
 | **2** | **Groot-19B-A3B** *(MTP)* | **162.5%** | **100.0 (A+)** |
 | **3** | **Sage-A1.5-35B** | **111.1%** | **100.0 (A+)** |
-| **4** | **Qwen3.8-35B-Distill** *(MTP)* | **136.4%** | **92.2 (A)** |
 | **—** | **Ling-3.0-tiny** *(SLM)* | **162.5%** | **100.0 (A+)** |
 | **—** | **LFM3-1.7B** *(SLM)* | **173.3%** | **100.0 (A+)** |
 
