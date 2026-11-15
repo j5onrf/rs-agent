@@ -46,8 +46,8 @@
 
 *\* Primary edge baselines • Auto-discovers local models on `http://127.0.0.1:8080`*
 
-* **Cloud Endpoints:** [Google Gemini](https://ai.google.dev) (`gemini-4-hydrogen`) • [OpenRouter](https://openrouter.ai) • [TokenHarbor](https://tokenharbor.ai)
-* **Free Endpoints:** [`gemini-3.5-flash-lite`](https://ai.google.dev) • [`openrouter/free`](https://openrouter.ai/models?variant=free) • [`deepseek-v4.1-flash:free`](https://tokenharbor.ai)
+* **Cloud Endpoints:** [Google Gemini](https://ai.google.dev) (`gemini-4-hydrogen`) • [OpenRouter](https://openrouter.ai) • [TokenHarbor](https://tokenharbor.ai) • [AMD Token Lab](https://notebooks.amd.com)
+* **Free Endpoints:** [`gemini-3.5-flash-lite`](https://ai.google.dev) • [`openrouter/free`](https://openrouter.ai/models?variant=free) • [`deepseek-v4.1-flash:free`](https://tokenharbor.ai) • [`DeepSeek-V4.1-Flash-1017`](https://notebooks.amd.com)
 
 ---
 
