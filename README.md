@@ -1,6 +1,6 @@
 <div align="center">
-  <img alt="Rs-Agent" src="assets/banner.svg" width="100%" />
-  <br /><br />
+  <img alt="rs-agent" src="assets/logo.svg" width="110" height="110" />
+  <h1>Rs-Agent</h1>
 
   <p>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.1.svg?variant=secondary" alt="Version"></a>
