@@ -1,5 +1,5 @@
 <div align="center">
-  <img alt="rs-agent" src="logo.svg?v=2" height="460" />
+  <img alt="rs-agent" src="assets/logo.svg" width="120" height="120" />
   <h1>Rs-Agent</h1>
 
   <p>
@@ -53,7 +53,7 @@
 
 ---
 
-## <img alt="rs-agent" src="logo.svg?v=2" height="46" /> Execution Modes & Controls
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Execution Modes & Controls
 
 | Invocation | Mode | Description |
 | :--- | :--- | :--- |
@@ -69,7 +69,7 @@
 
 ---
 
-## <img alt="rs-agent" src="logo.svg?v=2" height="46" /> Client Surface: T3 Code ADE
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Client Surface: T3 Code ADE
 
 **[T3 Code](https://t3.codes)** is the official agent developer environment for `rs-agent`, connected directly to `ai --bridge` over stdio JSON-RPC 2.0 (ACP).
 
@@ -81,7 +81,7 @@
 
 ---
 
-## <img alt="rs-agent" src="logo.svg?v=2" height="46" /> CLI Box Styles (`/box [1-7]`)
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> CLI Box Styles (`/box [1-7]`)
 
 * **`/box 1–6`:** Compact headers with minimal single-line `❯ ` prompt, inline stats, and dense layout (`pad: false` by default).
 * **`/box 7`:** 2-column welcome header with live ruled `────` input bar, bottom status stats, `/` command hints, and spaced layout (`pad: true`).
@@ -135,7 +135,7 @@
 
 ---
 
-## <img alt="rs-agent" src="logo.svg?v=2" height="46" /> Runtime Architecture
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Runtime Architecture
 
 ```text
 Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─▶ Workspace Teleport
@@ -154,7 +154,7 @@ Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─�
 
 ---
 
-## <img alt="rs-agent" src="logo.svg?v=2" height="46" /> Efficiency & Context Scaling
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Efficiency & Context Scaling
 
 ### Tool Schema Footprint
 
@@ -180,7 +180,7 @@ File reads and shell outputs adapt dynamically to `AI_MAX_TOKENS`, offloading ov
 
 ---
 
-## <img alt="rs-agent" src="logo.svg?v=2" height="46" /> Workspace Profiles & Skills
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Workspace Profiles & Skills
 
 Configure agent personas, tool tiers, MCP servers, and reasoning behavior in `profiles/*.md` frontmatter:
 
@@ -203,7 +203,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 ---
 
-## <img alt="rs-agent" src="logo.svg?v=2" height="46" /> Agent Evaluation (`eval-stack`)
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Agent Evaluation (`eval-stack`)
 
 5-stage autonomous benchmark measuring par efficiency, tool resilience, and token economy via `eva`:
 
@@ -218,7 +218,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 ---
 
-## <img alt="rs-agent" src="logo.svg?v=2" height="46" /> Developer Tools (`tools/`)
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Developer Tools (`tools/`)
 
 | Binary | Tool | Purpose |
 | :--- | :--- | :--- |
@@ -230,7 +230,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 ---
 
-## <img alt="rs-agent" src="logo.svg?v=2" height="46" /> Setup & Configuration
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Setup & Configuration
 
 ### 👤 Quick Start (Linux x86_64)
 
