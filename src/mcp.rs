@@ -66,48 +66,10 @@ pub fn expand_env_str(val: &str) -> String {
     out
 }
 
-async fn ensure_photocraft_bridge(clean_cmd: &str, clean_args: &[String]) {
-    if !clean_cmd.contains("photocraft") && !clean_args.iter().any(|a| a.contains("photocraft")) {
-        return;
-    }
-    if let Some(pos) = clean_args.iter().position(|a| a == "--bridge") {
-        if let Some(addr) = clean_args.get(pos + 1) {
-            // Check if socket is already accepting connections
-            if tokio::net::TcpStream::connect(addr).await.is_err() {
-                let token_file = expand_env_str("${HOME}/.config/photocraft/control.token");
-                let home = expand_env_str("${HOME}");
-                let port = addr.split(':').next_back().unwrap_or("7878");
-
-                // Auto-spawn PhotoCraft desktop GUI in background with control socket enabled
-                let _ = std::process::Command::new("photocraft")
-                    .arg("--control")
-                    .arg(port)
-                    .arg("--control-token-file")
-                    .arg(&token_file)
-                    .arg("--automation-read-root")
-                    .arg(&home)
-                    .arg("--automation-write-root")
-                    .arg(&home)
-                    .stdin(std::process::Stdio::null())
-                    .stdout(std::process::Stdio::null())
-                    .stderr(std::process::Stdio::null())
-                    .spawn();
-
-                // Wait up to 2 seconds for PhotoCraft to initialize socket
-                for _ in 0..20 {
-                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-                    if tokio::net::TcpStream::connect(addr).await.is_ok() {
-                        break;
-                    }
-                }
-            }
-        }
-    }
-}
-
 pub struct McpSession {
     child: Child,
     reader: BufReader<tokio::process::ChildStdout>,
+    stderr_buf: Arc<Mutex<String>>,
     req_id: u64,
 }
 
@@ -116,10 +78,12 @@ impl McpSession {
         let clean_cmd = expand_env_str(&cfg.command);
         let clean_args: Vec<String> = cfg.args.iter().map(|a| expand_env_str(a)).collect();
 
-        ensure_photocraft_bridge(&clean_cmd, &clean_args).await;
-
         let mut cmd = Command::new(&clean_cmd);
-        cmd.args(&clean_args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::null()).kill_on_drop(true);
+        cmd.args(&clean_args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
 
         for (k, v) in &cfg.env {
             cmd.env(k, expand_env_str(v));
@@ -129,10 +93,36 @@ impl McpSession {
         let stdout = child.stdout.take().context("No stdout on MCP child")?;
         let reader = BufReader::new(stdout);
 
-        let mut session = Self { child, reader, req_id: 0 };
+        let stderr_buf = Arc::new(Mutex::new(String::new()));
+        if let Some(stderr) = child.stderr.take() {
+            let buf_ref = Arc::clone(&stderr_buf);
+            tokio::spawn(async move {
+                let mut err_lines = BufReader::new(stderr).lines();
+                while let Ok(Some(line)) = err_lines.next_line().await {
+                    let mut guard = buf_ref.lock().await;
+                    if guard.len() < 2048 {
+                        if !guard.is_empty() {
+                            guard.push('\n');
+                        }
+                        guard.push_str(&line);
+                    }
+                }
+            });
+        }
 
+        let mut session = Self { child, reader, stderr_buf, req_id: 0 };
         session.initialize().await?;
         Ok(session)
+    }
+
+    async fn err_with_stderr(&mut self, msg: impl std::fmt::Display) -> anyhow::Error {
+        let _ = tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        let detail = self.stderr_buf.lock().await.trim().to_string();
+        if detail.is_empty() {
+            anyhow::anyhow!("{}", msg)
+        } else {
+            anyhow::anyhow!("{} (stderr: {})", msg, detail)
+        }
     }
 
     async fn send_raw(&mut self, payload: &Value) -> Result<()> {
@@ -155,7 +145,9 @@ impl McpSession {
             "params": params
         });
 
-        self.send_raw(&req).await?;
+        if let Err(e) = self.send_raw(&req).await {
+            return Err(self.err_with_stderr(e).await);
+        }
 
         let mut line = String::new();
         loop {
@@ -167,7 +159,9 @@ impl McpSession {
             .await
             .context("MCP server RPC timed out after 30s")??;
             if bytes_read == 0 {
-                break;
+                return Err(self
+                    .err_with_stderr(format!("MCP server closed stream before replying to '{}'", method))
+                    .await);
             }
             let trimmed = line.trim();
             if trimmed.is_empty() {
@@ -184,7 +178,6 @@ impl McpSession {
                 }
             }
         }
-        Ok(None)
     }
 
     async fn send_notification(&mut self, method: &str, params: Value) -> Result<()> {
@@ -193,7 +186,10 @@ impl McpSession {
             "method": method,
             "params": params
         });
-        self.send_raw(&notif).await
+        if let Err(e) = self.send_raw(&notif).await {
+            return Err(self.err_with_stderr(e).await);
+        }
+        Ok(())
     }
 
     async fn initialize(&mut self) -> Result<()> {
@@ -310,4 +306,20 @@ pub async fn call_tool(server_name: &str, tool_name: &str, arguments: &Value) ->
 
     let mut session = McpSession::spawn(cfg).await.map_err(|e| e.to_string())?;
     session.call_tool(tool_name, arguments).await.map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_spawn_surfaces_stderr_on_early_exit() {
+        let cfg = McpServerConfig {
+            command: "sh".into(),
+            args: vec!["-c".into(), "echo 'bad mcp arg' >&2; exit 2".into()],
+            env: HashMap::new(),
+        };
+        let err = McpSession::spawn(&cfg).await.err().expect("expected error").to_string();
+        assert!(err.contains("bad mcp arg"), "unexpected error: {err}");
+    }
 }

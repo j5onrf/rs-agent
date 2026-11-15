@@ -201,6 +201,45 @@ impl Profile {
         }
     }
 
+    pub fn hud_summary(&self, is_agent: bool) -> String {
+        let mut parts: Vec<String> = Vec::new();
+        if is_agent {
+            parts.push(
+                match self.tier {
+                    ToolTier::PureBash => "purebash",
+                    ToolTier::Core4 => "core4",
+                    ToolTier::Smol => "6-tool",
+                }
+                .to_string(),
+            );
+        } else {
+            parts.push("no tools".to_string());
+        }
+        if let Some(ref rb) = self.reasoning_budget {
+            let v = match rb {
+                ReasoningSetting::Tokens(n) => format!("t{}", n),
+                ReasoningSetting::Tier(t) => t.clone(),
+            };
+            parts.push(v);
+        }
+        if self.adapters {
+            parts.push("adp".to_string());
+        }
+        if self.memory {
+            parts.push("mem".to_string());
+        }
+        if self.delegate {
+            parts.push("del".to_string());
+        }
+        if !self.mcp_servers.is_empty() {
+            parts.push(format!("mcp:{}", self.mcp_servers.join(",")));
+        }
+        if !is_agent && parts.len() == 1 {
+            parts.push("pure chat".to_string());
+        }
+        parts.join(" · ")
+    }
+
     pub fn profile_dirs() -> Vec<PathBuf> {
         dirs::home_dir()
             .map(|h| vec![h.join(".config/rs-agent/profiles")])
@@ -341,7 +380,8 @@ impl Profile {
 
     pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String> {
         let ws_clean = ws_name.replace(['-', '_'], "").to_lowercase();
-        let mut matches = Vec::new();
+        let mut exact = Vec::new();
+        let mut prefix = Vec::new();
 
         for opt in available {
             let bare = opt.split('/').next_back().unwrap_or(opt);
@@ -349,22 +389,20 @@ impl Profile {
             let bare_clean = bare.replace(['-', '_'], "").to_lowercase();
 
             if opt_clean == ws_clean || bare_clean == ws_clean {
-                matches.push(opt.clone());
-                continue;
-            }
-            for sep in ['-', '_'] {
-                let prefix = format!("{}{}", ws_name.to_lowercase(), sep);
-                if (opt.to_lowercase().starts_with(&prefix) || bare.to_lowercase().starts_with(&prefix))
-                    && !matches.contains(opt)
-                {
-                    matches.push(opt.clone());
-                }
-            }
-            if (opt_clean.starts_with(&ws_clean) || bare_clean.starts_with(&ws_clean)) && !matches.contains(opt) {
-                matches.push(opt.clone());
+                exact.push(opt.clone());
+            } else if ws_clean.len() >= 2
+                && (opt_clean.starts_with(&ws_clean) || bare_clean.starts_with(&ws_clean))
+                && !prefix.contains(opt)
+            {
+                prefix.push(opt.clone());
             }
         }
-        matches
+
+        if !exact.is_empty() {
+            exact
+        } else {
+            prefix
+        }
     }
 
     pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String> {
@@ -744,5 +782,38 @@ mod tests {
         assert_eq!(local.reasoning_budget, Some(ReasoningSetting::Tokens(500)));
         let cloud = Profile::parse("---\nreasoning_budget: high\n---\nhi");
         assert_eq!(cloud.reasoning_budget, Some(ReasoningSetting::Tier("high".into())));
+    }
+
+    #[test]
+    fn test_hud_summary_formats_frontmatter() {
+        let ling = Profile::parse("---\nadapters: true\nreasoning_budget: 350\n---\nhi");
+        assert_eq!(ling.hud_summary(true), "6-tool · t350 · adp");
+
+        let gem = Profile::parse("---\ncore4: true\nreasoning_budget: xhigh\nmemory: true\ndelegate: true\nmcp: photocraft\n---\nhi");
+        assert_eq!(gem.hud_summary(true), "core4 · xhigh · mem · del · mcp:photocraft");
+
+        let chat = Profile::parse("hi");
+        assert_eq!(chat.hud_summary(false), "no tools · pure chat");
+    }
+
+    #[test]
+    fn test_find_workspace_candidates_resolves_ling_and_exact_groot() {
+        let avail = vec![
+            "artcraft/photocraft-c".to_string(),
+            "artcraft/photocraft-l".to_string(),
+            "groot/groot".to_string(),
+            "groot/groot2".to_string(),
+            "lfm3".to_string(),
+            "lingtiny".to_string(),
+        ];
+        assert_eq!(Profile::find_workspace_candidates("lin", &avail), vec!["lingtiny"]);
+        assert_eq!(Profile::find_workspace_candidates("ling", &avail), vec!["lingtiny"]);
+        assert_eq!(Profile::find_workspace_candidates("ling-tiny", &avail), vec!["lingtiny"]);
+        assert_eq!(Profile::find_workspace_candidates("lfm", &avail), vec!["lfm3"]);
+        assert_eq!(Profile::find_workspace_candidates("groot", &avail), vec!["groot/groot"]);
+        assert_eq!(
+            Profile::find_workspace_candidates("artcraft", &avail),
+            vec!["artcraft/photocraft-c", "artcraft/photocraft-l"]
+        );
     }
 }

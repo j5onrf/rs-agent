@@ -577,8 +577,15 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
         let needs_profile = !has_config || c.profile_name == "chat" || Profile::load(&c.profile_name).is_none();
         if needs_profile {
-            if Profile::load(&dir_name).is_some() {
+            let available = Profile::list_available();
+            let ws_candidates = Profile::find_workspace_candidates(&dir_name, &available);
+            if ws_candidates.len() == 1 {
+                c.profile_name = ws_candidates[0].clone();
+            } else if Profile::load(&dir_name).is_some() {
                 c.profile_name = dir_name;
+            } else if !ws_candidates.is_empty() {
+                c.profile_name =
+                    Profile::resolve_for_workspace(&dir_name, &provider.model, Some(&provider.base_url));
             } else if std::io::IsTerminal::is_terminal(&std::io::stdin()) {
                 if let Some(selected) = Profile::select_interactive(target_dir, &c.profile_name) {
                     c.profile_name = selected;
@@ -612,14 +619,15 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
     let (mut instance_num, first_guard) = resolve_instance_number(&cfg.profile_name);
     let mut lock_guard = Some(first_guard);
-    let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
+    let mut second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
 
     print!("\x1b]0;rs-agent: {}\x07", second_line);
     let _ = io::stdout().flush();
 
     let mut active_skills: Vec<String> = Vec::new();
     let mut current_box_style = state::get_box_style();
-    let mut buffered_char = ui::draw_box(&provider.model, &second_line, current_box_style, true);
+    let mut hud_meta = active_profile.hud_summary(cfg.is_agent);
+    let mut buffered_char = ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, true);
 
     let mut system_prompt =
         rs_agent::profile::build_system_prompt(&active_profile, target_dir, cfg.is_agent, &active_skills);
@@ -769,7 +777,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         } else {
                             println!("  {}", outcome.summary);
                         }
-                        ui::draw_box(&provider.model, &second_line, current_box_style, false);
+                        ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, false);
                         let _ = io::stdout().flush();
                     } else {
                         println!("  \x1b[2mModel unchanged.\x1b[0m\n");
@@ -818,6 +826,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     client.set_reasoning(loaded.reasoning_budget.clone());
                     let new_mcp = loaded.mcp_servers.clone();
                     active_profile = loaded;
+                    hud_meta = active_profile.hud_summary(cfg.is_agent);
 
                     system_prompt = rs_agent::profile::build_system_prompt(
                         &active_profile,
@@ -825,14 +834,17 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         cfg.is_agent,
                         &active_skills,
                     );
-                    let _ = cfg.save(target_dir);
+                    let dir_name = target_dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                    if Profile::find_workspace_candidates(dir_name, &Profile::list_available()).len() != 1 {
+                        let _ = cfg.save(target_dir);
+                    }
                     router = matcher::ContextRouter::load();
 
                     lock_guard.take();
                     let (new_num, new_guard) = resolve_instance_number(&cfg.profile_name);
                     instance_num = new_num;
                     lock_guard = Some(new_guard);
-                    let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
+                    second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
 
                     history.clear();
                     last_stat_line = None;
@@ -850,7 +862,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         "  \x1b[1;32m✓\x1b[0m \x1b[2mProfile set to:\x1b[0m \x1b[1;36m{}\x1b[0m",
                         cfg.profile_name
                     );
-                    ui::draw_box(&provider.model, &second_line, current_box_style, false);
+                    ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, false);
                     let _ = io::stdout().flush();
                 } else {
                     println!("  \x1b[1;31m✗\x1b[0m \x1b[2mProfile '{}' not found in profiles/\x1b[0m\n", new_prof);
@@ -964,7 +976,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             state::set_box_style(current_box_style);
 
             let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
-            ui::draw_box(&provider.model, &second_line, current_box_style, true);
+            ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, true);
             let _ = io::stdout().flush();
             continue;
         }
@@ -983,7 +995,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             println!();
             println!("\x1b[1;32m✓\x1b[0m \x1b[2mSession reset\x1b[0m");
             let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
-            ui::draw_box(&provider.model, &second_line, current_box_style, false);
+            ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, false);
             let _ = io::stdout().flush();
             continue;
         }
@@ -993,7 +1005,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             println!();
             println!("\x1b[1;32m✓\x1b[0m \x1b[2mSession reset\x1b[0m");
             let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
-            ui::draw_box(&provider.model, &second_line, current_box_style, false);
+            ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, false);
             let _ = io::stdout().flush();
             continue;
         }
@@ -1055,7 +1067,16 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             let stream_res = client.stream_chat(&history, active_tools.clone(), &mut renderer, &mut spinner).await;
             spinner.stop();
             drop(cursor_guard);
-            let (reply, reasoning, tool_calls, stats) = stream_res?;
+            let (reply, reasoning, tool_calls, stats) = match stream_res {
+                Ok(v) => v,
+                Err(e) => {
+                    if round == 0 {
+                        history.pop();
+                    }
+                    println!("  \x1b[1;31m✗\x1b[0m {}\n", e);
+                    break;
+                }
+            };
 
             if tool_calls.is_none() || tool_calls.as_ref().map(|v| v.is_empty()).unwrap_or(true) {
                 let stat_str = renderer.finish_with_print(&stats, history_char_count(&history), current_box_style != 7);

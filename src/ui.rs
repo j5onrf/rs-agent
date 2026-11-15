@@ -229,7 +229,7 @@ fn render_dot_slab_inner_wipe(model: &str, profile: &str, col: usize) -> (String
 
 pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) -> (Vec<String>, usize) {
     let git_info = if style >= 4 { resolve_git_status() } else { String::new() };
-    render_frame_inner(model, profile, &git_info, style, progress)
+    render_frame_inner(model, profile, None, &git_info, style, progress)
 }
 
 fn clamp_chars(s: &str, max_chars: usize) -> String {
@@ -256,7 +256,7 @@ fn short_cwd() -> String {
     s
 }
 
-fn render_claude_box(model: &str, profile: &str, git_info: &str, progress: f64) -> (Vec<String>, usize) {
+fn render_agent_box(model: &str, profile: &str, meta: Option<&str>, git_info: &str, progress: f64) -> (Vec<String>, usize) {
     let term_w = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(92);
     let w = term_w.saturating_sub(2).clamp(48, 92);
     let ver = env!("CARGO_PKG_VERSION");
@@ -301,7 +301,7 @@ fn render_claude_box(model: &str, profile: &str, git_info: &str, progress: f64) 
             format!("ctx {} · max {} steps · ↑/↓ history", tok_s, crate::config::get_max_rounds())
         };
 
-        let r0 = clamp_chars("Tips for getting started", right_w.saturating_sub(1));
+        let r0 = clamp_chars(meta.unwrap_or("Tips for getting started"), right_w.saturating_sub(2));
         let r1 = clamp_chars("Type / for commands · Tab completes", right_w.saturating_sub(1));
         let r2 = "─".repeat(right_w.saturating_sub(2));
         let r3 = clamp_chars(&status_info, right_w.saturating_sub(1));
@@ -361,7 +361,7 @@ fn render_claude_box(model: &str, profile: &str, git_info: &str, progress: f64) 
     }
 }
 
-fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, progress: f64) -> (Vec<String>, usize) {
+fn render_frame_inner(model: &str, profile: &str, meta: Option<&str>, git_info: &str, style: usize, progress: f64) -> (Vec<String>, usize) {
     let box_w: usize = 46;
 
     match style {
@@ -779,16 +779,20 @@ fn render_frame_inner(model: &str, profile: &str, git_info: &str, style: usize, 
             (lines, line_count)
         }
 
-        7 => render_claude_box(model, profile, git_info, progress),
-        _ => render_frame_inner(model, profile, git_info, 1, progress),
+        7 => render_agent_box(model, profile, meta, git_info, progress),
+        _ => render_frame_inner(model, profile, meta, git_info, 1, progress),
     }
 }
 
 pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Option<char> {
+    draw_box_with_meta(model, profile, None, style, animate)
+}
+
+pub fn draw_box_with_meta(model: &str, profile: &str, meta: Option<&str>, style: usize, animate: bool) -> Option<char> {
     // Early exit without terminal switching if unbuffered or raw mode fails
     if !animate || enable_raw_mode().is_err() {
         let git_info = if style >= 4 { resolve_git_status() } else { String::new() };
-        let (lines, _) = render_frame_inner(model, profile, &git_info, style, 1.0);
+        let (lines, _) = render_frame_inner(model, profile, meta, &git_info, style, 1.0);
         let stdout = io::stdout();
         let mut handle = stdout.lock();
         for line in lines {
@@ -838,7 +842,7 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
             break;
         }
 
-        let (lines, line_count) = render_frame_inner(model, profile, &git_info, style, progress);
+        let (lines, line_count) = render_frame_inner(model, profile, meta, &git_info, style, progress);
 
         let stdout = io::stdout();
         let mut handle = stdout.lock();
@@ -872,7 +876,7 @@ pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Opti
     }
 
     // Final resting frame
-    let (lines, line_count) = render_frame_inner(model, profile, &git_info, style, 1.0);
+    let (lines, line_count) = render_frame_inner(model, profile, meta, &git_info, style, 1.0);
     let stdout = io::stdout();
     let mut handle = stdout.lock();
     if !first_frame {
