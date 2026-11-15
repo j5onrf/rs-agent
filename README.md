@@ -11,7 +11,7 @@
   </p>
 
   <p>
-    <strong>Sub-millisecond native Rust AI harness for local <code>llama-server</code> GGUF backends and cloud reasoning models.</strong><br />
+    <strong>Sub-millisecond native Rust AI harness for local <code>llama-server</code> GGUF backends and frontier cloud endpoints.</strong><br />
     Parallel 6-tool kernel &nbsp;•&nbsp; 3-stage resilient edits &nbsp;•&nbsp; Zero-trust path sandbox &nbsp;•&nbsp; Native T3 Code ACP bridge
   </p>
 
@@ -22,7 +22,7 @@
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Model Tiers & Endpoints
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Tested Tiers & Endpoints
 
 <table>
   <tr>
