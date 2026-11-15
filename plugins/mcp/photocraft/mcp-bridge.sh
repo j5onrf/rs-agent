@@ -10,7 +10,7 @@ port_open() {
 }
 
 if ! port_open && [[ "${PHOTOCRAFT_AUTOSTART:-0}" == "1" ]]; then
-    photocraft \
+    nohup setsid photocraft \
         --control "$PORT" \
         --control-token-file "$TOKEN_FILE" \
         --automation-read-root "$HOME" \

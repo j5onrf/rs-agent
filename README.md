@@ -3,7 +3,7 @@
   <h1>Rs-Agent</h1>
 
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.6.9.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.1.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -121,8 +121,8 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
-╭─── rs-agent v0.6.9 ──────────────────────────────────────────────────────────────────────╮
-│   ╭────╮  Ling-3.0-tiny                    │ Tips for getting started                    │
+╭─── rs-agent v0.7.1 ──────────────────────────────────────────────────────────────────────╮
+│   ╭────╮  Ling-3.0-tiny                    │ 6-tool · t350 · adp                         │
 │   │ Li │  lingtiny                         │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · 11 modified          │ ─────────────────────────────────────────── │
 │   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · max 10 steps · ↑/↓ history       │
@@ -194,6 +194,7 @@ memory: true            # Inject project-isolated rules from .rs/memory.md
 purebash: true          # Single run_command tool (~95t). Omit for Core 4 / Native 6
 delegate: true          # Attach isolated delegate_task sub-agent (+~100t)
 mcp: photocraft         # Attach stdio MCP server(s) (e.g. photocraft, blender, mailcraft)
+mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 ---
 ```
 

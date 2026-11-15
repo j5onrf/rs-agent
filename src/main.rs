@@ -634,7 +634,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     let mut history = vec![ChatMessage::system(&system_prompt)];
     let mcp_servers = active_profile.mcp_servers.clone();
     let mut active_tools = if cfg.is_agent {
-        Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &mcp_servers).await)
+        Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &mcp_servers, &active_profile.mcp_tools).await)
     } else {
         None
     };
@@ -850,18 +850,13 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     last_stat_line = None;
                     history.push(ChatMessage::system(&system_prompt));
                     active_tools = if cfg.is_agent {
-                        Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &new_mcp).await)
+                        Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &new_mcp, &active_profile.mcp_tools).await)
                     } else {
                         None
                     };
 
                     print!("\x1b]0;rs-agent: {}\x07", second_line);
                     print!("\x1b[H\x1b[2J");
-                    println!();
-                    println!(
-                        "  \x1b[1;32m✓\x1b[0m \x1b[2mProfile set to:\x1b[0m \x1b[1;36m{}\x1b[0m",
-                        cfg.profile_name
-                    );
                     ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, false);
                     let _ = io::stdout().flush();
                 } else {

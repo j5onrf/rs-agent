@@ -291,7 +291,7 @@ async fn assemble_session_setup(workspace: &Path) -> Result<SessionSetup> {
 
     let sys_prompt = profile::build_system_prompt(&prof, workspace, is_agent, &active_skills);
     let active_tools = if is_agent {
-        Some(tools::get_tools_schema_with_mcp(&prof.tier, prof.delegate, &prof.mcp_servers).await)
+        Some(tools::get_tools_schema_with_mcp(&prof.tier, prof.delegate, &prof.mcp_servers, &prof.mcp_tools).await)
     } else {
         None
     };

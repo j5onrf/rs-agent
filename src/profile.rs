@@ -87,6 +87,7 @@ pub struct Profile {
     pub delegate: bool,
     pub system_prompt: String,
     pub mcp_servers: Vec<String>,
+    pub mcp_tools: Vec<String>,
 }
 
 struct RawModeGuard;
@@ -124,6 +125,7 @@ impl Profile {
         let mut memory = false;
         let mut delegate = false;
         let mut mcp_servers = Vec::new();
+        let mut mcp_tools = Vec::new();
         let mut body = String::new();
         let mut in_frontmatter = false;
         let mut frontmatter_closed = false;
@@ -181,6 +183,15 @@ impl Profile {
                                 }
                             }
                         }
+                        "mcp_tools" => {
+                            let clean = val.trim_matches('[').trim_matches(']').trim();
+                            for item in clean.split(',') {
+                                let s = item.trim().trim_matches('"').trim_matches('\'').trim();
+                                if !s.is_empty() {
+                                    mcp_tools.push(s.to_string());
+                                }
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -198,6 +209,7 @@ impl Profile {
             delegate,
             system_prompt: body.trim().to_string(),
             mcp_servers,
+            mcp_tools,
         }
     }
 
@@ -232,7 +244,11 @@ impl Profile {
             parts.push("del".to_string());
         }
         if !self.mcp_servers.is_empty() {
-            parts.push(format!("mcp:{}", self.mcp_servers.join(",")));
+            if self.mcp_tools.is_empty() {
+                parts.push(format!("mcp:{}", self.mcp_servers.join(",")));
+            } else {
+                parts.push(format!("mcp:{}({})", self.mcp_servers.join(","), self.mcp_tools.len()));
+            }
         }
         if !is_agent && parts.len() == 1 {
             parts.push("pure chat".to_string());
@@ -815,5 +831,13 @@ mod tests {
             Profile::find_workspace_candidates("artcraft", &avail),
             vec!["artcraft/photocraft-c", "artcraft/photocraft-l"]
         );
+    }
+
+    #[test]
+    fn test_profile_parses_mcp_tools_allowlist() {
+        let p = Profile::parse("---\nmcp: photocraft\nmcp_tools: doc_new, doc_save, ui_set\n---\nhi");
+        assert_eq!(p.mcp_servers, vec!["photocraft"]);
+        assert_eq!(p.mcp_tools, vec!["doc_new", "doc_save", "ui_set"]);
+        assert_eq!(p.hud_summary(true), "6-tool · mcp:photocraft(3)");
     }
 }

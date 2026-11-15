@@ -44,14 +44,55 @@ pub fn get_tools_schema(tier: &ToolTier, delegate: bool) -> Value {
     get_base_tools_schema(tier, delegate)
 }
 
-pub async fn get_tools_schema_with_mcp(tier: &ToolTier, delegate: bool, mcp_servers: &[String]) -> Value {
+fn matches_mcp_allowlist(full_name: &str, mcp_servers: &[String], allowlist: &[String]) -> bool {
+    if allowlist.is_empty() || allowlist.iter().any(|w| w == full_name) {
+        return true;
+    }
+    mcp_servers.iter().any(|srv| {
+        full_name
+            .strip_prefix(&format!("mcp_{}_", srv))
+            .is_some_and(|short| allowlist.iter().any(|w| w == short))
+    })
+}
+
+fn compact_mcp_schema(schema: &mut Value) {
+    if let Some(fn_obj) = schema.get_mut("function").and_then(|v| v.as_object_mut()) {
+        if let Some(desc) = fn_obj.get("description").and_then(|v| v.as_str()) {
+            let line = desc.lines().next().unwrap_or(desc).trim();
+            let sent = line.split(". ").next().unwrap_or(line);
+            let clamped: String = sent.chars().take(120).collect();
+            fn_obj.insert("description".to_string(), Value::String(clamped));
+        }
+        if let Some(params) = fn_obj.get_mut("parameters").and_then(|v| v.as_object_mut()) {
+            params.remove("$schema");
+            params.remove("additionalProperties");
+            params.remove("title");
+        }
+    }
+}
+
+pub async fn get_tools_schema_with_mcp(
+    tier: &ToolTier,
+    delegate: bool,
+    mcp_servers: &[String],
+    mcp_tools: &[String],
+) -> Value {
     let mut base_schema = get_base_tools_schema(tier, delegate);
     if !mcp_servers.is_empty() {
+        let should_compact = !mcp_tools.is_empty() || crate::config::get_max_tokens() <= 16_384;
         if let Some(arr) = base_schema.as_array_mut() {
             for server in mcp_servers {
                 match crate::mcp::get_server_tools_schema(server).await {
                     Ok(schemas) => {
-                        arr.extend(schemas);
+                        for mut s in schemas {
+                            let name = s["function"]["name"].as_str().unwrap_or("");
+                            if matches_mcp_allowlist(name, mcp_servers, mcp_tools) {
+                                if should_compact {
+                                    compact_mcp_schema(&mut s);
+                                }
+                                arr.push(s);
+                            }
+                        }
                     }
                     Err(e) => {
                         eprintln!("  \x1b[1;33m▲ [mcp warning]\x1b[0m Could not connect to '{}': {}", server, e);
@@ -857,5 +898,25 @@ mod tests {
         let out = resilient_replace(orig, old, new).unwrap();
         assert!(out.contains("    let result = val * 3;"));
         assert!(out.ends_with("\n"));
+    }
+
+    #[test]
+    fn test_mcp_allowlist_and_compaction() {
+        let srvs = vec!["photocraft".to_string()];
+        let allow = vec!["doc_new".to_string(), "ui_set".to_string()];
+        assert!(matches_mcp_allowlist("mcp_photocraft_doc_new", &srvs, &allow));
+        assert!(!matches_mcp_allowlist("mcp_photocraft_jobs_cancel", &srvs, &allow));
+
+        let mut schema = json!({
+            "type": "function",
+            "function": {
+                "name": "mcp_photocraft_doc_new",
+                "description": "[photocraft] Create a new document. Extra verbose paragraph here.",
+                "parameters": { "$schema": "http://json-schema.org", "type": "object", "additionalProperties": false }
+            }
+        });
+        compact_mcp_schema(&mut schema);
+        assert_eq!(schema["function"]["description"], "[photocraft] Create a new document");
+        assert!(schema["function"]["parameters"].get("$schema").is_none());
     }
 }
