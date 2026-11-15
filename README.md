@@ -26,15 +26,15 @@
 
 <table>
   <tr>
-    <td width="400" valign="top">
-      <strong>👤 Sub-27B (SLM)</strong><br />
+    <td width="50%" valign="top">
+      <strong><img alt="" src="assets/prompt.svg" width="16" height="16" /> Sub-27B (SLM)</strong><br />
       <em>Tool calling, fast refactoring, single-turn edits</em><br /><br />
       <code>LFM3-1.7B</code> &nbsp;•&nbsp; <code>Ling-3.0-tiny*</code><br />
       <code>MiniCPM5-2B</code> &nbsp;•&nbsp; <code>Qwen3.5-2B+</code><br />
       <code>MiniCPM-V-4.7-1B</code> &nbsp;•&nbsp; <code>LFM2.5-24B-A2B</code>
     </td>
-    <td width="400" valign="top">
-      <strong>👤 27B+ (LLM)</strong><br />
+    <td width="50%" valign="top">
+      <strong><img alt="" src="assets/prompt.svg" width="16" height="16" /> 27B+ (LLM)</strong><br />
       <em>Deep reasoning, complex logic, multi-turn loops</em><br /><br />
       <code>Groot-19B-A3B</code> &nbsp;•&nbsp; <code>Clover-35B-A3B</code><br />
       <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br />
@@ -46,7 +46,7 @@
   </tr>
 </table>
 
-*Primary edge baselines • Auto-discovers local models on `http://127.0.0.1:8080`*
+*\* Primary edge baselines • Auto-discovers local models on `http://127.0.0.1:8080`*
 
 * **Cloud Endpoints:** [Google Gemini](https://ai.google.dev) (`gemini-4-hydrogen`) • [OpenRouter](https://openrouter.ai) • [TokenHarbor](https://tokenharbor.ai)
 * **Free Endpoints:** [`gemini-3.5-flash-lite`](https://ai.google.dev) • [`openrouter/free`](https://openrouter.ai/models?variant=free) • [`deepseek-v4.1-flash:free`](https://tokenharbor.ai)
@@ -58,8 +58,8 @@
 | Invocation | Mode | Description |
 | :--- | :--- | :--- |
 | `[shortcut]` | **Shell Teleport** | Sub-`0.2ms` router via `rs-context.md` (`lfm`, `ling`, etc.) |
-| 👤 `ai` | **Interactive Chat** | Pure conversational REPL (`~180t` profile, thinking gutters, `/pad`) |
-| 👤 `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security sandbox |
+| <img alt="" src="assets/prompt.svg" width="14" height="14" /> `ai` | **Interactive Chat** | Pure conversational REPL (`~180t` profile, thinking gutters, `/pad`) |
+| <img alt="" src="assets/prompt.svg" width="14" height="14" /> `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security sandbox |
 | `/task [goal]` | **Task Loop** | Multi-step autonomous loop; auto-loads `TASK.md` if goal is omitted |
 | `/t3` / `/t3 web` | **T3 Code ADE** | Compositor handover to official T3 Code GUI with live diffs & permission gates |
 | `ai --bridge` | **Headless ACP** | Embedded stdio JSON-RPC 2.0 server for ADEs and desktop surfaces |
@@ -222,7 +222,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 | Binary | Tool | Purpose |
 | :--- | :--- | :--- |
-| 👤 `ms` | **Model Select** | Interactive TUI for switching active providers, `AI_MAX_TOKENS` (`4k`–`1M`), and loop limits |
+| <img alt="" src="assets/prompt.svg" width="14" height="14" /> `ms` | **Model Select** | Interactive TUI for switching active providers, `AI_MAX_TOKENS` (`4k`–`1M`), and loop limits |
 | `newp` | **New Project** | Scaffolds workspace, `.rs/config.json`, profile, and `rs-context.md` aliases |
 | `idx` | **Index Map** | Generates token-dense Rust AST codebase maps (`index-map.txt`) |
 | `ta` | **Test Agent** | 10-pass live verification suite checking tools, security boundary, UI, and `--bridge` ACP |
@@ -232,7 +232,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 ## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Setup & Configuration
 
-### 👤 Quick Start (Linux x86_64)
+### <img alt="" src="assets/prompt.svg" width="18" height="18" /> Quick Start (Linux x86_64)
 
 ```bash
 git clone https://github.com/j5onrf/rs-agent.git ~/.config/rs-agent
@@ -301,4 +301,3 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <em>Built for speed, clarity, and terminal minimalism. Licensed under the <strong><a href="LICENSE">MIT License</a></strong>.</em>
 </div>
-
