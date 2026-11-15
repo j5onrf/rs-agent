@@ -76,11 +76,10 @@
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> CLI Box Styles (`/b`, `/box [1-7]`)
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> CLI Box Styles (`/box [1-7]`)
 
-* **`/b 1–6`:** Compact headers with single-line `❯ ` prompt, `│ ` thinking gutter, inline stats, and dense layout (`pad: false`).
-* **`/b 7` *(default)*:** 2-column HUD showing active profile settings (`6-tool · t350 · adp`, `mcp:photocraft(7)`), live `────` input bar, `/` command menu, `∴` expanded thinking, and spaced layout (`pad: true`).
-* **`/tk` / `/think`:** Cycle reasoning display between expanded `∴` italic (Box 7 default), `│ ` gutter (Boxes 1–6 default), or collapsed `∴ Thought for Xs` (persisted via `"showThinkingSummaries"` in `state.json`).
+* **`/box 1–6`:** Compact headers with single-line `❯ ` prompt, `│ ` thinking gutter, inline stats, and dense layout (`pad: false`).
+* **`/box 7` *(default)*:** 2-column HUD showing active profile settings, live `────` input bar, `/` command menu, `∴` expanded thinking, and spaced layout (`pad: true`).
 
 ```console
 ~ ❯ ai
