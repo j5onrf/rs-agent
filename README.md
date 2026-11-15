@@ -1,7 +1,7 @@
 <h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
 
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.1.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.2.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -83,7 +83,7 @@
 
 ```console
 ~ ❯ ai
-╭─── rs-agent v0.7.1 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.7.2 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ 6-tool · t350 · adp                         │
 │   │ Li │  lingtiny                         │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · 11 modified          │ ─────────────────────────────────────────── │
@@ -124,7 +124,7 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
-╭─── rs-agent v0.7.1 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.7.2 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ purebash · t256 · adp · mcp:photocraft(7)   │
 │   │ Li │  artcraft/photocraft-l            │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · clean                │ ─────────────────────────────────────────── │
@@ -264,33 +264,32 @@ source ~/.config/rs-agent/rs-hook.sh
 Priority goes to the first uncommented active key; when all cloud keys are commented out, `rs-agent` falls back to local `llama-server` on `:8080`.
 
 ```env
+# Rs-Agent Provider Cascade (.env) — Priority: First active key | Switch with: ms
+# Fallback: Local llama-server (:8080) when all cloud keys are commented with '#'.
+
 # ── 1. Google Gemini ──────────────────────────────────────────────────────────
 #GEMINI_API_KEY="AQ.your-key-here"
-GEMINI_MODEL="gemini-4-hydrogen"       # or gemini-3.5-flash-lite (free tier)
+GEMINI_MODEL="gemini-3.5-flash-lite"
 
 # ── 2. OpenRouter ─────────────────────────────────────────────────────────────
 #OPENROUTER_API_KEY="sk-or-v1-your-key-here"
 OPENROUTER_MODEL="openrouter/free"
 
-# ── 3. TokenHarbor ────────────────────────────────────────────────────────────
-#TOKENHARBOR_API_KEY="thk_live_your-key-here"
-TOKENHARBOR_MODEL="deepseek-v4.1-flash:free"
+# ── 3. Custom Direct (CUSTOM1..CUSTOM9) ───────────────────────────────────────
+#CUSTOM1_API_KEY="thk_live_your-key-here"
+CUSTOM1_NAME="TokenHarbor"
+CUSTOM1_URL="https://tokenharbor.ai/v1/chat/completions"
+CUSTOM1_MODEL="deepseek-v4.1-flash:free"
 
-# ── More Direct Providers ─────────────────────────────────────────────────────
-# OPENAI_API_KEY="sk-your-key-here"
-# ANTHROPIC_API_KEY="sk-ant-your-key-here"
+# AMD Token Lab (30-day preview — https://notebooks.amd.com)
+# CUSTOM2_NAME="AMD Token Lab"
+# CUSTOM2_API_KEY="tl-your-key-here"
+# CUSTOM2_URL="https://api.tokenlab.amd.com/v1/chat/completions"
+# CUSTOM2_MODEL="DeepSeek-V4.1-Flash"
 
-# ── 4. Custom Direct Slots (CUSTOM1..CUSTOM9) ─────────────────────────────────
-# CUSTOM1_NAME="Custom Provider"
-# CUSTOM1_API_KEY="sk-your-key-here"
-CUSTOM1_URL="https://api.deepseek.com/chat/completions"
-CUSTOM1_MODEL="deepseek-flash"
-
-# ── MCP Server Keys (Optional) ────────────────────────────────────────────────
-# FIRECRAWL_API_KEY="fc-your-actual-api-key"
-
-# ── Runtime Governors ─────────────────────────────────────────────────────────
-AI_MAX_TOKENS="8192"                   # Set 65536+ for cloud models
+# ── 4. MCP & Runtime Governors ────────────────────────────────────────────────
+#FIRECRAWL_API_KEY="fc-your-actual-api-key"
+AI_MAX_TOKENS="8192"
 AI_MAX_AGENT_ROUNDS="10"
 ```
 

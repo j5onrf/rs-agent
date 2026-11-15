@@ -96,7 +96,6 @@ fn load_provider_slots(lines: &[String]) -> Vec<ProviderSlot> {
     const DIRECT_CANDIDATES: &[(&str, &str, &str)] = &[
         ("GEMINI", "Google Gemini", "gemini-3.5-flash-lite"),
         ("OPENROUTER", "OpenRouter", "openrouter/free"),
-        ("TOKENHARBOR", "TokenHarbor", "deepseek-v4.1-flash:free"),
         ("OPENAI", "OpenAI", "gpt-4o"),
         ("ANTHROPIC", "Anthropic Claude", "claude-3-5-sonnet"),
     ];

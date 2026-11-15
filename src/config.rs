@@ -154,6 +154,15 @@ async fn probe_local_model() -> String {
     "local-model".to_string()
 }
 
+fn normalize_chat_url(url: &str) -> String {
+    let trimmed = url.trim().trim_end_matches('/');
+    if trimmed.ends_with("/v1") || trimmed.ends_with("/openai") || trimmed.ends_with("/v1beta") {
+        format!("{}/chat/completions", trimmed)
+    } else {
+        url.trim().to_string()
+    }
+}
+
 impl ProviderConfig {
     pub async fn load() -> Self {
         let env_path = get_env_path();
@@ -173,7 +182,6 @@ impl ProviderConfig {
                 "gemini-3.5-flash-lite",
             ),
             ("OPENROUTER", "https://openrouter.ai/api/v1/chat/completions", "openrouter/free"),
-            ("TOKENHARBOR", "https://tokenharbor.ai/v1/chat/completions", "deepseek-v4.1-flash:free"),
             ("OPENAI", "https://api.openai.com/v1/chat/completions", "gpt-4o"),
             ("ANTHROPIC", "https://api.anthropic.com/v1/chat/completions", "claude-3-5-sonnet-20241022"),
             ("DEEPSEEK", "https://api.deepseek.com/chat/completions", "deepseek-chat"),
@@ -186,8 +194,9 @@ impl ProviderConfig {
                 if is_valid_key(&api_key) {
                     let model =
                         get_env_val(&env_content, &format!("{}_MODEL", pfx)).unwrap_or_else(|| def_model.to_string());
-                    let base_url =
-                        get_env_val(&env_content, &format!("{}_URL", pfx)).unwrap_or_else(|| def_url.to_string());
+                    let base_url = normalize_chat_url(
+                        &get_env_val(&env_content, &format!("{}_URL", pfx)).unwrap_or_else(|| def_url.to_string()),
+                    );
 
                     return ProviderConfig { base_url, api_key: api_key.trim().to_string(), model, max_tokens };
                 }
@@ -206,9 +215,11 @@ impl ProviderConfig {
                 if is_valid_key(&api_key) {
                     let url_var = format!("CUSTOM{}_URL", i);
                     let legacy_url = if i == 1 { Some("CUSTOM_URL") } else { None };
-                    let base_url = get_env_val(&env_content, &url_var)
-                        .or_else(|| legacy_url.and_then(|k| get_env_val(&env_content, k)))
-                        .unwrap_or_else(|| "https://api.deepseek.com/chat/completions".to_string());
+                    let base_url = normalize_chat_url(
+                        &get_env_val(&env_content, &url_var)
+                            .or_else(|| legacy_url.and_then(|k| get_env_val(&env_content, k)))
+                            .unwrap_or_else(|| "https://api.deepseek.com/chat/completions".to_string()),
+                    );
 
                     let model_var = format!("CUSTOM{}_MODEL", i);
                     let legacy_model = if i == 1 { Some("CUSTOM_MODEL") } else { None };
@@ -260,5 +271,17 @@ mod tests {
         let env = "API_KEY=\"sk#123\" # trailing note\nMODEL='gemini-4-hydrogen' # free\n";
         assert_eq!(get_env_val(env, "API_KEY").as_deref(), Some("sk#123"));
         assert_eq!(get_env_val(env, "MODEL").as_deref(), Some("gemini-4-hydrogen"));
+    }
+
+    #[test]
+    fn test_normalize_chat_url_appends_chat_completions_for_base_paths() {
+        assert_eq!(
+            normalize_chat_url("https://api.tokenlab.amd.com/v1/"),
+            "https://api.tokenlab.amd.com/v1/chat/completions"
+        );
+        assert_eq!(
+            normalize_chat_url("https://api.tokenlab.amd.com/v1/chat/completions"),
+            "https://api.tokenlab.amd.com/v1/chat/completions"
+        );
     }
 }
