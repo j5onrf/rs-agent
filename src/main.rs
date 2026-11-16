@@ -772,7 +772,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         provider = ProviderConfig::load().await;
                         client = LlmClient::new(provider.clone());
                         client.set_reasoning(active_profile.reasoning_budget.clone());
-                        rs_agent::config::set_profile_max_tokens(None);
+                        rs_agent::config::set_profile_max_tokens(active_profile.ctx);
                         max_rounds = rs_agent::config::get_max_rounds();
                         last_stat_line = None;
 
@@ -780,9 +780,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         print!("\x1b[H\x1b[2J");
                         println!();
                         if history.len() > 1 {
-                            println!("  {} \x1b[2m(history kept · /r to reset)\x1b[0m", outcome.summary);
+                            println!("\x1b[1;32m✓\x1b[0m \x1b[2mModel updated · /r to reset\x1b[0m");
                         } else {
-                            println!("  {}", outcome.summary);
+                            println!("\x1b[1;32m✓\x1b[0m \x1b[2mModel updated\x1b[0m");
                         }
                         ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, false);
                         let _ = io::stdout().flush();
