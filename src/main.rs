@@ -325,7 +325,6 @@ async fn execute_tool_batch(
     target_dir: &Path,
     boundary: &SecurityBoundary,
     use_adapters: bool,
-    pad: bool,
     history: &mut Vec<ChatMessage>,
     spinner: &mut InlineSpinner,
 ) -> usize {
@@ -372,12 +371,12 @@ async fn execute_tool_batch(
                     Ok(out) => {
                         let summary = summarize_tool_output(&c_name, &out, elapsed);
                         println!("    \x1b[90m⎿\x1b[0m  \x1b[2m{}\x1b[0m", summary);
-                        if pad { println!(); }
+                        println!();
                         history.push(ChatMessage::tool_response(call_id, out));
                     }
                     Err(err) => {
                         println!("    \x1b[90m⎿\x1b[0m  \x1b[1;31m✗ {}\x1b[0m \x1b[2m({:.1}s)\x1b[0m", err, elapsed);
-                        if pad { println!(); }
+                        println!();
                         history.push(ChatMessage::tool_response(call_id, format!("[tool error] {}", err)));
                     }
                 }
@@ -420,23 +419,21 @@ async fn execute_tool_batch(
                                 brief, adds, rems, elapsed
                             );
                             print_inline_diff(old_txt, new_txt);
-                            if pad {
-                                println!();
-                            }
+                            println!();
                         } else {
                             println!("    \x1b[90m⎿\x1b[0m  \x1b[2mUpdated {} ({:.1}s)\x1b[0m", brief, elapsed);
-                            if pad { println!(); }
+                            println!();
                         }
                     } else {
                         let summary = summarize_tool_output(fn_name, &out, elapsed);
                         println!("    \x1b[90m⎿\x1b[0m  \x1b[2m{}\x1b[0m", summary);
-                        if pad { println!(); }
+                        println!();
                     }
                     history.push(ChatMessage::tool_response(call_id, out));
                 }
                 Err(err) => {
                     println!("    \x1b[90m⎿\x1b[0m  \x1b[1;31m✗ {}\x1b[0m \x1b[2m({:.1}s)\x1b[0m", err, elapsed);
-                        if pad { println!(); }
+                    println!();
                     history.push(ChatMessage::tool_response(call_id, format!("[tool error] {}", err)));
                 }
             }
@@ -540,7 +537,7 @@ async fn execute_task_loop(
                 history.push(assistant_msg);
 
                 total_tools_run +=
-                    execute_tool_batch(&calls, target_dir, boundary, cfg.adapters, renderer.pad, history, spinner).await;
+                    execute_tool_batch(&calls, target_dir, boundary, cfg.adapters, history, spinner).await;
             } else {
                 history.push(ChatMessage::assistant_with_reasoning(reply.clone(), reasoning.clone()));
             }
@@ -1114,11 +1111,11 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 if !renderer.at_line_start {
                     println!();
                 }
-                if pad {
-                    println!();
-                }
+                println!();
+            } else if !pad && (round == 0 || renderer.thinking_started) {
+                println!();
             }
-            execute_tool_batch(&calls, target_dir, &boundary, cfg.adapters, pad, &mut history, &mut spinner).await;
+            execute_tool_batch(&calls, target_dir, &boundary, cfg.adapters, &mut history, &mut spinner).await;
         }
     }
 

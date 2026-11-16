@@ -374,6 +374,15 @@ fn extract_stream_error(json: &Value) -> Option<String> {
     None
 }
 
+#[inline]
+fn extract_delta_reasoning(delta: &Value) -> Option<&str> {
+    delta
+        .get("reasoning_content")
+        .or_else(|| delta.get("thinking"))
+        .or_else(|| delta.get("reasoning"))
+        .and_then(|r| r.as_str())
+}
+
 impl LlmClient {
     pub fn set_reasoning(&self, setting: Option<ReasoningSetting>) {
         if let Ok(mut guard) = self.reasoning.lock() {
@@ -654,9 +663,7 @@ impl LlmClient {
                     }
 
                     if let Some(delta) = choice.get("delta") {
-                        if let Some(reasoning) =
-                            delta.get("reasoning_content").or_else(|| delta.get("thinking")).and_then(|r| r.as_str())
-                        {
+                        if let Some(reasoning) = extract_delta_reasoning(delta) {
                             if !reasoning.is_empty() {
                                 has_emitted = true;
                                 on_event(StreamEvent::Chunk(reasoning, true));
@@ -1076,5 +1083,14 @@ mod tests {
         assert_eq!(LlmClient::parse_retry_after_secs(&h), Some(8));
         assert!(LlmClient::is_transient_same_model_status(reqwest::StatusCode::TOO_MANY_REQUESTS));
         assert!(!LlmClient::is_transient_same_model_status(reqwest::StatusCode::NOT_FOUND));
+    }
+
+    #[test]
+    fn test_extract_delta_reasoning_handles_openrouter_and_local_fields() {
+        assert_eq!(extract_delta_reasoning(&serde_json::json!({"reasoning_content": "a"})), Some("a"));
+        assert_eq!(extract_delta_reasoning(&serde_json::json!({"thinking": "b"})), Some("b"));
+        assert_eq!(extract_delta_reasoning(&serde_json::json!({"reasoning": "c"})), Some("c"));
+        assert_eq!(extract_delta_reasoning(&serde_json::json!({"reasoning": {"encrypted": "x"}})), None);
+        assert_eq!(extract_delta_reasoning(&serde_json::json!({"reasoning": null})), None);
     }
 }
