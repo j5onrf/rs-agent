@@ -259,7 +259,7 @@ GEMINI_MODEL="gemini-3.5-flash-lite"
 
 # ── 2. OpenRouter ─────────────────────────────────────────────────────────────
 #OPENROUTER_API_KEY="sk-or-v1-your-key-here"
-OPENROUTER_MODEL="openrouter/free"
+OPENROUTER_MODEL="nvidia/nemotron-3.5-lightning:free, nvidia/nemotron-3-ultra-550b-a55b:free, openrouter/free"
 
 # ── 3. Custom Direct (CUSTOM1..CUSTOM9) ───────────────────────────────────────
 #CUSTOM1_API_KEY="thk_live_your-key-here"
