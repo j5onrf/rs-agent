@@ -291,7 +291,7 @@ CUSTOM1_MODEL="deepseek-v4.1-flash:free"
 # CUSTOM2_NAME="AMD Token Lab"
 # CUSTOM2_API_KEY="tl-your-key-here"
 # CUSTOM2_URL="https://api.tokenlab.amd.com/v1/chat/completions"
-# CUSTOM2_MODEL="DeepSeek-V4.1-Flash, DeepSeek-V4-Flash, Qwen3.8-27B"
+# CUSTOM2_MODEL="DeepSeek-V4.1-Flash, DeepSeek-V4-Flash, Qwen3.8-27B, Gemma-4-31B-IT, MiniCPM-V-4.7-35B-A3B"
 
 # ── 4. MCP & Runtime Governors ────────────────────────────────────────────────
 #FIRECRAWL_API_KEY="fc-your-actual-api-key"
