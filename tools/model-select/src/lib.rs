@@ -283,6 +283,17 @@ fn save_to_env(
     Ok(())
 }
 
+fn format_slot_model(raw: &str) -> String {
+    let mut parts = raw.split(',').map(str::trim).filter(|s| !s.is_empty());
+    let first = parts.next().unwrap_or(raw);
+    let extra = parts.count();
+    if extra > 0 {
+        format!("{} (+{})", first, extra)
+    } else {
+        first.to_string()
+    }
+}
+
 fn render_tui(
     slots: &[ProviderSlot],
     max_tokens: usize,
@@ -298,7 +309,7 @@ fn render_tui(
         let pointer = if cursor == idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
         let icon = get_icon_for_slot(&slot.name);
         let status = if slot.is_active {
-            format!("\x1b[1;32m{}\x1b[0m", slot.model)
+            format!("\x1b[1;32m{}\x1b[0m", format_slot_model(&slot.model))
         } else {
             "\x1b[90mDISABLED\x1b[0m".to_string()
         };

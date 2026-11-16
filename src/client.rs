@@ -15,11 +15,13 @@ use crate::spinner::InlineSpinner;
 use crate::stream::{StreamRenderer, UsageStats};
 
 const STREAM_IDLE_TIMEOUT_SECS: u64 = 120;
+const FALLBACK_HEADER_TIMEOUT_SECS: u64 = 15;
 const CONNECT_TIMEOUT_SECS: u64 = 15;
 
 pub enum StreamEvent<'a> {
     Chunk(&'a str, bool),
     ToolStart,
+    Fallback(&'a str),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -92,6 +94,7 @@ impl ChatMessage {
 
 pub struct LlmClient {
     reasoning: std::sync::Mutex<Option<ReasoningSetting>>,
+    last_model: std::sync::Mutex<String>,
     http: Client,
     config: ProviderConfig,
 }
@@ -382,7 +385,12 @@ impl LlmClient {
         self.reasoning.lock().ok().and_then(|g| g.clone())
     }
 
+    pub fn last_model(&self) -> String {
+        self.last_model.lock().map(|g| g.clone()).unwrap_or_else(|_| self.config.model.clone())
+    }
+
     pub fn new(config: ProviderConfig) -> Self {
+        let initial_model = config.model.clone();
         let http = Client::builder()
             .connect_timeout(Duration::from_secs(CONNECT_TIMEOUT_SECS))
             .tcp_keepalive(Duration::from_secs(30))
@@ -393,6 +401,7 @@ impl LlmClient {
 
         Self {
             reasoning: std::sync::Mutex::new(None),
+            last_model: std::sync::Mutex::new(initial_model),
             http,
             config,
         }
@@ -400,11 +409,12 @@ impl LlmClient {
 
     #[cfg(test)]
     fn build_request_body(&self, messages: &[ChatMessage], tools: Option<Value>) -> Value {
-        self.build_request_body_with_reasoning(messages, tools, None)
+        self.build_request_body_with_reasoning(&self.config.model, messages, tools, None)
     }
 
     fn build_request_body_with_reasoning(
         &self,
+        model: &str,
         messages: &[ChatMessage],
         tools: Option<Value>,
         reasoning_override: Option<Option<ReasoningSetting>>,
@@ -412,7 +422,7 @@ impl LlmClient {
         let active_reasoning = reasoning_override.unwrap_or_else(|| self.current_reasoning());
         let is_local = is_local_endpoint(&self.config.base_url);
         let is_google =
-            self.config.base_url.contains("googleapis.com") || self.config.model.to_lowercase().contains("gemini");
+            self.config.base_url.contains("googleapis.com") || model.to_lowercase().contains("gemini");
 
         let mut sanitized_messages = serde_json::to_value(messages).unwrap_or_else(|_| serde_json::json!([]));
 
@@ -454,7 +464,7 @@ impl LlmClient {
         }
 
         let mut body = serde_json::json!({
-            "model": self.config.model,
+            "model": model,
             "messages": sanitized_messages,
             "stream": true,
             "stream_options": { "include_usage": true }
@@ -479,7 +489,7 @@ impl LlmClient {
                 }
             }
         } else if let Some(setting) = active_reasoning {
-            let effort = setting.to_cloud_tier(is_google, &self.config.model);
+            let effort = setting.to_cloud_tier(is_google, model);
             body["reasoning_effort"] = serde_json::json!(effort);
         }
 
@@ -501,35 +511,44 @@ impl LlmClient {
         req
     }
 
-    /// Single unified streaming engine for both interactive chat and ACP bridge.
-    async fn execute_stream<F>(
+    fn is_retryable_status(status: reqwest::StatusCode) -> bool {
+        matches!(status.as_u16(), 404 | 408 | 429 | 500 | 502 | 503 | 504)
+    }
+
+    async fn try_stream_once<F>(
         &self,
+        model: &str,
+        has_fallback: bool,
         messages: &[ChatMessage],
         tools: Option<Value>,
         cancel_flag: Option<Arc<AtomicBool>>,
         reasoning_override: Option<Option<ReasoningSetting>>,
-        mut on_event: F,
-    ) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>
+        on_event: &mut F,
+    ) -> std::result::Result<(String, Option<String>, Option<Vec<Value>>, UsageStats), (anyhow::Error, bool)>
     where
         F: FnMut(StreamEvent<'_>) + Send,
     {
-        let body = self.build_request_body_with_reasoning(messages, tools, reasoning_override);
+        let body = self.build_request_body_with_reasoning(model, messages, tools, reasoning_override);
         let req = self.prepare_request(&body);
+        let wait_secs = if has_fallback { FALLBACK_HEADER_TIMEOUT_SECS } else { STREAM_IDLE_TIMEOUT_SECS };
 
-        let send_res = tokio::time::timeout(Duration::from_secs(STREAM_IDLE_TIMEOUT_SECS), req.send()).await;
+        let send_res = tokio::time::timeout(Duration::from_secs(wait_secs), req.send()).await;
         let response = match send_res {
             Ok(Ok(res)) => res,
-            Ok(Err(e)) => return Err(e).context("Failed to connect to LLM endpoint"),
+            Ok(Err(e)) => return Err((anyhow::Error::new(e).context("Failed to connect to LLM endpoint"), true)),
             Err(_) => {
-                anyhow::bail!("Connection timeout waiting for response from '{}'", redact_url(&self.config.base_url));
+                return Err((
+                    anyhow::anyhow!("Connection timeout waiting for response from '{}'", redact_url(&self.config.base_url)),
+                    true,
+                ));
             }
         };
 
         if !response.status().is_success() {
             let status = response.status();
             let err_body = response.text().await.unwrap_or_default();
-            let err_msg = format_http_error(status, &err_body, &self.config.model, &self.config.base_url);
-            anyhow::bail!("{}", err_msg);
+            let err_msg = format_http_error(status, &err_body, model, &self.config.base_url);
+            return Err((anyhow::anyhow!("{}", err_msg), Self::is_retryable_status(status)));
         }
 
         let mut stream = response.bytes_stream().eventsource();
@@ -538,11 +557,17 @@ impl LlmClient {
         let mut think_parser = ThinkTagParser::new();
         let mut saw_done = false;
         let mut saw_finish = false;
+        let mut has_emitted = false;
         let mut stats = UsageStats::default();
         let mut tool_calls_map: BTreeMap<usize, (String, String, String, Option<Value>)> = BTreeMap::new();
-        let mut stream_err: Option<anyhow::Error> = None;
+        let mut stream_err: Option<(anyhow::Error, bool)> = None;
 
         while let Some(event_res) = {
+            let chunk_timeout = if !has_emitted && has_fallback {
+                FALLBACK_HEADER_TIMEOUT_SECS
+            } else {
+                STREAM_IDLE_TIMEOUT_SECS
+            };
             tokio::select! {
                 biased;
                 _ = async {
@@ -556,15 +581,18 @@ impl LlmClient {
                 } => {
                     None
                 }
-                next_opt = tokio::time::timeout(Duration::from_secs(STREAM_IDLE_TIMEOUT_SECS), stream.next()) => {
+                next_opt = tokio::time::timeout(Duration::from_secs(chunk_timeout), stream.next()) => {
                     match next_opt {
                         Ok(Some(ev)) => Some(ev),
                         Ok(None) => None,
                         Err(_) => {
-                            stream_err = Some(anyhow::anyhow!(
-                                "Stream idle timeout: no data received from '{}' for {}s",
-                                redact_url(&self.config.base_url),
-                                STREAM_IDLE_TIMEOUT_SECS
+                            stream_err = Some((
+                                anyhow::anyhow!(
+                                    "Stream idle timeout: no data received from '{}' for {}s",
+                                    redact_url(&self.config.base_url),
+                                    chunk_timeout
+                                ),
+                                !has_emitted,
                             ));
                             None
                         }
@@ -575,7 +603,7 @@ impl LlmClient {
             let event = match event_res {
                 Ok(ev) => ev,
                 Err(e) => {
-                    stream_err = Some(anyhow::anyhow!("Error reading SSE event: {}", e));
+                    stream_err = Some((anyhow::anyhow!("Error reading SSE event: {}", e), !has_emitted));
                     break;
                 }
             };
@@ -587,7 +615,7 @@ impl LlmClient {
 
             if let Ok(json) = serde_json::from_str::<Value>(&event.data) {
                 if let Some(err_msg) = extract_stream_error(&json) {
-                    stream_err = Some(anyhow::anyhow!("Stream error from LLM endpoint: {}", err_msg));
+                    stream_err = Some((anyhow::anyhow!("Stream error from LLM endpoint: {}", err_msg), !has_emitted));
                     break;
                 }
 
@@ -597,7 +625,8 @@ impl LlmClient {
                     if let Some(fr) = choice.get("finish_reason").and_then(|f| f.as_str()) {
                         saw_finish = true;
                         if fr == "length" {
-                            eprintln!("\n[Notice: LLM generation reached token limit]");
+                            eprintln!("
+[Notice: LLM generation reached token limit]");
                         }
                     }
 
@@ -606,6 +635,7 @@ impl LlmClient {
                             delta.get("reasoning_content").or_else(|| delta.get("thinking")).and_then(|r| r.as_str())
                         {
                             if !reasoning.is_empty() {
+                                has_emitted = true;
                                 on_event(StreamEvent::Chunk(reasoning, true));
                                 full_reasoning.push_str(reasoning);
                             }
@@ -615,6 +645,7 @@ impl LlmClient {
                             if !content.is_empty() {
                                 think_parser.feed(content, |slice, is_thinking| {
                                     if !slice.is_empty() {
+                                        has_emitted = true;
                                         on_event(StreamEvent::Chunk(slice, is_thinking));
                                         if is_thinking {
                                             full_reasoning.push_str(slice);
@@ -627,6 +658,7 @@ impl LlmClient {
                         }
 
                         if delta.get("tool_calls").and_then(|v| v.as_array()).is_some() {
+                            has_emitted = true;
                             on_event(StreamEvent::ToolStart);
                             accumulate_tool_calls(delta, &mut tool_calls_map);
                         }
@@ -637,6 +669,7 @@ impl LlmClient {
 
         think_parser.flush(|slice, is_thinking| {
             if !slice.is_empty() {
+                has_emitted = true;
                 on_event(StreamEvent::Chunk(slice, is_thinking));
                 if is_thinking {
                     full_reasoning.push_str(slice);
@@ -651,11 +684,20 @@ impl LlmClient {
         }
 
         let cancelled = cancel_flag.as_ref().map(|f| f.load(Ordering::Relaxed)).unwrap_or(false);
-        if !cancelled && !saw_done && !saw_finish && (!full_response.is_empty() || !tool_calls_map.is_empty()) {
-            anyhow::bail!(
-                "Stream from '{}' terminated abruptly without completion signal",
-                redact_url(&self.config.base_url)
-            );
+        if !cancelled && !saw_done && !saw_finish {
+            if !has_emitted {
+                return Err((
+                    anyhow::anyhow!("Empty stream from '{}' terminated without completion signal", redact_url(&self.config.base_url)),
+                    true,
+                ));
+            }
+            return Err((
+                anyhow::anyhow!(
+                    "Stream from '{}' terminated abruptly without completion signal",
+                    redact_url(&self.config.base_url)
+                ),
+                false,
+            ));
         }
 
         let tool_calls = if tool_calls_map.is_empty() {
@@ -681,6 +723,60 @@ impl LlmClient {
 
         let opt_reasoning = if !full_reasoning.is_empty() { Some(full_reasoning) } else { None };
         Ok((full_response, opt_reasoning, tool_calls, stats))
+    }
+
+    /// Single unified streaming engine for both interactive chat and ACP bridge.
+    async fn execute_stream<F>(
+        &self,
+        messages: &[ChatMessage],
+        tools: Option<Value>,
+        cancel_flag: Option<Arc<AtomicBool>>,
+        reasoning_override: Option<Option<ReasoningSetting>>,
+        mut on_event: F,
+    ) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>
+    where
+        F: FnMut(StreamEvent<'_>) + Send,
+    {
+        let candidates: Vec<&str> = std::iter::once(self.config.model.as_str())
+            .chain(self.config.fallback_models.iter().map(String::as_str))
+            .collect();
+
+        let mut last_err = anyhow::anyhow!("No model configured");
+        for (idx, model) in candidates.iter().enumerate() {
+            if cancel_flag.as_ref().is_some_and(|f| f.load(Ordering::Relaxed)) {
+                break;
+            }
+            if idx > 0 {
+                on_event(StreamEvent::Fallback(model));
+            }
+            let has_fallback = idx + 1 < candidates.len();
+            match self
+                .try_stream_once(
+                    model,
+                    has_fallback,
+                    messages,
+                    tools.clone(),
+                    cancel_flag.clone(),
+                    reasoning_override.clone(),
+                    &mut on_event,
+                )
+                .await
+            {
+                Ok(res) => {
+                    if let Ok(mut g) = self.last_model.lock() {
+                        *g = (*model).to_string();
+                    }
+                    return Ok(res);
+                }
+                Err((err, retryable)) => {
+                    last_err = err;
+                    if !retryable || !has_fallback {
+                        break;
+                    }
+                }
+            }
+        }
+        Err(last_err)
     }
 
     pub async fn stream_chat_raw_with_reasoning<F>(
@@ -734,6 +830,9 @@ impl LlmClient {
                     spinner.start("Drafting tool action...");
                     tool_signaled = true;
                 }
+            }
+            StreamEvent::Fallback(model) => {
+                spinner.update(&format!("Fallback: {}...", model));
             }
         };
 
@@ -853,6 +952,7 @@ mod tests {
             base_url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions".into(),
             api_key: "test".into(),
             model: "gemini-4-hydrogen".into(),
+            fallback_models: Vec::new(),
             max_tokens: 65536,
         };
         let client = LlmClient::new(cfg);
@@ -911,5 +1011,24 @@ mod tests {
 
         assert_eq!(thinking, "step 1");
         assert_eq!(answer, "Hi Done! a < b");
+    }
+
+    #[test]
+    fn test_retryable_status_and_fallback_body_model() {
+        assert!(LlmClient::is_retryable_status(reqwest::StatusCode::TOO_MANY_REQUESTS));
+        assert!(LlmClient::is_retryable_status(reqwest::StatusCode::SERVICE_UNAVAILABLE));
+        assert!(!LlmClient::is_retryable_status(reqwest::StatusCode::BAD_REQUEST));
+        assert!(!LlmClient::is_retryable_status(reqwest::StatusCode::UNAUTHORIZED));
+
+        let cfg = ProviderConfig {
+            base_url: "https://api.tokenlab.amd.com/v1/chat/completions".into(),
+            api_key: "test".into(),
+            model: "DeepSeek-V4.1-Flash".into(),
+            fallback_models: vec!["Qwen3.8-27B".into()],
+            max_tokens: 65536,
+        };
+        let client = LlmClient::new(cfg);
+        let body = client.build_request_body_with_reasoning("Qwen3.8-27B", &[ChatMessage::user("hi")], None, None);
+        assert_eq!(body["model"], "Qwen3.8-27B");
     }
 }

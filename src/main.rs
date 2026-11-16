@@ -1077,9 +1077,14 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 let stat_str = renderer.finish_with_print(&stats, history_char_count(&history), current_box_style != 7);
                 last_stat_line = Some(stat_str);
 
-                if !active_skills.is_empty() {
-                    let formatted_skills = active_skills.join(" · ");
-                    println!("  \x1b[2m{}\x1b[0m\n", formatted_skills);
+                let used_model = client.last_model();
+                let mut footer_notes: Vec<String> = Vec::new();
+                if used_model != provider.model {
+                    footer_notes.push(format!("↳ {}", used_model));
+                }
+                footer_notes.extend(active_skills.iter().cloned());
+                if !footer_notes.is_empty() {
+                    println!("  \x1b[2m{}\x1b[0m\n", footer_notes.join(" · "));
                 }
 
                 history.push(ChatMessage::assistant_with_reasoning(reply, reasoning));

@@ -138,6 +138,7 @@ pub struct ProviderConfig {
     pub base_url: String,
     pub api_key: String,
     pub model: String,
+    pub fallback_models: Vec<String>,
     pub max_tokens: usize,
 }
 
@@ -152,6 +153,12 @@ async fn probe_local_model() -> String {
         }
     }
     "local-model".to_string()
+}
+
+fn parse_model_list(raw: &str) -> (String, Vec<String>) {
+    let mut parts = raw.split(',').map(str::trim).filter(|s| !s.is_empty()).map(ToString::to_string);
+    let primary = parts.next().unwrap_or_else(|| "default".to_string());
+    (primary, parts.collect())
 }
 
 fn normalize_chat_url(url: &str) -> String {
@@ -192,13 +199,14 @@ impl ProviderConfig {
             let key_var = format!("{}_API_KEY", pfx);
             if let Some(api_key) = get_env_val(&env_content, &key_var) {
                 if is_valid_key(&api_key) {
-                    let model =
+                    let raw_model =
                         get_env_val(&env_content, &format!("{}_MODEL", pfx)).unwrap_or_else(|| def_model.to_string());
+                    let (model, fallback_models) = parse_model_list(&raw_model);
                     let base_url = normalize_chat_url(
                         &get_env_val(&env_content, &format!("{}_URL", pfx)).unwrap_or_else(|| def_url.to_string()),
                     );
 
-                    return ProviderConfig { base_url, api_key: api_key.trim().to_string(), model, max_tokens };
+                    return ProviderConfig { base_url, api_key: api_key.trim().to_string(), model, fallback_models, max_tokens };
                 }
             }
         }
@@ -223,11 +231,12 @@ impl ProviderConfig {
 
                     let model_var = format!("CUSTOM{}_MODEL", i);
                     let legacy_model = if i == 1 { Some("CUSTOM_MODEL") } else { None };
-                    let model = get_env_val(&env_content, &model_var)
+                    let raw_model = get_env_val(&env_content, &model_var)
                         .or_else(|| legacy_model.and_then(|k| get_env_val(&env_content, k)))
                         .unwrap_or_else(|| "default".to_string());
+                    let (model, fallback_models) = parse_model_list(&raw_model);
 
-                    return ProviderConfig { base_url, api_key: api_key.trim().to_string(), model, max_tokens };
+                    return ProviderConfig { base_url, api_key: api_key.trim().to_string(), model, fallback_models, max_tokens };
                 }
             }
         }
@@ -236,7 +245,7 @@ impl ProviderConfig {
         let base_url = "http://127.0.0.1:8080/v1/chat/completions".to_string();
         let model = probe_local_model().await;
 
-        ProviderConfig { base_url, api_key: "not-needed".to_string(), model, max_tokens }
+        ProviderConfig { base_url, api_key: "not-needed".to_string(), model, fallback_models: Vec::new(), max_tokens }
     }
 }
 
@@ -283,5 +292,12 @@ mod tests {
             normalize_chat_url("https://api.tokenlab.amd.com/v1/chat/completions"),
             "https://api.tokenlab.amd.com/v1/chat/completions"
         );
+    }
+
+    #[test]
+    fn test_parse_model_list_handles_fallbacks_and_trailing_comma() {
+        let (primary, fallbacks) = parse_model_list("DeepSeek-V4.1-Flash, Qwen3.8-27B, Gemma-4-31B-IT,");
+        assert_eq!(primary, "DeepSeek-V4.1-Flash");
+        assert_eq!(fallbacks, vec!["Qwen3.8-27B", "Gemma-4-31B-IT"]);
     }
 }
