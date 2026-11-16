@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use eventsource_stream::Eventsource;
 use futures_util::StreamExt;
 use reqwest::Client;
@@ -515,6 +515,18 @@ impl LlmClient {
         matches!(status.as_u16(), 404 | 408 | 429 | 500 | 502 | 503 | 504)
     }
 
+    fn is_transient_same_model_status(status: reqwest::StatusCode) -> bool {
+        matches!(status.as_u16(), 408 | 429 | 500 | 502 | 503 | 504)
+    }
+
+    fn parse_retry_after_secs(headers: &reqwest::header::HeaderMap) -> Option<u64> {
+        headers
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|s| s.trim().parse::<u64>().ok())
+            .map(|s| s.clamp(1, 8))
+    }
+
     async fn try_stream_once<F>(
         &self,
         model: &str,
@@ -524,7 +536,7 @@ impl LlmClient {
         cancel_flag: Option<Arc<AtomicBool>>,
         reasoning_override: Option<Option<ReasoningSetting>>,
         on_event: &mut F,
-    ) -> std::result::Result<(String, Option<String>, Option<Vec<Value>>, UsageStats), (anyhow::Error, bool)>
+    ) -> std::result::Result<(String, Option<String>, Option<Vec<Value>>, UsageStats), (anyhow::Error, bool, bool, Option<u64>)>
     where
         F: FnMut(StreamEvent<'_>) + Send,
     {
@@ -535,20 +547,30 @@ impl LlmClient {
         let send_res = tokio::time::timeout(Duration::from_secs(wait_secs), req.send()).await;
         let response = match send_res {
             Ok(Ok(res)) => res,
-            Ok(Err(e)) => return Err((anyhow::Error::new(e).context("Failed to connect to LLM endpoint"), true)),
+            Ok(Err(e)) => {
+                return Err((anyhow::Error::new(e).context("Failed to connect to LLM endpoint"), true, true, None));
+            }
             Err(_) => {
                 return Err((
                     anyhow::anyhow!("Connection timeout waiting for response from '{}'", redact_url(&self.config.base_url)),
                     true,
+                    false,
+                    None,
                 ));
             }
         };
 
         if !response.status().is_success() {
             let status = response.status();
+            let retry_after = Self::parse_retry_after_secs(response.headers());
             let err_body = response.text().await.unwrap_or_default();
             let err_msg = format_http_error(status, &err_body, model, &self.config.base_url);
-            return Err((anyhow::anyhow!("{}", err_msg), Self::is_retryable_status(status)));
+            return Err((
+                anyhow::anyhow!("{}", err_msg),
+                Self::is_retryable_status(status),
+                Self::is_transient_same_model_status(status),
+                retry_after,
+            ));
         }
 
         let mut stream = response.bytes_stream().eventsource();
@@ -560,7 +582,7 @@ impl LlmClient {
         let mut has_emitted = false;
         let mut stats = UsageStats::default();
         let mut tool_calls_map: BTreeMap<usize, (String, String, String, Option<Value>)> = BTreeMap::new();
-        let mut stream_err: Option<(anyhow::Error, bool)> = None;
+        let mut stream_err: Option<(anyhow::Error, bool, bool, Option<u64>)> = None;
 
         while let Some(event_res) = {
             let chunk_timeout = if !has_emitted && has_fallback {
@@ -593,6 +615,8 @@ impl LlmClient {
                                     chunk_timeout
                                 ),
                                 !has_emitted,
+                                false,
+                                None,
                             ));
                             None
                         }
@@ -603,7 +627,7 @@ impl LlmClient {
             let event = match event_res {
                 Ok(ev) => ev,
                 Err(e) => {
-                    stream_err = Some((anyhow::anyhow!("Error reading SSE event: {}", e), !has_emitted));
+                    stream_err = Some((anyhow::anyhow!("Error reading SSE event: {}", e), !has_emitted, !has_emitted, None));
                     break;
                 }
             };
@@ -615,7 +639,7 @@ impl LlmClient {
 
             if let Ok(json) = serde_json::from_str::<Value>(&event.data) {
                 if let Some(err_msg) = extract_stream_error(&json) {
-                    stream_err = Some((anyhow::anyhow!("Stream error from LLM endpoint: {}", err_msg), !has_emitted));
+                    stream_err = Some((anyhow::anyhow!("Stream error from LLM endpoint: {}", err_msg), !has_emitted, false, None));
                     break;
                 }
 
@@ -689,6 +713,8 @@ impl LlmClient {
                 return Err((
                     anyhow::anyhow!("Empty stream from '{}' terminated without completion signal", redact_url(&self.config.base_url)),
                     true,
+                    true,
+                    None,
                 ));
             }
             return Err((
@@ -697,6 +723,8 @@ impl LlmClient {
                     redact_url(&self.config.base_url)
                 ),
                 false,
+                false,
+                None,
             ));
         }
 
@@ -743,34 +771,44 @@ impl LlmClient {
 
         let mut last_err = anyhow::anyhow!("No model configured");
         for (idx, model) in candidates.iter().enumerate() {
-            if cancel_flag.as_ref().is_some_and(|f| f.load(Ordering::Relaxed)) {
-                break;
-            }
             if idx > 0 {
                 on_event(StreamEvent::Fallback(model));
             }
             let has_fallback = idx + 1 < candidates.len();
-            match self
-                .try_stream_once(
-                    model,
-                    has_fallback,
-                    messages,
-                    tools.clone(),
-                    cancel_flag.clone(),
-                    reasoning_override.clone(),
-                    &mut on_event,
-                )
-                .await
-            {
-                Ok(res) => {
-                    if let Ok(mut g) = self.last_model.lock() {
-                        *g = (*model).to_string();
-                    }
-                    return Ok(res);
+            let max_attempts = if has_fallback { 1 } else { 3 };
+
+            for attempt in 0..max_attempts {
+                if cancel_flag.as_ref().is_some_and(|f| f.load(Ordering::Relaxed)) {
+                    return Err(last_err);
                 }
-                Err((err, retryable)) => {
-                    last_err = err;
-                    if !retryable || !has_fallback {
+                match self
+                    .try_stream_once(
+                        model,
+                        has_fallback,
+                        messages,
+                        tools.clone(),
+                        cancel_flag.clone(),
+                        reasoning_override.clone(),
+                        &mut on_event,
+                    )
+                    .await
+                {
+                    Ok(res) => {
+                        if let Ok(mut g) = self.last_model.lock() {
+                            *g = (*model).to_string();
+                        }
+                        return Ok(res);
+                    }
+                    Err((err, retryable, can_retry_same, retry_after)) => {
+                        last_err = err;
+                        if !has_fallback && can_retry_same && attempt + 1 < max_attempts {
+                            let delay = retry_after.unwrap_or(1 << attempt).min(8);
+                            tokio::time::sleep(Duration::from_secs(delay)).await;
+                            continue;
+                        }
+                        if !retryable || !has_fallback {
+                            return Err(last_err);
+                        }
                         break;
                     }
                 }
@@ -1030,5 +1068,14 @@ mod tests {
         let client = LlmClient::new(cfg);
         let body = client.build_request_body_with_reasoning("Qwen3.8-27B", &[ChatMessage::user("hi")], None, None);
         assert_eq!(body["model"], "Qwen3.8-27B");
+    }
+
+    #[test]
+    fn test_parse_retry_after_clamps_and_transient_status() {
+        let mut h = reqwest::header::HeaderMap::new();
+        h.insert(reqwest::header::RETRY_AFTER, "30".parse().unwrap());
+        assert_eq!(LlmClient::parse_retry_after_secs(&h), Some(8));
+        assert!(LlmClient::is_transient_same_model_status(reqwest::StatusCode::TOO_MANY_REQUESTS));
+        assert!(!LlmClient::is_transient_same_model_status(reqwest::StatusCode::NOT_FOUND));
     }
 }

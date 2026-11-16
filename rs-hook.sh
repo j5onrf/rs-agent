@@ -1,4 +1,4 @@
-# Rs-Agent shell hook (ponytail minimalism: < 0.2ms, Bash & Zsh, macOS & Linux)
+# Rs-Agent shell hook (minimal: < 0.2ms, Bash & Zsh, macOS & Linux)
 [[ $- == *i* ]] || return 0 2>/dev/null || exit 0
 
 # 1. First-Draw Screen Hygiene (Zero-fork, wipes window-spawn hotkey leak before Prompt #1)

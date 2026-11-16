@@ -1,7 +1,7 @@
 <h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
 
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.2.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.3.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
@@ -60,30 +60,30 @@
 | <img alt="" src="assets/prompt.svg" width="14" height="14" /> `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security sandbox |
 
 **In-Session Slash Commands:**
-`/p` profile select • `/ms` model select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/box [1-7]` box themes • `/pad` spacing • `/tk` thinking view • `/r` reset
+`/p` profile select • `/ms` model select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/b [1-7]` box themes • `/pad` spacing • `/tk` thinking view • `/r` reset
 
 ---
 
 ## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Client Surface: T3 Code ADE
 
-**[T3 Code](https://t3.codes)** is the official agent developer environment for `rs-agent`, connected directly to `ai --bridge` over stdio JSON-RPC 2.0 (ACP).
+**[T3 Code](https://t3.codes)** connects to `ai --bridge` over stdio JSON-RPC 2.0 (ACP).
 
-| Capability | Mechanism | What It Gives You |
+| Feature | Mechanism | Behavior |
 | :--- | :--- | :--- |
-| **Seamless Handover** | `/t3` · `/t3 web` | Instant desktop or browser launch (`projects/chat` for chat, workspace root for agents) |
-| **Interactive Diff Review** | `session/request_permission` | Live split/unified previews with T3's 4-tier controls (*Supervised*, *Auto-accept*, *Auto*, *Full access*) |
-| **Dynamic Controls** | `$skills` · `/commands` · `thought_level` | Autocomplete `$` skill pills, reasoning selector (`low`–`xhigh` cloud / token budgets local), multimodal vision |
+| **Handover** | `/t3` · `/t3 web` | Launches desktop or browser (`projects/chat` in chat mode, workspace root for agents) |
+| **Diff Review** | `session/request_permission` | Split/unified diff gates (*Supervised*, *Auto-accept*, *Auto*, *Full access*) |
+| **Live Controls** | `$skills` · `/commands` · `thought_level` | `$` skill pills, reasoning tier/budget selector, vision input |
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> CLI Box Styles (`/box [1-7]`)
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> CLI Box Styles (`/b`, `/box [1-7]`)
 
-* **`/box 1–6`:** Compact headers with single-line `❯ ` prompt, `│ ` thinking gutter, inline stats, and dense layout (`pad: false`).
-* **`/box 7` *(default)*:** 2-column HUD showing active profile settings, live `────` input bar, `/` command menu, `∴` expanded thinking, and spaced layout (`pad: true`).
+* **`/b 1–6`:** Compact header, single-line `❯ ` prompt, `│ ` thinking gutter, inline stats, dense layout (`pad: false`).
+* **`/b 7` *(default)*:** 2-column profile HUD, ruled `────` input bar, `/` command menu, `∴` expanded thinking, spaced layout (`pad: true`).
 
 ```console
 ~ ❯ ai
-╭─── rs-agent v0.7.2 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.7.3 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ 6-tool · t350 · adp                         │
 │   │ Li │  lingtiny                         │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · 11 modified          │ ─────────────────────────────────────────── │
@@ -124,13 +124,13 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
-╭─── rs-agent v0.7.2 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.7.3 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ purebash · t256 · adp · mcp:photocraft(7)   │
 │   │ Li │  artcraft/photocraft-l            │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · clean                │ ─────────────────────────────────────────── │
 │   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · max 15 steps · ↑/↓ history       │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
-╭─── rs-agent v0.7.2 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.7.3 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  DeepSeek-V4.1-Flash              │ core4 · medium                              │
 │   │ De │  tokenlab                         │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · 7 modified           │ ─────────────────────────────────────────── │
@@ -147,17 +147,17 @@
 ```text
 Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─▶ Workspace Teleport
                                      └─▶ ai / ai --bridge
-                                            ├── client.rs   (SSE stream, thought_signature, cloud effort / local budget)
-                                            ├── adapter.rs  (JSON bracket balancer, gutter strip, alias normalization)
-                                            ├── tools.rs    (concurrent read-only batching, 3-stage edit, 30s timeout)
-                                            ├── security.rs (symlink-safe canonical jail, arrow-key command gates)
-                                            └── mcp.rs      (on-demand stdio MCP plugins e.g. photocraft)
+                                            ├── client.rs   (streaming, retries, model fallback, reasoning)
+                                            ├── adapter.rs  (line-number strip, path & JSON cleanup)
+                                            ├── tools.rs    (parallel reads, 3-stage edits, 30s timeout)
+                                            ├── security.rs (symlink-safe sandbox, command gates)
+                                            └── mcp.rs      (MCP plugins + per-profile mcp_tools filter)
 ```
 
-* **Parallel Read-Only Tool Kernel (`tools.rs`):** Executes contiguous `read_file`, `list_dir`, and `search_code` calls concurrently while keeping mutating actions (`edit_file`, `write_file`, `run_command`) strictly ordered, rendered as `● Tool(...)` / `⎿` trees with inline colored diffs.
-* **3-Stage Resilient Edits (`tools.rs`):** Patches files through *Exact match → Indent-delta whitespace normalization → Levenshtein fuzzy match (≥ 0.85)*, with automatic process-group reaping (`SIGTERM` → `SIGKILL`) after 30s on `run_command`.
-* **Edge Argument Healer (`adapter.rs`):** Strips copied line gutters (`12: `), fixes container paths (`/workspace/...`), balances truncated JSON quotes/brackets, and normalizes parameter aliases in memory.
-* **Zero-Trust Security Boundary (`security.rs`):** Walks ancestors and inspects symlinks before canonicalization. Fails closed on `../` traversal, system directories (`/etc`, `/usr`, `/root`, ...), `python -m pip`, destructive `rm`, and privileged binaries with an interactive inline gate.
+* **Streaming & Retries (`client.rs`):** Talks straight to provider APIs without an external SDK, so local `llama-server` prompt caching and Gemini reasoning work natively. Retries brief rate limits or server errors up to 2 times (`Retry-After`), or switches to the next model in comma-separated `*_MODEL` lists after `15s` (`↳ <model>`).
+* **Tool Runner (`tools.rs`):** Runs read-only lookups (`read_file`, `list_dir`, `search_code`) in parallel, applies file edits with whitespace and fuzzy matching plus inline diffs, and stops hung shell commands after `30s`.
+* **Input Cleanup (`adapter.rs`):** Strips copied line numbers (`12: `), fixes `/workspace/` paths, and repairs broken JSON tool arguments from small local models.
+* **Sandbox (`security.rs`):** Resolves symlinks to keep file access inside the workspace, and prompts before running risky commands (`rm`, `pip`, `sudo`).
 
 ---
 
@@ -176,7 +176,7 @@ Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─�
 
 ### Context Ceilings (`AI_MAX_TOKENS`)
 
-File reads and shell outputs adapt dynamically to `AI_MAX_TOKENS`, offloading overflows to `.rs/scratchpad.log` with clean head/tail previews:
+File reads and shell output scale with `AI_MAX_TOKENS`, spilling overflows to `.rs/scratchpad.log`:
 
 | `AI_MAX_TOKENS` | `read_file` Ceiling | `run_command` Cap | `search_code` Cap |
 | :--- | :---: | :---: | :---: |
@@ -189,7 +189,7 @@ File reads and shell outputs adapt dynamically to `AI_MAX_TOKENS`, offloading ov
 
 ## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Workspace Profiles & Skills
 
-Configure agent personas, tool tiers, MCP servers, and reasoning behavior in `profiles/*.md` frontmatter:
+Configure tool tiers, reasoning, and MCP servers in `profiles/*.md`:
 
 ```yaml
 ---
@@ -212,7 +212,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 ## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Agent Evaluation (`eval-stack`)
 
-5-stage autonomous benchmark measuring par efficiency, tool resilience, and token economy via `eva`:
+5-stage benchmark via `eva`:
 
 | Rank | Model | Par Eff | Agent Index |
 | :---: | :--- | :---: | :---: |
@@ -304,6 +304,6 @@ AI_MAX_AGENT_ROUNDS="10"
 ---
 
 <div align="center">
-  <em>Built for speed, clarity, and terminal minimalism. Licensed under the <strong><a href="LICENSE">MIT License</a></strong>.</em>
+  <sub><a href="LICENSE">MIT License</a></sub>
 </div>
 
