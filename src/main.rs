@@ -616,6 +616,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     let mut active_profile = Profile::load(&cfg.profile_name)
         .ok_or_else(|| anyhow::anyhow!("Profile '{}' not found in ~/.config/rs-agent/profiles/", cfg.profile_name))?;
     client.set_reasoning(active_profile.reasoning_budget.clone());
+    rs_agent::config::set_profile_max_tokens(active_profile.ctx);
 
     let (mut instance_num, first_guard) = resolve_instance_number(&cfg.profile_name);
     let mut lock_guard = Some(first_guard);
@@ -766,6 +767,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         provider = ProviderConfig::load().await;
                         client = LlmClient::new(provider.clone());
                         client.set_reasoning(active_profile.reasoning_budget.clone());
+                        rs_agent::config::set_profile_max_tokens(None);
                         max_rounds = rs_agent::config::get_max_rounds();
                         last_stat_line = None;
 
@@ -826,6 +828,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     client.set_reasoning(loaded.reasoning_budget.clone());
                     let new_mcp = loaded.mcp_servers.clone();
                     active_profile = loaded;
+                    rs_agent::config::set_profile_max_tokens(active_profile.ctx);
                     hud_meta = active_profile.hud_summary(cfg.is_agent);
 
                     system_prompt = rs_agent::profile::build_system_prompt(

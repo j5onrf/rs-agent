@@ -196,6 +196,7 @@ Configure tool tiers, reasoning, and MCP servers in `profiles/*.md`:
 description: "High-Speed Coding & Systems Engineer"
 adapters: true          # Strip line gutters, normalize aliases, heal malformed JSON
 core4: true             # Minimal 4-tool schema (~480t) for 27B+ / cloud (omit for 6-tool)
+ctx: 65536              # Optional session context ceiling override (defaults to AI_MAX_TOKENS)
 reasoning_budget: 500   # Local: 0-10000 tokens (0 = off) | Cloud: low, medium, high, xhigh
 memory: true            # Inject project-isolated rules from .rs/memory.md
 purebash: true          # Single run_command tool (~95t). Omit for Core 4 / Native 6

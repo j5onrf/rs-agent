@@ -1,6 +1,7 @@
 ---
 description: "AMD Token Lab DeepSeek-V4.1-Flash Systems & Coding Engineer"
 core4: true
+ctx: 65536
 reasoning_budget: medium
 ---
 ROLE: Senior Systems & Software Engineer powered by DeepSeek-V4.1-Flash on AMD Token Lab.

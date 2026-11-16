@@ -88,6 +88,7 @@ pub struct Profile {
     pub system_prompt: String,
     pub mcp_servers: Vec<String>,
     pub mcp_tools: Vec<String>,
+    pub ctx: Option<usize>,
 }
 
 struct RawModeGuard;
@@ -126,6 +127,7 @@ impl Profile {
         let mut delegate = false;
         let mut mcp_servers = Vec::new();
         let mut mcp_tools = Vec::new();
+        let mut ctx = None;
         let mut body = String::new();
         let mut in_frontmatter = false;
         let mut frontmatter_closed = false;
@@ -183,6 +185,13 @@ impl Profile {
                                 }
                             }
                         }
+                        "ctx" | "context_size" => {
+                            if let Ok(n) = val.trim_matches(['"', '\'']).parse::<usize>() {
+                                if n > 0 {
+                                    ctx = Some(n);
+                                }
+                            }
+                        }
                         "mcp_tools" => {
                             let clean = val.trim_matches('[').trim_matches(']').trim();
                             for item in clean.split(',') {
@@ -210,6 +219,7 @@ impl Profile {
             system_prompt: body.trim().to_string(),
             mcp_servers,
             mcp_tools,
+            ctx,
         }
     }
 
@@ -839,5 +849,11 @@ mod tests {
         assert_eq!(p.mcp_servers, vec!["photocraft"]);
         assert_eq!(p.mcp_tools, vec!["doc_new", "doc_save", "ui_set"]);
         assert_eq!(p.hud_summary(true), "6-tool · mcp:photocraft(3)");
+    }
+
+    #[test]
+    fn test_profile_parses_ctx_override() {
+        let p = Profile::parse("---\nctx: 65536\n---\nhi");
+        assert_eq!(p.ctx, Some(65536));
     }
 }

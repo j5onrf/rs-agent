@@ -102,7 +102,17 @@ pub fn get_env_path() -> PathBuf {
     dirs::home_dir().map(|h| h.join(".config/rs-agent/.env")).unwrap_or_else(|| PathBuf::from(".env"))
 }
 
+static PROFILE_MAX_TOKENS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+pub fn set_profile_max_tokens(val: Option<usize>) {
+    PROFILE_MAX_TOKENS.store(val.unwrap_or(0), std::sync::atomic::Ordering::Relaxed);
+}
+
 pub fn get_max_tokens() -> usize {
+    let profile_ctx = PROFILE_MAX_TOKENS.load(std::sync::atomic::Ordering::Relaxed);
+    if profile_ctx > 0 {
+        return profile_ctx;
+    }
     if let Ok(content) = fs::read_to_string(get_env_path()) {
         if let Some(n) = get_env_val(&content, "AI_MAX_TOKENS").and_then(|v| v.parse::<usize>().ok()) {
             return n;
