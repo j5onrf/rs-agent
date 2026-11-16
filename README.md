@@ -76,10 +76,10 @@
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> CLI Box Styles (`/b`, `/box [1-7]`)
+## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> CLI Box Styles (`/box [1-7]`)
 
-* **`/b 1–6`:** Compact header, single-line `❯ ` prompt, `│ ` thinking gutter, inline stats, dense layout (`pad: false`).
-* **`/b 7` *(default)*:** 2-column profile HUD, ruled `────` input bar, `/` command menu, `∴` expanded thinking, spaced layout (`pad: true`).
+* **`/box 1–6`:** Compact header, single-line `❯ ` prompt, `│ ` thinking gutter, inline stats, dense layout (`pad: false`).
+* **`/box 7` *(default)*:** 2-column profile HUD, ruled `────` input bar, `/` command menu, `∴` expanded thinking, spaced layout (`pad: true`).
 
 ```console
 ~ ❯ ai
@@ -154,7 +154,7 @@ Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─�
                                             └── mcp.rs      (MCP plugins + per-profile mcp_tools filter)
 ```
 
-* **Streaming & Retries (`client.rs`):** Talks straight to provider APIs without an external SDK, so local `llama-server` prompt caching and Gemini reasoning work natively. Retries brief rate limits or server errors up to 2 times (`Retry-After`), or switches to the next model in comma-separated `*_MODEL` lists after `15s` (`↳ <model>`).
+* **Streaming & Retries (`client.rs`):** Talks straight to provider APIs without an external SDK, so local `llama-server` prompt caching and reasoning work natively. Retries brief rate limits or server errors up to 2 times (`Retry-After`), or switches to the next model in comma-separated `*_MODEL` lists after `15s` (`↳ <model>`).
 * **Tool Runner (`tools.rs`):** Runs read-only lookups (`read_file`, `list_dir`, `search_code`) in parallel, applies file edits with whitespace and fuzzy matching plus inline diffs, and stops hung shell commands after `30s`.
 * **Input Cleanup (`adapter.rs`):** Strips copied line numbers (`12: `), fixes `/workspace/` paths, and repairs broken JSON tool arguments from small local models.
 * **Sandbox (`security.rs`):** Resolves symlinks to keep file access inside the workspace, and prompts before running risky commands (`rm`, `pip`, `sudo`).
