@@ -16,33 +16,15 @@
   <p>
     <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>t3code</code> &nbsp;•&nbsp; <code>omarchy</code> &nbsp;•&nbsp; <code>local-first</code>
   </p>
-</div>
 
 ---
 
 ## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Tested Tiers & Endpoints
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <strong><img alt="" src="assets/prompt.svg" width="16" height="16" /> Sub-27B (SLM)</strong><br />
-      <em>Tool calling, fast refactoring, single-turn edits</em><br /><br />
-      <code>LFM3-1.7B</code> &nbsp;•&nbsp; <code>Ling-3.0-tiny*</code><br />
-      <code>MiniCPM5-2B</code> &nbsp;•&nbsp; <code>Qwen3.5-2B+</code><br />
-      <code>MiniCPM-V-4.7-1B</code> &nbsp;•&nbsp; <code>LFM2.5-24B-A2B</code>
-    </td>
-    <td width="50%" valign="top">
-      <strong><img alt="" src="assets/prompt.svg" width="16" height="16" /> 27B+ (LLM)</strong><br />
-      <em>Deep reasoning, complex logic, multi-turn loops</em><br /><br />
-      <code>Groot-19B-A3B</code> &nbsp;•&nbsp; <code>Clover-35B-A3B</code><br />
-      <code>Sage-A1.5-35B</code> &nbsp;•&nbsp; <code>Flint-40B-A2.5B*</code><br />
-      <code>Qwen3.8-35B-D</code> &nbsp;•&nbsp; <code>KAT-Coder-V2.5</code><br />
-      <code>Ornith-1.5-35B</code> &nbsp;•&nbsp; <code>Tiel-Coder-35B</code><br />
-      <code>Qwen3.8-27B</code> &nbsp;•&nbsp; <code>Qwen4.0-27B</code><br />
-      <code>Qwen3.8-Flash</code> &nbsp;•&nbsp; <code>DeepSeek-V4.1</code>
-    </td>
-  </tr>
-</table>
+| Tier | Tested Models | Workload |
+| :--- | :--- | :--- |
+| **Sub-27B**<br />*(SLM)* | `LFM3-1.7B` · `Ling-3.0-tiny*` · `MiniCPM5-2B` · `Qwen3.5-2B+` · `MiniCPM-V-4.7-1B` · `LFM2.5-24B-A2B` | Tool calling, fast refactoring, single-turn edits |
+| **27B+**<br />*(LLM)* | `Groot-19B-A3B` · `Clover-35B-A3B` · `Sage-A1.5-35B` · `Flint-40B-A2.5B*` · `Qwen3.8-35B-D` · `KAT-Coder-V2.5` · `Ornith-1.5-35B` · `Tiel-Coder-35B` · `Qwen3.8-27B` · `Qwen4.0-27B` · `Qwen3.8-Flash` · `DeepSeek-V4.1` | Deep reasoning, complex logic, multi-turn loops |
 
 *\* Primary edge baselines • Auto-discovers local models on `http://127.0.0.1:8080`*
 
@@ -80,7 +62,7 @@
 
 * **`/box 1–6`:** Compact header, single-line `❯ ` prompt, `│ ` thinking gutter, inline stats, dense layout (`pad: false`).
 * **`/box 7` *(default)*:** 2-column profile HUD, ruled `────` input bar, `/` command menu, `∴` expanded thinking, spaced layout (`pad: true`).
-* **`/think`:** Cycle reasoning display between `rs-agent` `│ ` gutter (default), expanded `∴` italic, or collapsed `∴ Thought for Xs` (persisted via `"showThinkingSummaries"` in `state.json`).
+* **`/think`:** Cycle reasoning display between expanded `∴` italic (Box 7 default), `│ ` gutter (Boxes 1–6 default), or collapsed `∴ Thought for Xs` (persisted via `"showThinkingSummaries"` in `state.json`).
 
 <details>
 <summary><b>Preview all 7 box themes (halftone skeleton dither, dot slabs, 2-column header)</b></summary>
@@ -304,4 +286,5 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <sub><a href="LICENSE">MIT License</a></sub>
 </div>
+
 
