@@ -80,16 +80,7 @@
 
 * **`/box 1–6`:** Compact header, single-line `❯ ` prompt, `│ ` thinking gutter, inline stats, dense layout (`pad: false`).
 * **`/box 7` *(default)*:** 2-column profile HUD, ruled `────` input bar, `/` command menu, `∴` expanded thinking, spaced layout (`pad: true`).
-
-```console
-~ ❯ ai
-╭─── rs-agent v0.7.3 ──────────────────────────────────────────────────────────────────────╮
-│   ╭────╮  Ling-3.0-tiny                    │ 6-tool · t350 · adp                         │
-│   │ Li │  lingtiny                         │ Type / for commands · Tab completes         │
-│   ╰────╯  git: main · 11 modified          │ ─────────────────────────────────────────── │
-│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · max 10 steps · ↑/↓ history       │
-╰──────────────────────────────────────────────────────────────────────────────────────────╯
-```
+* **`/think`:** Cycle reasoning display between `rs-agent` `│ ` gutter (default), expanded `∴` italic, or collapsed `∴ Thought for Xs` (persisted via `"showThinkingSummaries"` in `state.json`).
 
 <details>
 <summary><b>Preview all 7 box themes (halftone skeleton dither, dot slabs, 2-column header)</b></summary>
@@ -124,6 +115,12 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
+╭─── rs-agent v0.7.3 ──────────────────────────────────────────────────────────────────────╮
+│   ╭────╮  Ling-3.0-tiny                    │ 6-tool · t350 · adp                         │
+│   │ Li │  lingtiny                         │ Type / for commands · Tab completes         │
+│   ╰────╯  git: main · 11 modified          │ ─────────────────────────────────────────── │
+│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · max 10 steps · ↑/↓ history       │
+╰──────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─── rs-agent v0.7.3 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ purebash · t256 · adp · mcp:photocraft(7)   │
 │   │ Li │  artcraft/photocraft-l            │ Type / for commands · Tab completes         │
