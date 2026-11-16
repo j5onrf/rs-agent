@@ -860,6 +860,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
                     print!("\x1b]0;rs-agent: {}\x07", second_line);
                     print!("\x1b[H\x1b[2J");
+                    println!();
                     ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, false);
                     let _ = io::stdout().flush();
                 } else {
@@ -991,7 +992,6 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
             print!("\x1b[H\x1b[2J");
             println!();
-            println!("\x1b[1;32m✓\x1b[0m \x1b[2mSession reset\x1b[0m");
             let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
             ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, false);
             let _ = io::stdout().flush();
@@ -1001,7 +1001,6 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         if input == "/clear" || input == "/c" {
             print!("\x1b[H\x1b[2J");
             println!();
-            println!("\x1b[1;32m✓\x1b[0m \x1b[2mSession reset\x1b[0m");
             let second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
             ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, false);
             let _ = io::stdout().flush();
@@ -1043,9 +1042,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         }
 
         let pad = state::get_pad();
-        if pad {
-            println!();
-        }
+        println!();
         io::stdout().flush()?;
 
         history.push(ChatMessage::user(input));
@@ -1107,7 +1104,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     println!();
                 }
                 println!();
-            } else if !pad && (round == 0 || renderer.thinking_started) {
+            } else if !pad && renderer.thinking_started {
                 println!();
             }
             execute_tool_batch(&calls, target_dir, &boundary, cfg.adapters, &mut history, &mut spinner).await;
