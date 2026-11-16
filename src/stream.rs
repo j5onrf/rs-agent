@@ -178,7 +178,16 @@ impl StreamRenderer {
             }
             let _ = io::stdout().flush();
         } else {
-            self.answer_chars += chunk.len();
+            let clean = if !self.bullet_started {
+                let trimmed = chunk.trim_start_matches('\n');
+                if trimmed.is_empty() {
+                    return;
+                }
+                trimmed
+            } else {
+                chunk
+            };
+            self.answer_chars += clean.len();
 
             // Transition from thinking to answer
             if self.thinking_started && !self.answer_started {
@@ -188,17 +197,12 @@ impl StreamRenderer {
             let stdout = io::stdout();
             let mut handle = stdout.lock();
             if !self.bullet_started {
-                let clean = chunk.trim_start_matches('\n');
-                if clean.is_empty() {
-                    return;
-                }
                 self.bullet_started = true;
                 let _ = write!(handle, "  \x1b[1;36m●\x1b[0m \x1b[0m{}", clean);
-                self.at_line_start = clean.ends_with('\n');
             } else {
-                let _ = write!(handle, "\x1b[0m{}", chunk);
-                self.at_line_start = chunk.ends_with('\n');
+                let _ = write!(handle, "\x1b[0m{}", clean);
             }
+            self.at_line_start = clean.ends_with('\n');
             let _ = handle.flush();
         }
     }
@@ -269,5 +273,20 @@ impl StreamRenderer {
         }
         let _ = io::stdout().flush();
         stat_line
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_leading_newline_before_bullet_does_not_count_answer_or_close_thinking() {
+        let mut r = StreamRenderer::new(true);
+        r.thinking_started = true;
+        r.on_chunk("\n\n", false);
+        assert_eq!(r.answer_chars, 0);
+        assert!(!r.bullet_started);
+        assert!(!r.answer_started);
     }
 }

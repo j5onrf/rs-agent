@@ -649,8 +649,7 @@ impl LlmClient {
                     if let Some(fr) = choice.get("finish_reason").and_then(|f| f.as_str()) {
                         saw_finish = true;
                         if fr == "length" {
-                            eprintln!("
-[Notice: LLM generation reached token limit]");
+                            eprintln!("\n[Notice: LLM generation reached token limit]");
                         }
                     }
 
@@ -681,7 +680,7 @@ impl LlmClient {
                             }
                         }
 
-                        if delta.get("tool_calls").and_then(|v| v.as_array()).is_some() {
+                        if delta.get("tool_calls").and_then(|v| v.as_array()).is_some_and(|a| !a.is_empty()) {
                             has_emitted = true;
                             on_event(StreamEvent::ToolStart);
                             accumulate_tool_calls(delta, &mut tool_calls_map);

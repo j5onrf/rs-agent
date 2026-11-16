@@ -550,7 +550,7 @@ async fn execute_task_loop(
 
         if !ran_tools && tools::is_task_complete(&reply) {
             println!(
-                "\n  \x1b[1;32m✓ [Task Loop] Goal completed in {} step(s) ({} tool action(s) executed)!\x1b[0m\n",
+                "  \x1b[1;32m✓ [Task Loop] Goal completed in {} step(s) ({} tool action(s) executed)!\x1b[0m\n",
                 turn + 1,
                 total_tools_run
             );
@@ -562,7 +562,7 @@ async fn execute_task_loop(
         }
     }
 
-    println!("\n  \x1b[1;33m▲ [Task Loop] Reached max limit ({}) without completion marker.\x1b[0m\n", max_rounds);
+    println!("  \x1b[1;33m▲ [Task Loop] Reached max limit ({}) without completion marker.\x1b[0m\n", max_rounds);
     Ok(false)
 }
 
