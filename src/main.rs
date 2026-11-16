@@ -779,11 +779,6 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         print!("\x1b]0;rs-agent: {}\x07", second_line);
                         print!("\x1b[H\x1b[2J");
                         println!();
-                        if history.len() > 1 {
-                            println!("\x1b[1;32m✓\x1b[0m \x1b[2mModel updated · /r to reset\x1b[0m");
-                        } else {
-                            println!("\x1b[1;32m✓\x1b[0m \x1b[2mModel updated\x1b[0m");
-                        }
                         ui::draw_box_with_meta(&provider.model, &second_line, Some(&hud_meta), current_box_style, false);
                         let _ = io::stdout().flush();
                     } else {
