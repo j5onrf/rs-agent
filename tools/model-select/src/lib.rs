@@ -127,12 +127,26 @@ fn load_provider_slots(lines: &[String]) -> Vec<ProviderSlot> {
         let is_configured = has_active_model || is_active || (!is_dummy_val(key_val) && !key_val.is_empty());
         if is_configured {
             let mut slot_model = def_model.to_string();
+            let mut found_active = false;
             for m_line in lines {
-                let mu = m_line.trim().trim_start_matches('#').trim();
-                if mu.starts_with(&model_var) {
-                    let val = extract_quoted_val(mu);
+                let trimmed = m_line.trim();
+                if !trimmed.starts_with('#') && trimmed.starts_with(&model_var) {
+                    let val = extract_quoted_val(trimmed);
                     if !val.is_empty() {
                         slot_model = val.to_string();
+                        found_active = true;
+                        break;
+                    }
+                }
+            }
+            if !found_active {
+                for m_line in lines {
+                    let mu = m_line.trim().trim_start_matches('#').trim();
+                    if mu.starts_with(&model_var) {
+                        let val = extract_quoted_val(mu);
+                        if !val.is_empty() {
+                            slot_model = val.to_string();
+                        }
                     }
                 }
             }
@@ -177,7 +191,12 @@ fn load_provider_slots(lines: &[String]) -> Vec<ProviderSlot> {
                 if !val.is_empty() {
                     slot_name = val.to_string();
                 }
-            } else if uncommented.starts_with(&model_var) {
+            } else if !trimmed.starts_with('#') && trimmed.starts_with(&model_var) {
+                let val = extract_quoted_val(trimmed);
+                if !val.is_empty() {
+                    slot_model = val.to_string();
+                }
+            } else if slot_model == "default" && uncommented.starts_with(&model_var) {
                 let val = extract_quoted_val(uncommented);
                 if !val.is_empty() {
                     slot_model = val.to_string();
@@ -559,5 +578,24 @@ mod tests {
         assert!(reloaded[0].is_active && !reloaded[1].is_active);
         assert_eq!(tok, 65536);
         assert_eq!(rnd, 20);
+    }
+
+    #[test]
+    fn test_load_provider_slots_prioritizes_active_model_over_commented_presets() {
+        let lines: Vec<String> = vec![
+            "#OPENROUTER_API_KEY=\"sk-test\"\n".into(),
+            "OPENROUTER_MODEL=\"nvidia/nemotron-3-ultra-550b-a55b:free, nvidia/nemotron-3.5-lightning:free\"".into(),
+            "# OPENROUTER_MODEL=\"openrouter/free\"".into(),
+        ];
+        let slots = load_provider_slots(&lines);
+        let or_slot = slots.iter().find(|s| s.name == "OpenRouter").expect("OpenRouter slot missing");
+        assert_eq!(
+            or_slot.model,
+            "nvidia/nemotron-3-ultra-550b-a55b:free, nvidia/nemotron-3.5-lightning:free"
+        );
+        assert_eq!(
+            format_slot_model(&or_slot.model),
+            "nvidia/nemotron-3-ultra-550b-a55b:free (+1)"
+        );
     }
 }
