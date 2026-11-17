@@ -38,8 +38,8 @@
 | Invocation | Mode | Description |
 | :--- | :--- | :--- |
 | `[shortcut]` | **Shell Teleport** | Sub-`0.2ms` router via `rs-context.md` (`lfm`, `ling`, etc.) |
-| <img alt="" src="assets/prompt.svg" width="14" height="14" /> `ai` | **Interactive Chat** | Pure conversational REPL (`~180t` profile, thinking gutters, `/pad`) |
-| <img alt="" src="assets/prompt.svg" width="14" height="14" /> `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security sandbox |
+| <img alt="" src="assets/prompt2.svg" width="14" height="14" /> `ai` | **Interactive Chat** | Pure conversational REPL (`~180t` profile, thinking gutters, `/pad`) |
+| <img alt="" src="assets/prompt2.svg" width="14" height="14" /> `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security sandbox |
 
 **In-Session Slash Commands:**
 `/p` profile select • `/ms` model select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/b [1-7]` box themes • `/pad` spacing • `/tk` thinking view • `/r` reset
@@ -208,7 +208,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 | Binary | Tool | Purpose |
 | :--- | :--- | :--- |
-| <img alt="" src="assets/prompt.svg" width="14" height="14" /> `ms` | **Model Select** | Interactive TUI for switching active providers, `AI_MAX_TOKENS` (`4k`–`1M`), and loop limits |
+| <img alt="" src="assets/prompt2.svg" width="14" height="14" /> `ms` | **Model Select** | Interactive TUI for switching active providers, `AI_MAX_TOKENS` (`4k`–`1M`), and loop limits |
 | `newp` | **New Project** | Scaffolds workspace, `.rs/config.json`, profile, and `rs-context.md` aliases |
 | `idx` | **Index Map** | Generates token-dense Rust AST codebase maps (`index-map.txt`) |
 | `ta` | **Test Agent** | 10-pass live verification suite checking tools, security boundary, UI, and `--bridge` ACP |
@@ -218,7 +218,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 ## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Setup & Configuration
 
-### <img alt="" src="assets/prompt.svg" width="18" height="18" /> Quick Start (Linux x86_64)
+### <img alt="" src="assets/prompt2.svg" width="18" height="18" /> Quick Start (Linux x86_64)
 
 ```bash
 git clone https://github.com/j5onrf/rs-agent.git ~/.config/rs-agent
@@ -286,6 +286,7 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <a href="LICENSE">MIT License</a>
 </div>
+
 
 
 
