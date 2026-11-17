@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 52" width="900" height="52" role="img" aria-label="Rs-Agent">
+  <defs>
+    <style>
+      .ember { animation: breathe 4.8s ease-in-out infinite; }
+      .core { animation: breathe 4.8s ease-in-out infinite 0.6s; }
+      @keyframes breathe {
+        0%, 100% { fill-opacity: 0.55; }
+        50% { fill-opacity: 1.0; }
+      }
+    </style>
+    <radialGradient id="rust_glow" cx="50%" cy="50%" r="46%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.16"/>
+      <stop offset="55%" stop-color="#ce422b" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#ea580c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="horizon" gradientUnits="userSpaceOnUse" x1="56" y1="0" x2="844" y2="0">
+      <stop offset="0%" stop-color="#1e293b" stop-opacity="0"/>
+      <stop offset="24%" stop-color="#334155" stop-opacity="0.45"/>
+      <stop offset="42%" stop-color="#9a3412" stop-opacity="0.72"/>
+      <stop offset="50%" stop-color="#ea580c" stop-opacity="0.90"/>
+      <stop offset="58%" stop-color="#9a3412" stop-opacity="0.72"/>
+      <stop offset="76%" stop-color="#334155" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#1e293b" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="filament" gradientUnits="userSpaceOnUse" x1="340" y1="0" x2="560" y2="0">
+      <stop offset="0%" stop-color="#ce422b" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#f59e0b" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#ce422b" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="52" rx="10" fill="#0d1117"/>
+  <ellipse cx="450" cy="26" rx="260" ry="20" fill="url(#rust_glow)"/>
+
+  <line x1="56" y1="26" x2="844" y2="26" stroke="url(#horizon)" stroke-width="1"/>
+  <rect class="ember" x="340" y="25.25" width="220" height="1.5" rx="0.75" fill="url(#filament)"/>
+  <rect class="core" x="424" y="24.75" width="52" height="2.5" rx="1.25" fill="#f59e0b" style="opacity:0.85"/>
+</svg>

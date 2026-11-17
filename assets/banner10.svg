@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 56" width="900" height="56" role="img" aria-label="Rs-Agent">
+  <defs>
+    <style>
+      .t0 { animation: flow 4.4s ease-in-out infinite 0.0s; }
+      .t1 { animation: flow 4.4s ease-in-out infinite 1.2s; }
+      .t2 { animation: flow 4.4s ease-in-out infinite 2.4s; }
+      @keyframes flow {
+        0%, 100% { fill-opacity: 0.55; }
+        50% { fill-opacity: 1.0; }
+      }
+    </style>
+    <radialGradient id="rust_glow" cx="50%" cy="50%" r="46%">
+      <stop offset="0%" stop-color="#ea580c" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#ea580c" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="track_fade" gradientUnits="userSpaceOnUse" x1="56" y1="0" x2="844" y2="0">
+      <stop offset="0%" stop-color="#1e293b" stop-opacity="0"/>
+      <stop offset="20%" stop-color="#334155" stop-opacity="0.38"/>
+      <stop offset="50%" stop-color="#475569" stop-opacity="0.52"/>
+      <stop offset="80%" stop-color="#334155" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#1e293b" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="56" rx="10" fill="#0d1117"/>
+  <ellipse cx="450" cy="28" rx="300" ry="22" fill="url(#rust_glow)"/>
+
+  <g stroke="url(#track_fade)" stroke-width="1">
+    <line x1="56" y1="22" x2="844" y2="22"/>
+    <line x1="56" y1="34" x2="844" y2="34"/>
+  </g>
+
+  <rect class="t0" x="190" y="20.75" width="38" height="2.5" rx="1.25" fill="#475569" style="opacity:0.42"/>
+  <rect class="t1" x="318" y="20.75" width="78" height="2.5" rx="1.25" fill="#ce422b" style="opacity:0.78"/>
+  <rect class="t2" x="424" y="20.75" width="96" height="2.5" rx="1.25" fill="#f59e0b" style="opacity:0.92"/>
+  <circle class="t2" cx="520" cy="22" r="2.0" fill="#f59e0b"/>
+  <rect class="t0" x="612" y="20.75" width="44" height="2.5" rx="1.25" fill="#9a3412" style="opacity:0.48"/>
+
+  <rect class="t1" x="235" y="32.75" width="46" height="2.5" rx="1.25" fill="#9a3412" style="opacity:0.48"/>
+  <rect class="t2" x="368" y="32.75" width="104" height="2.5" rx="1.25" fill="#ea580c" style="opacity:0.86"/>
+  <circle class="t2" cx="472" cy="34" r="2.0" fill="#f59e0b"/>
+  <rect class="t0" x="502" y="32.75" width="68" height="2.5" rx="1.25" fill="#ce422b" style="opacity:0.72"/>
+  <rect class="t1" x="646" y="32.75" width="36" height="2.5" rx="1.25" fill="#475569" style="opacity:0.40"/>
+</svg>
