@@ -6,9 +6,9 @@
     </linearGradient>
   </defs>
   <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#sq_bg)"/>
-  <circle cx="43.5" cy="37" r="10.5" fill="#4a5968"/>
-  <path d="M 43.5 40 V 77 Q 43.5 90 56.5 90 H 78" fill="none" stroke="#4a5968" stroke-width="10.5" stroke-linecap="round"/>
-  <path d="M 43.5 43 Q 43.5 56 56.5 56 H 78" fill="none" stroke="#4a5968" stroke-width="10.5" stroke-linecap="round"/>
-  <rect x="74.5" y="46" width="20" height="20" rx="5.5" fill="#4a5968"/>
-  <rect x="74.5" y="80" width="20" height="20" rx="5.5" fill="#4a5968"/>
+  <circle cx="43.5" cy="37" r="10.5" fill="#0d1117"/>
+  <path d="M 43.5 40 V 77 Q 43.5 90 56.5 90 H 78" fill="none" stroke="#0d1117" stroke-width="10.5" stroke-linecap="round"/>
+  <path d="M 43.5 43 Q 43.5 56 56.5 56 H 78" fill="none" stroke="#0d1117" stroke-width="10.5" stroke-linecap="round"/>
+  <rect x="74.5" y="46" width="20" height="20" rx="5.5" fill="#0d1117"/>
+  <rect x="74.5" y="80" width="20" height="20" rx="5.5" fill="#0d1117"/>
 </svg>
