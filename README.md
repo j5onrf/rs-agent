@@ -121,7 +121,7 @@
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Runtime Architecture
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Runtime Architecture
 
 ```text
 Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─▶ Workspace Teleport
