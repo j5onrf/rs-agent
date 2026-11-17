@@ -1,9 +1,6 @@
 <div align="center">
 <img alt="" src="assets/logo.svg" />
 </div>
-<div align="center">
-<img alt="" src="assets/logo.svg" width="360" height="360" />
-</div>
 <h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
 
   <p>
