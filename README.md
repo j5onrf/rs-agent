@@ -29,7 +29,7 @@
 *\* Primary edge baselines • Auto-discovers local models on `http://127.0.0.1:8080`*
 
 * **Cloud Endpoints:** [Google Gemini](https://ai.google.dev) (`gemini-4-hydrogen`) • [OpenRouter](https://openrouter.ai) • [TokenHarbor](https://tokenharbor.ai) • [AMD Token Lab](https://notebooks.amd.com)
-* **Free Endpoints:** [`gemini-3.5-flash-lite`](https://ai.google.dev) • [`openrouter/free`](https://openrouter.ai/models?variant=free) • [`deepseek-v4.1-flash:free`](https://tokenharbor.ai) • [`DeepSeek-V4.1-Flash-1017`](https://notebooks.amd.com)
+* **Free Endpoints:** [`gemini-3.5-flash-lite`](https://ai.google.dev) • [`baidu/ernie-5.5-flash-preview:free`](https://openrouter.ai/baidu/ernie-5.5-flash-preview:free) • [`deepseek-v4.1-flash:free`](https://tokenharbor.ai) • [`DeepSeek-V4.1-Flash-1017`](https://notebooks.amd.com)
 
 ---
 
@@ -247,25 +247,22 @@ source ~/.config/rs-agent/rs-hook.sh
 <details>
 <summary><b>Provider Cascade &amp; Governors (<code>~/.config/rs-agent/.env</code>)</b></summary>
 
-Priority goes to the first uncommented active key; when all cloud keys are commented out, `rs-agent` falls back to local `llama-server` on `:8080`.
+Priority goes to the first uncommented active key; when all cloud keys are commented out, `rs-agent` falls back to local `llama-server` on `:8080`. Switch models with: /ms or ms.
 
 ```env
-# Rs-Agent Provider Cascade (.env) — Priority: First active key | Switch with: ms
-# Fallback: Local llama-server (:8080) when all cloud keys are commented with '#'.
-
 # ── 1. Google Gemini ──────────────────────────────────────────────────────────
 #GEMINI_API_KEY="AQ.your-key-here"
-GEMINI_MODEL="gemini-3.5-flash-lite"
+GEMINI_MODEL="gemini-3.5-flash-lite, gemini-4-hydrogen, gemini-3.8-flash, gemini-decision-1"
 
 # ── 2. OpenRouter ─────────────────────────────────────────────────────────────
 #OPENROUTER_API_KEY="sk-or-v1-your-key-here"
-OPENROUTER_MODEL="nvidia/nemotron-3.5-lightning:free, nvidia/nemotron-3-ultra-550b-a55b:free, openrouter/free"
+OPENROUTER_MODEL="nvidia/nemotron-3.5-lightning:free, nvidia/nemotron-3.5-super-vl:free, nvidia/nemotron-3-ultra-550b-a55b:free, baidu/ernie-5.5-flash-preview:free, openrouter/free"
 
 # ── 3. Custom Direct (CUSTOM1..CUSTOM9) ───────────────────────────────────────
 #CUSTOM1_API_KEY="thk_live_your-key-here"
 CUSTOM1_NAME="TokenHarbor"
 CUSTOM1_URL="https://tokenharbor.ai/v1/chat/completions"
-CUSTOM1_MODEL="deepseek-v4.1-flash:free, deepseek-v4-flash:free"
+CUSTOM1_MODEL="deepseek-v4.1-flash:free, mimo-v2.6-flash:free"
 
 # AMD Token Lab (Comma fallbacks)
 # CUSTOM2_NAME="AMD Token Lab"
@@ -286,8 +283,3 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <a href="LICENSE">MIT License</a>
 </div>
-
-
-
-
-
