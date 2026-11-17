@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Rs-Agent Logo">
   <defs>
     <linearGradient id="sq_bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#ee573d"/>
-      <stop offset="100%" stop-color="#c63722"/>
+      <stop offset="0%" stop-color="#f45746"/>
+      <stop offset="100%" stop-color="#ee4d3c"/>
     </linearGradient>
   </defs>
   <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#sq_bg)"/>
-  <circle cx="43.5" cy="37" r="10.5" fill="#242e38"/>
-  <path d="M 43.5 40 V 77 Q 43.5 90 56.5 90 H 78" fill="none" stroke="#242e38" stroke-width="10.5" stroke-linecap="round"/>
-  <path d="M 43.5 43 Q 43.5 56 56.5 56 H 78" fill="none" stroke="#242e38" stroke-width="10.5" stroke-linecap="round"/>
-  <rect x="74.5" y="46" width="20" height="20" rx="5.5" fill="#242e38"/>
-  <rect x="74.5" y="80" width="20" height="20" rx="5.5" fill="#242e38"/>
+  <circle cx="43.5" cy="37" r="10.5" fill="#4a5968"/>
+  <path d="M 43.5 40 V 77 Q 43.5 90 56.5 90 H 78" fill="none" stroke="#4a5968" stroke-width="10.5" stroke-linecap="round"/>
+  <path d="M 43.5 43 Q 43.5 56 56.5 56 H 78" fill="none" stroke="#4a5968" stroke-width="10.5" stroke-linecap="round"/>
+  <rect x="74.5" y="46" width="20" height="20" rx="5.5" fill="#4a5968"/>
+  <rect x="74.5" y="80" width="20" height="20" rx="5.5" fill="#4a5968"/>
 </svg>
