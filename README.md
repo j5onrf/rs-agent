@@ -1,7 +1,3 @@
-<div align="center">
-  <img alt="Rs-Agent" src="assets/banner.svg" width="100%" />
-</div>
-
 <h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
 
   <p>
@@ -23,7 +19,7 @@
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Tested Tiers & Endpoints
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Tested Tiers & Endpoints
 
 | Tier | Tested Models | Workload |
 | :--- | :--- | :--- |
@@ -37,7 +33,7 @@
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Execution Modes & Controls
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Execution Modes & Controls
 
 | Invocation | Mode | Description |
 | :--- | :--- | :--- |
@@ -50,7 +46,7 @@
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Client Surface: T3 Code ADE
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Client Surface: T3 Code ADE
 
 **[T3 Code](https://t3.codes)** connects to `ai --bridge` over stdio JSON-RPC 2.0 (ACP).
 
@@ -62,7 +58,7 @@
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> CLI Box Styles (`/box [1-7]`)
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> CLI Box Styles (`/box [1-7]`)
 
 * **`/box 1–6`:** Compact header, single-line `❯ ` prompt, `│ ` thinking gutter, inline stats, dense layout (`pad: false`).
 * **`/box 7` *(default)*:** 2-column profile HUD, ruled `────` input bar, `/` command menu, `∴` expanded thinking, spaced layout (`pad: true`).
@@ -144,7 +140,7 @@ Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─�
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Efficiency & Context Scaling
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Efficiency & Context Scaling
 
 ### Tool Schema Footprint
 
@@ -170,7 +166,7 @@ File reads and shell output scale with `AI_MAX_TOKENS`, spilling overflows to `.
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Workspace Profiles & Skills
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Workspace Profiles & Skills
 
 Configure tool tiers, reasoning, and MCP servers in `profiles/*.md`:
 
@@ -194,7 +190,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Agent Evaluation (`eval-stack`)
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Agent Evaluation (`eval-stack`)
 
 5-stage benchmark via `eva`:
 
@@ -208,7 +204,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Developer Tools (`tools/`)
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Developer Tools (`tools/`)
 
 | Binary | Tool | Purpose |
 | :--- | :--- | :--- |
@@ -220,7 +216,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 ---
 
-## <img alt="rs-agent" src="assets/logo.svg" width="26" height="26" /> Setup & Configuration
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Setup & Configuration
 
 ### <img alt="" src="assets/prompt.svg" width="18" height="18" /> Quick Start (Linux x86_64)
 
@@ -290,5 +286,6 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <a href="LICENSE">MIT License</a>
 </div>
+
 
 
