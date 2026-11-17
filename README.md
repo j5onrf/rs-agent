@@ -67,7 +67,7 @@
 <details>
 <summary><b>Preview all 7 box themes (halftone skeleton dither, dot slabs, 2-column header)</b></summary>
 
-```console
+```yaml
 ╭─ ○ ────────────────────────────────────────╮
 │  LFM3-1.7B                                 │
 │  chat                                      │
