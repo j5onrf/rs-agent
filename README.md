@@ -247,7 +247,7 @@ source ~/.config/rs-agent/rs-hook.sh
 <details>
 <summary><b>Provider Cascade &amp; Governors (<code>~/.config/rs-agent/.env</code>)</b></summary>
 
-Priority goes to the first uncommented active key; when all cloud keys are commented out, `rs-agent` falls back to local `llama-server` on `:8080`. Switch models with: /ms or ms.
+Priority goes to the first uncommented active key; when all cloud keys are commented out, `rs-agent` falls back to local `llama-server` on `:8080`. Model select with: /ms or ms.
 
 ```env
 # ── 1. Google Gemini ──────────────────────────────────────────────────────────
