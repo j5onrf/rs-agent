@@ -123,7 +123,7 @@
 
 ## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Runtime Architecture
 
-```text
+```yaml
 Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─▶ Workspace Teleport
                                      └─▶ ai / ai --bridge
                                             ├── client.rs   (streaming, retries, model fallback, reasoning)
