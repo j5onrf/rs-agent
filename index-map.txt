@@ -34,12 +34,15 @@
 #   ├── profiles/groot/groot2.md         - Groot-19B-A3B Autonomous Systems Engineer
 #   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer
 #   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer
+#   ├── profiles/nemo.md                 - NVIDIA Nemotron Ultra & Lightning Autonomous Systems Architect
 #   ├── profiles/purebash.md             - Pure Bash LFM Minimalist Shell Agent
+#   ├── profiles/qwen38.md               - Qwen3.8-35B-Distill (Local)
 #   ├── profiles/sage.md                 - InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent
 #   ├── profiles/tokenlab.md             - AMD Token Lab DeepSeek-V4.1-Flash Systems & Coding Engineer
 #   ├── projects/groot/New Document.txt
 #   ├── projects/lfm3/New Document.txt
-#   ├── projects/ling-tiny/test_calc.py  - def add(a, b):
+#   ├── projects/ling-tiny/math_utils.py - #!/usr/bin/env python3
+#   ├── projects/nemo/math_utils.py      - #!/usr/bin/env python3
 #   ├── projects/sage/test_calc.py       - def add(a, b):
 #   ├── projects/tokenlab/calc.py        - def add(a, b):
 #   ├── projects/tokenlab/test_calc.py   - import unittest
@@ -119,7 +122,7 @@
   }
   L139: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
   L156: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff, Mcp { .. } }
-  L1112: async fn main() -> anyhow :: Result<()>;
+  L1122: async fn main() -> anyhow :: Result<()>;
 ```
 
 ### `tools/model-select/src/lib.rs`
@@ -128,8 +131,8 @@
   L019: impl Drop for RawModeGuard {
     L020: fn drop(&mut self);
   }
-  L350: pub fn run_selector(alt_screen: bool) -> io :: Result<SelectOutcome>;
-  L526: mod tests;
+  L369: pub fn run_selector(alt_screen: bool) -> io :: Result<SelectOutcome>;
+  L545: mod tests;
 ```
 
 ### `tools/model-select/src/main.rs`
@@ -144,7 +147,7 @@
 
 ### `tools/test-agent/src/main.rs`
 ```rust
-  L393: async fn main();
+  L418: async fn main();
 ```
 
 ### `src/adapter.rs`
@@ -175,15 +178,15 @@
   }
   L095: pub struct LlmClient
   L102: pub fn is_local_endpoint(url: &str) -> bool;
-  L377: impl LlmClient {
-    L378: pub fn set_reasoning(&self, setting: Option<ReasoningSetting>);
-    L388: pub fn last_model(&self) -> String;
-    L392: pub fn new(config: ProviderConfig) -> Self;
-    L820: pub async fn stream_chat_raw_with_reasoning<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, reasoning_override: Option<Option<ReasoningSetting>>, mut on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
-    L839: pub async fn stream_chat_raw<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
-    L852: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>;
+  L386: impl LlmClient {
+    L387: pub fn set_reasoning(&self, setting: Option<ReasoningSetting>);
+    L397: pub fn last_model(&self) -> String;
+    L401: pub fn new(config: ProviderConfig) -> Self;
+    L834: pub async fn stream_chat_raw_with_reasoning<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, reasoning_override: Option<Option<ReasoningSetting>>, mut on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
+    L853: pub async fn stream_chat_raw<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
+    L866: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>;
   }
-  L946: mod tests;
+  L960: mod tests;
 ```
 
 ### `src/config.rs`
@@ -191,25 +194,25 @@
   L006: pub fn strip_inline_comment(s: &str) -> &str;
   L049: pub enum ToolTier { PureBash, Core4, Smol }
   L056: pub struct WorkspaceConfig { pub profile_name: String, pub is_agent: bool, pub tier: ToolTier, ... (5 fields) }
-  L066: impl Default for WorkspaceConfig {
-    L067: fn default() -> Self;
+  L067: impl Default for WorkspaceConfig {
+    L068: fn default() -> Self;
   }
-  L072: impl WorkspaceConfig {
-    L073: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
-    L083: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
+  L073: impl WorkspaceConfig {
+    L074: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
+    L084: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
   }
-  L092: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
-  L101: pub fn get_env_path() -> PathBuf;
-  L107: pub fn set_profile_max_tokens(val: Option<usize>);
-  L111: pub fn get_max_tokens() -> usize;
-  L124: pub fn get_max_rounds() -> usize;
-  L133: pub fn get_context_ceilings() -> ContextCeilings;
-  L146: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, ... (5 fields) }
-  L183: impl ProviderConfig {
-    L184: pub async fn load() -> Self;
+  L093: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
+  L102: pub fn get_env_path() -> PathBuf;
+  L108: pub fn set_profile_max_tokens(val: Option<usize>);
+  L112: pub fn get_max_tokens() -> usize;
+  L125: pub fn get_max_rounds() -> usize;
+  L134: pub fn get_context_ceilings() -> ContextCeilings;
+  L147: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, ... (5 fields) }
+  L184: impl ProviderConfig {
+    L185: pub async fn load() -> Self;
   }
-  L262: pub fn load_global_instructions() -> Option<String>;
-  L284: mod tests;
+  L263: pub fn load_global_instructions() -> Option<String>;
+  L285: mod tests;
 ```
 
 ### `src/matcher.rs`
@@ -264,9 +267,14 @@
     L434: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
     L476: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
     L519: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
+    L752: pub fn ensure_model_workspace(provider: &crate :: config :: ProviderConfig) -> Option<String>;
   }
-  L754: pub fn build_system_prompt(profile: &Profile, workspace: &Path, is_agent: bool, active_skills: &[String]) -> String;
-  L784: mod tests;
+  L800: pub fn model_slug(raw: &str) -> String;
+  L876: pub fn pick_short_alias(slug: &str, used_aliases: &HashSet<String>, check_path: bool) -> Option<String>;
+  L890: pub fn build_auto_profile_content(model: &str, is_local: bool) -> String;
+  L995: pub fn ensure_workspace_in_root(root: &Path, raw_model: &str, is_local: bool, check_path: bool ,) -> Option<String>;
+  L1100: pub fn build_system_prompt(profile: &Profile, workspace: &Path, is_agent: bool, active_skills: &[String]) -> String;
+  L1130: mod tests;
 ```
 
 ### `src/security.rs`
@@ -340,9 +348,10 @@
     L029: pub fn new(pad: bool) -> Self;
     L089: pub fn close_thinking(&mut self); // Closes thinking block; emits spacer line only when pad is true
     L116: pub fn on_chunk(&mut self, chunk: &str, is_thinking: bool);
-    L206: pub fn finish(&mut self, stats: &UsageStats, prompt_chars: usize);
-    L210: pub fn finish_with_print(&mut self, stats: &UsageStats, prompt_chars: usize, print_line: bool) -> String;
+    L210: pub fn finish(&mut self, stats: &UsageStats, prompt_chars: usize);
+    L214: pub fn finish_with_print(&mut self, stats: &UsageStats, prompt_chars: usize, print_line: bool) -> String;
   }
+  L279: mod tests;
 ```
 
 ### `src/tools.rs`
