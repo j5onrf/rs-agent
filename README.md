@@ -1,3 +1,9 @@
+<div align="center">
+<img alt="" src="assets/logo.svg" />
+</div>
+<div align="center">
+<img alt="" src="assets/logo.svg" width="360" height="360" />
+</div>
 <h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
 
   <p>
@@ -265,7 +271,7 @@ OPENROUTER_MODEL="nvidia/nemotron-3.5-lightning:free, nvidia/nemotron-3-ultra-55
 #CUSTOM1_API_KEY="thk_live_your-key-here"
 CUSTOM1_NAME="TokenHarbor"
 CUSTOM1_URL="https://tokenharbor.ai/v1/chat/completions"
-CUSTOM1_MODEL="deepseek-v4.1-flash:free"
+CUSTOM1_MODEL="deepseek-v4.1-flash:free, deepseek-v4-flash:free"
 
 # AMD Token Lab (Comma fallbacks)
 # CUSTOM2_NAME="AMD Token Lab"
