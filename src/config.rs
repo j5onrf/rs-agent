@@ -60,6 +60,7 @@ pub struct WorkspaceConfig {
     pub tier: ToolTier,
     #[serde(default)]
     pub adapters: bool,
+    #[serde(default)]
     pub delegate: bool,
 }
 
@@ -310,4 +311,5 @@ mod tests {
         assert_eq!(primary, "DeepSeek-V4.1-Flash");
         assert_eq!(fallbacks, vec!["Qwen3.8-27B", "Gemma-4-31B-IT"]);
     }
+
 }

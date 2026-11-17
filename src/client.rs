@@ -498,8 +498,16 @@ impl LlmClient {
                 }
             }
         } else if let Some(setting) = active_reasoning {
-            let effort = setting.to_cloud_tier(is_google, model);
-            body["reasoning_effort"] = serde_json::json!(effort);
+            if self.config.base_url.contains("openrouter.ai") {
+                body["reasoning"] = match setting {
+                    ReasoningSetting::Tokens(0) => serde_json::json!({ "effort": "none" }),
+                    ReasoningSetting::Tokens(n) => serde_json::json!({ "max_tokens": n }),
+                    ReasoningSetting::Tier(t) => serde_json::json!({ "effort": t }),
+                };
+            } else {
+                let effort = setting.to_cloud_tier(is_google, model);
+                body["reasoning_effort"] = serde_json::json!(effort);
+            }
         }
 
         body
@@ -1092,5 +1100,26 @@ mod tests {
         assert_eq!(extract_delta_reasoning(&serde_json::json!({"reasoning": "c"})), Some("c"));
         assert_eq!(extract_delta_reasoning(&serde_json::json!({"reasoning": {"encrypted": "x"}})), None);
         assert_eq!(extract_delta_reasoning(&serde_json::json!({"reasoning": null})), None);
+    }
+
+    #[test]
+    fn test_openrouter_uses_reasoning_max_tokens_without_reasoning_effort() {
+        let cfg = ProviderConfig {
+            base_url: "https://openrouter.ai/api/v1/chat/completions".into(),
+            api_key: "test".into(),
+            model: "nvidia/nemotron-3.5-lightning:free".into(),
+            fallback_models: Vec::new(),
+            max_tokens: 8192,
+        };
+        let client = LlmClient::new(cfg);
+        client.set_reasoning(Some(ReasoningSetting::Tokens(250)));
+        let b1 = client.build_request_body(&[ChatMessage::user("hi")], None);
+        assert_eq!(b1["reasoning"]["max_tokens"], 250);
+        assert!(b1.get("reasoning_effort").is_none());
+
+        client.set_reasoning(Some(ReasoningSetting::Tier("medium".into())));
+        let b2 = client.build_request_body(&[ChatMessage::user("hi")], None);
+        assert_eq!(b2["reasoning"]["effort"], "medium");
+        assert!(b2.get("reasoning_effort").is_none());
     }
 }

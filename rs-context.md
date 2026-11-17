@@ -2,6 +2,7 @@
 
 ```properties
 # --- Workspaces ---
+ai init ~/.config/rs-agent/projects/qwen38 ---> qwen38, qwe
 ai init ~/.config/rs-agent/projects/nemo ---> nemo, nem
 ai init ~/.config/rs-agent/projects/tokenlab ---> tok, tokenlab
 ai init ~/.config/rs-agent/projects/groot ---> groot, gro

@@ -748,8 +748,354 @@ impl Profile {
             }
         }
     }
+
+    pub fn ensure_model_workspace(provider: &crate::config::ProviderConfig) -> Option<String> {
+        let is_local = crate::client::is_local_endpoint(&provider.base_url);
+        let root = dirs::home_dir()?.join(".config/rs-agent");
+        ensure_workspace_in_root(&root, &provider.model, is_local, true)
+    }
 }
 
+fn is_param_size_tok(tok: &str) -> bool {
+    let t = tok.trim_start_matches('a');
+    if let Some(num) = t.strip_suffix('b') {
+        !num.is_empty() && num.chars().all(|c| c.is_ascii_digit() || c == '.')
+    } else {
+        false
+    }
+}
+
+fn is_noise_tok(tok: &str) -> bool {
+    is_param_size_tok(tok)
+        || matches!(
+            tok,
+            "q4" | "q5" | "q6" | "q8" | "iq4" | "fp16" | "bf16" | "gguf" | "instruct" | "it" | "chat"
+                | "preview" | "abliterated" | "distill" | "apex" | "miniplus" | "nanoplus" | "compact"
+                | "free" | "base" | "mtp" | "qad" | "versatile" | "hydrogen" | "flash" | "lite" | "mini"
+                | "tiny" | "ultra" | "lightning" | "coder" | "sonnet" | "opus" | "haiku" | "pro" | "plus"
+                | "i" | "v"
+        )
+}
+
+fn extract_version_digits(tok: &str) -> Option<String> {
+    if is_param_size_tok(tok) || is_noise_tok(tok) {
+        return None;
+    }
+    let clean = tok.strip_prefix('v').unwrap_or(tok);
+    let trimmed = clean.strip_suffix(".0").unwrap_or(clean);
+    if trimmed == "4o" {
+        return Some("4o".to_string());
+    }
+    if trimmed.is_empty() || trimmed.len() > 4 || !trimmed.chars().next()?.is_ascii_digit() {
+        return None;
+    }
+    let digits: String = trimmed.chars().filter(|c| c.is_ascii_digit()).collect();
+    if trimmed.chars().all(|c| c.is_ascii_digit() || c == '.') && !digits.is_empty() && digits.len() <= 3 {
+        Some(digits)
+    } else {
+        None
+    }
+}
+
+pub fn model_slug(raw: &str) -> String {
+    let tail = raw.trim().rsplit('/').next().unwrap_or("");
+    let before_tag = tail.split(':').next().unwrap_or("");
+    let stripped = before_tag.strip_suffix(".gguf").or_else(|| before_tag.strip_suffix(".GGUF")).unwrap_or(before_tag);
+
+    let tokens: Vec<String> = stripped
+        .split(['-', '_', ' '])
+        .map(|s| s.trim().to_ascii_lowercase())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    let mut idx = tokens.iter().position(|t| !is_noise_tok(t)).unwrap_or(0);
+    let Some(first) = tokens.get(idx) else {
+        return String::new();
+    };
+    let clean_first = first.strip_suffix(".0").unwrap_or(first);
+    let mut slug: String = clean_first.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+    idx += 1;
+
+    if !slug.chars().any(|c| c.is_ascii_digit()) {
+        let mut ver_added = 0;
+        while idx < tokens.len() && ver_added < 2 {
+            let tok = &tokens[idx];
+            if tok == "v" {
+                idx += 1;
+                continue;
+            }
+            if let Some(ver) = extract_version_digits(tok) {
+                if slug.len() + ver.len() <= 10 {
+                    slug.push_str(&ver);
+                }
+                ver_added += 1;
+                idx += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    slug.chars().take(10).collect()
+}
+
+fn command_shadows_shell(cmd: &str) -> bool {
+    const BUILTINS: &[&str] = &[
+        "alias", "bg", "cd", "echo", "eval", "exec", "exit", "export", "false", "fc", "fg", "hash", "jobs",
+        "kill", "local", "printf", "pwd", "read", "set", "shift", "shopt", "test", "times", "trap", "true",
+        "type", "ulimit", "umask", "unset", "wait",
+    ];
+    if BUILTINS.contains(&cmd) {
+        return true;
+    }
+    let Some(path_var) = std::env::var_os("PATH") else {
+        return false;
+    };
+    for dir in std::env::split_paths(&path_var) {
+        if dir.ends_with("rs-agent/target/release") {
+            continue;
+        }
+        let cand = dir.join(cmd);
+        if let Ok(meta) = fs::metadata(&cand) {
+            if meta.is_file() {
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    if meta.permissions().mode() & 0o111 != 0 {
+                        return true;
+                    }
+                }
+                #[cfg(not(unix))]
+                return true;
+            }
+        }
+    }
+    false
+}
+
+pub fn pick_short_alias(slug: &str, used_aliases: &HashSet<String>, check_path: bool) -> Option<String> {
+    let alnum: String = slug.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
+    if alnum.len() <= 3 {
+        return None;
+    }
+    for len in 3..alnum.len() {
+        let cand = &alnum[..len];
+        if cand != slug && !used_aliases.contains(cand) && (!check_path || !command_shadows_shell(cand)) {
+            return Some(cand.to_string());
+        }
+    }
+    None
+}
+
+pub fn build_auto_profile_content(model: &str, is_local: bool) -> String {
+    if is_local {
+        format!(
+            "---\ndescription: \"{model} (Local)\"\nadapters: true\nreasoning_budget: 500\n---\nROLE: {model} Engineer.\n- Greetings/chat: 1 sentence, 0 tools, minimal thought.\n- Tools: Emit directly, no preamble/filler, relative paths only.\n- Inspect (`list_dir`/`search_code`/`read_file`) -> Edit (`edit_file`/`write_file`). Never `read_file` after own write/edit.\n- Run `run_command` only if tests requested; never repeat identical failing command without edit.\n- Halt: `✓ Task complete: <summary>`\n"
+        )
+    } else {
+        format!(
+            "---\ndescription: \"{model} (Cloud)\"\ncore4: true\nctx: 65536\nreasoning_budget: medium\n---\nROLE: {model} Engineer.\n- Greetings/questions: Reply directly (1 sentence for greetings), 0 tools/commands, minimal thought.\n- Tasks: Parallel `read_file` -> `edit_file`/`write_file` -> `run_command` tests. No filler.\n- Halt: `✓ Task complete: <summary>`\n"
+        )
+    }
+}
+
+fn read_profile_description(prof_path: &Path) -> Option<String> {
+    let content = fs::read_to_string(prof_path).ok()?;
+    let mut in_fm = false;
+    for line in content.lines() {
+        let t = line.trim();
+        if t == "---" {
+            if !in_fm {
+                in_fm = true;
+                continue;
+            }
+            break;
+        }
+        if in_fm {
+            if let Some((k, v)) = t.split_once(':') {
+                if k.trim() == "description" {
+                    return Some(strip_inline_comment(v.trim()).trim_matches(['"', '\'']).to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn find_profile_file_in(profiles_dir: &Path, profile_name: &str) -> Option<PathBuf> {
+    let direct = profiles_dir.join(format!("{profile_name}.md"));
+    if direct.is_file() {
+        return Some(direct);
+    }
+    let stem = profile_name.split('/').next_back().unwrap_or(profile_name);
+    if let Ok(entries) = fs::read_dir(profiles_dir) {
+        for entry in entries.flatten() {
+            if entry.path().is_dir() {
+                let sub = entry.path().join(format!("{stem}.md"));
+                if sub.is_file() {
+                    return Some(sub);
+                }
+            }
+        }
+    }
+    None
+}
+
+fn workspace_matches_model(
+    proj_dir: &Path,
+    profiles_dir: &Path,
+    raw_model: &str,
+    base: &str,
+    is_local: bool,
+) -> bool {
+    let Some(dir_name) = proj_dir.file_name().and_then(|n| n.to_str()) else {
+        return false;
+    };
+    let cfg = crate::config::WorkspaceConfig::load_or_default(proj_dir);
+    let desc = find_profile_file_in(profiles_dir, &cfg.profile_name)
+        .and_then(|p| read_profile_description(&p))
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+
+    if desc.ends_with("(local)") && !is_local {
+        return false;
+    }
+    if desc.ends_with("(cloud)") && is_local {
+        return false;
+    }
+
+    let model_low = raw_model.to_ascii_lowercase();
+    if !desc.is_empty() && desc.contains(&model_low) && (desc.ends_with("(local)") || desc.ends_with("(cloud)") || is_local == cfg.adapters) {
+        return true;
+    }
+    if is_local == cfg.adapters {
+        if dir_name.eq_ignore_ascii_case(base) {
+            return true;
+        }
+        let candidates = vec![dir_name.to_string(), cfg.profile_name.clone()];
+        if !Profile::find_model_candidates(raw_model, &candidates).is_empty() {
+            return true;
+        }
+    }
+    false
+}
+
+fn has_project_route(ctx_content: &str, slug: &str) -> bool {
+    let needle = format!("projects/{slug}");
+    ctx_content.lines().any(|line| {
+        if let Some(pos) = line.find(&needle) {
+            let after = &line[pos + needle.len()..];
+            after.is_empty() || after.starts_with([' ', '\t', '-'])
+        } else {
+            false
+        }
+    })
+}
+
+pub fn ensure_workspace_in_root(
+    root: &Path,
+    raw_model: &str,
+    is_local: bool,
+    check_path: bool,
+) -> Option<String> {
+    let model = raw_model.trim();
+    if model.is_empty() || model.eq_ignore_ascii_case("local-model") || model.eq_ignore_ascii_case("default") {
+        return None;
+    }
+
+    let base = model_slug(model);
+    if base.is_empty() {
+        return None;
+    }
+
+    let projects_dir = root.join("projects");
+    let profiles_dir = root.join("profiles");
+
+    if let Ok(entries) = fs::read_dir(&projects_dir) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if !p.is_dir() {
+                continue;
+            }
+            let Some(name) = p.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if name == "chat" || name.starts_with('.') {
+                continue;
+            }
+            if workspace_matches_model(&p, &profiles_dir, model, &base, is_local) {
+                return None;
+            }
+        }
+    }
+
+    let mut candidates = vec![base.clone(), format!("{base}-{}", if is_local { 'l' } else { 'c' })];
+    for n in 2..=4 {
+        candidates.push(format!("{base}-{n}"));
+    }
+
+    let slug = candidates.into_iter().find(|c| {
+        let proj_exists = projects_dir.join(c).exists();
+        if proj_exists {
+            return false;
+        }
+        // Avoid reusing a profile file created for the opposite mode (local vs cloud)
+        if let Some(desc) = read_profile_description(&profiles_dir.join(format!("{c}.md"))) {
+            let low = desc.to_ascii_lowercase();
+            if (is_local && low.ends_with("(cloud)")) || (!is_local && low.ends_with("(local)")) {
+                return false;
+            }
+        }
+        true
+    })?;
+
+    let proj_dir = projects_dir.join(&slug);
+    let cfg = crate::config::WorkspaceConfig {
+        profile_name: slug.clone(),
+        is_agent: true,
+        tier: if is_local { ToolTier::Smol } else { ToolTier::Core4 },
+        adapters: is_local,
+        delegate: false,
+    };
+    cfg.save(&proj_dir).ok()?;
+
+    let _ = fs::create_dir_all(&profiles_dir);
+    let prof_path = profiles_dir.join(format!("{slug}.md"));
+    if !prof_path.exists() {
+        let _ = fs::write(&prof_path, build_auto_profile_content(model, is_local));
+    }
+
+    let ctx_path = root.join("rs-context.md");
+    let ctx_content = fs::read_to_string(&ctx_path).unwrap_or_default();
+    if !has_project_route(&ctx_content, &slug) {
+        let mut used: HashSet<String> = HashSet::new();
+        for line in ctx_content.lines() {
+            if let Some(entry) = crate::matcher::ContextEntry::parse(line) {
+                used.extend(entry.aliases);
+            }
+        }
+        let aliases = match pick_short_alias(&slug, &used, check_path) {
+            Some(short) => format!("{slug}, {short}"),
+            None => slug.clone(),
+        };
+        let route_line = format!("ai init ~/.config/rs-agent/projects/{slug} ---> {aliases}");
+        let mut out_lines = Vec::new();
+        let mut inserted = false;
+        for line in ctx_content.lines() {
+            out_lines.push(line.to_string());
+            if !inserted && line.trim() == "# --- Workspaces ---" {
+                out_lines.push(route_line.clone());
+                inserted = true;
+            }
+        }
+        if !inserted {
+            out_lines.push(route_line);
+        }
+        let _ = fs::write(&ctx_path, out_lines.join("\n") + "\n");
+    }
+
+    Some(slug)
+}
 
 pub fn build_system_prompt(profile: &Profile, workspace: &Path, is_agent: bool, active_skills: &[String]) -> String {
     let mut prompt = if is_agent {
@@ -855,5 +1201,64 @@ mod tests {
     fn test_profile_parses_ctx_override() {
         let p = Profile::parse("---\nctx: 65536\n---\nhi");
         assert_eq!(p.ctx, Some(65536));
+    }
+
+    #[test]
+    fn test_model_slug_normalizes_local_and_cloud_names() {
+        assert_eq!(model_slug("Ling-3.0-tiny"), "ling3");
+        assert_eq!(model_slug("LFM3-1.7B-QAD-Q4_0.gguf"), "lfm3");
+        assert_eq!(model_slug("Qwen3.8-35B-A3B-Distill-MTP-APEX-I-MiniPlus-V2.1"), "qwen38");
+        assert_eq!(model_slug("Gemma-4-31B-IT"), "gemma4");
+        assert_eq!(model_slug("nvidia/nemotron-3.5-lightning:free"), "nemotron35");
+        assert_eq!(model_slug("DeepSeek-V4.1-Flash"), "deepseek41");
+        assert_eq!(model_slug("claude-3-5-sonnet-20241022"), "claude35");
+        assert_eq!(model_slug("openai/gpt-4o"), "gpt4o");
+        assert_eq!(model_slug("Flint-40B-A2.5B-APEX-I-NanoPlus-V2.1"), "flint");
+    }
+
+    #[test]
+    fn test_pick_short_alias_steps_3_to_4_to_5_avoiding_collisions() {
+        let used: HashSet<String> = ["qwe", "qwen"].into_iter().map(String::from).collect();
+        assert_eq!(pick_short_alias("qwen38", &used, false).as_deref(), Some("qwen3"));
+        assert_eq!(pick_short_alias("gpt", &used, false), None);
+    }
+
+    #[test]
+    fn test_build_auto_profile_content_local_vs_cloud() {
+        let local = build_auto_profile_content("Qwen3.8-35B", true);
+        assert!(local.contains("adapters: true") && !local.contains("core4: true"));
+        assert!(!local.contains("ctx:") && local.contains("reasoning_budget: 500"));
+        for tool in ["list_dir", "search_code", "read_file", "edit_file", "write_file", "run_command"] {
+            assert!(local.contains(tool), "missing {tool}");
+        }
+
+        let cloud = build_auto_profile_content("Gemma-4-31B-IT", false);
+        assert!(cloud.contains("core4: true") && !cloud.contains("adapters: true"));
+        assert!(cloud.contains("ctx: 65536") && cloud.contains("reasoning_budget: medium"));
+        for tool in ["read_file", "edit_file", "write_file", "run_command"] {
+            assert!(cloud.contains(tool), "missing {tool}");
+        }
+    }
+
+    #[test]
+    fn test_ensure_workspace_in_root_scaffolds_once_and_separates_local_cloud() {
+        let tmp = std::env::temp_dir().join(format!("rs_agent_scaffold_test_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        fs::write(tmp.join("rs-context.md"), "# --- Workspaces ---\n").unwrap();
+
+        assert_eq!(ensure_workspace_in_root(&tmp, "local-model", true, false), None);
+
+        let created = ensure_workspace_in_root(&tmp, "Gemma-4-31B-IT", true, false);
+        assert_eq!(created.as_deref(), Some("gemma4"));
+        assert_eq!(ensure_workspace_in_root(&tmp, "Gemma-4-31B-IT", true, false), None);
+
+        let cloud = ensure_workspace_in_root(&tmp, "google/gemma-4-31b:free", false, false);
+        assert_eq!(cloud.as_deref(), Some("gemma4-c"));
+
+        let ctx_txt = fs::read_to_string(tmp.join("rs-context.md")).unwrap();
+        assert!(ctx_txt.contains("projects/gemma4 ---> gemma4, gem"));
+        assert!(ctx_txt.contains("projects/gemma4-c ---> gemma4-c, gemm"));
+        let _ = fs::remove_dir_all(&tmp);
     }
 }

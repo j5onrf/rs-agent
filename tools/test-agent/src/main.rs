@@ -278,6 +278,31 @@ impl TestRunner {
         let skill = Skill::parse("ponytail", "---\ndescription: \"x\"\n---\nKeep it minimal.");
         let skill_ok = skill.name == "ponytail" && skill.content == "Keep it minimal.";
         self.record(prof_ok && skill_ok, "LIVE Profile & Skill Frontmatter Parsers", "core4, xhigh, adapters, delegate");
+
+        let ta_root = std::env::temp_dir().join(format!("rs-agent-ta-scaffold-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&ta_root);
+        let _ = fs::create_dir_all(&ta_root);
+        let _ = fs::write(ta_root.join("rs-context.md"), "# --- Workspaces ---\n");
+        let skip_local = rs_agent::profile::ensure_workspace_in_root(&ta_root, "local-model", true, false).is_none();
+        let loc_slug = rs_agent::profile::ensure_workspace_in_root(&ta_root, "Gemma-4-31B-IT", true, false);
+        let idemp_ok = rs_agent::profile::ensure_workspace_in_root(&ta_root, "Gemma-4-31B-IT", true, false).is_none();
+        let cld_slug = rs_agent::profile::ensure_workspace_in_root(&ta_root, "google/gemma-4-31b:free", false, false);
+        let loc_prof = fs::read_to_string(ta_root.join("profiles/gemma4.md")).unwrap_or_default();
+        let cld_prof = fs::read_to_string(ta_root.join("profiles/gemma4-c.md")).unwrap_or_default();
+        let ctx_ok = fs::read_to_string(ta_root.join("rs-context.md"))
+            .map(|c| c.contains("projects/gemma4 ---> gemma4, gem") && c.contains("projects/gemma4-c ---> gemma4-c, gemm"))
+            .unwrap_or(false);
+        let scaffold_ok = skip_local
+            && loc_slug.as_deref() == Some("gemma4")
+            && idemp_ok
+            && cld_slug.as_deref() == Some("gemma4-c")
+            && loc_prof.contains("adapters: true")
+            && !loc_prof.contains("ctx:")
+            && cld_prof.contains("core4: true")
+            && cld_prof.contains("ctx: 65536")
+            && ctx_ok;
+        let _ = fs::remove_dir_all(&ta_root);
+        self.record(scaffold_ok, "LIVE Auto-Scaffold (Slug, Alias & Local/Cloud Separation)", "gemma4 + gemma4-c verified");
         println!();
 
         // [Pass 8/10] LIVE Terminal UI Box Engine & State Read

@@ -564,12 +564,14 @@ async fn execute_task_loop(
 }
 
 async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<()> {
+    let mut provider = ProviderConfig::load().await;
+    Profile::ensure_model_workspace(&provider);
+
     if !target_dir.exists() {
         std::fs::create_dir_all(target_dir)?;
     }
     let _ = env::set_current_dir(target_dir);
 
-    let mut provider = ProviderConfig::load().await;
     let mut client = LlmClient::new(provider.clone());
     let boundary = SecurityBoundary::new(target_dir);
 
@@ -770,6 +772,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 Ok(outcome) => {
                     if outcome.changed {
                         provider = ProviderConfig::load().await;
+                        if Profile::ensure_model_workspace(&provider).is_some() {
+                            router = matcher::ContextRouter::load();
+                        }
                         client = LlmClient::new(provider.clone());
                         client.set_reasoning(active_profile.reasoning_budget.clone());
                         rs_agent::config::set_profile_max_tokens(active_profile.ctx);
