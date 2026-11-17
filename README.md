@@ -1,4 +1,4 @@
-<h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
+<h1><img alt="" src="assets/prompt.svg" width="36" height="36" /> Rs-Agent</h1>
 
   <p>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.4.svg?variant=secondary" alt="Version"></a>
@@ -286,6 +286,7 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <a href="LICENSE">MIT License</a>
 </div>
+
 
 
 
