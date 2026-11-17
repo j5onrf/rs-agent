@@ -1,20 +1,11 @@
-<svg id="svg-7" xmlns="http://www.w3.org/2000/svg" viewBox="35 35 230 230">
-          <defs>
-            <linearGradient id="tor-a" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#00F2FE"/>
-              <stop offset="100%" stop-color="#3A7BD5"/>
-            </linearGradient>
-            <linearGradient id="tor-b" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stop-color="#3A7BD5"/>
-              <stop offset="100%" stop-color="#4FACFE"/>
-            </linearGradient>
-          </defs>
-          <g>
-            <!-- Loop A -->
-            <path d="M 150 55 A 75 75 0 1 0 225 130" fill="none" stroke="url(#tor-a)" stroke-width="36" stroke-linecap="round"/>
-            <!-- Loop B (Interweaving) -->
-            <path d="M 150 245 A 75 75 0 1 0 75 170" fill="none" stroke="url(#tor-b)" stroke-width="36" stroke-opacity="0.88" stroke-linecap="round"/>
-            <circle cx="150" cy="55" r="15" fill="#00F2FE"/>
-            <circle cx="150" cy="245" r="15" fill="#3A7BD5"/>
-          </g>
-        </svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Rs-Agent Rust Logo">
+  <defs>
+    <linearGradient id="sq_bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ee573d"/>
+      <stop offset="100%" stop-color="#c63722"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#sq_bg)"/>
+  <path d="M 38 42 L 62 64 L 38 86" fill="none" stroke="#242e38" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="68" y="75" width="24" height="12" rx="6" fill="#242e38"/>
+</svg>

@@ -1,14 +1,15 @@
 <div align="center">
-<img alt="" src="assets/logo.svg" />
+  <img alt="Rs-Agent" src="assets/banner.svg" width="100%" />
 </div>
+
 <h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
 
   <p>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.4.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=branded&brand=cplusplus" alt="C++"></a>
-    <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT-green.svg" alt="License"></a>
-    <a href="https://shieldcn.dev/badge/status-beta-blue.svg"><img src="https://shieldcn.dev/badge/status-beta-blue.svg" alt="Status"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=secondary&logo=cplusplus" alt="C++"></a>
+    <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT.svg?variant=secondary" alt="License"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/status-beta.svg?variant=secondary" alt="Status"></a>
   </p>
 
   <p>
@@ -287,7 +288,7 @@ AI_MAX_AGENT_ROUNDS="10"
 ---
 
 <div align="center">
-  <sub><a href="LICENSE">MIT License</a></sub>
+  <a href="LICENSE">MIT License</a>
 </div>
 
 
