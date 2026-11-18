@@ -566,6 +566,7 @@ async fn execute_task_loop(
 async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<()> {
     let mut provider = ProviderConfig::load().await;
     Profile::ensure_model_workspace(&provider);
+    ui::set_endpoint(&provider.base_url);
 
     if !target_dir.exists() {
         std::fs::create_dir_all(target_dir)?;
@@ -654,7 +655,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     let mut max_rounds = rs_agent::config::get_max_rounds();
 
     loop {
-        let minimal_ui = current_box_style != 7;
+        let minimal_ui = current_box_style != 7 && current_box_style != 8;
         let default_status = format!("{} · {}", second_line, provider.model);
         let status_display = last_stat_line.as_deref().unwrap_or(&default_status);
 
@@ -775,6 +776,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                         if Profile::ensure_model_workspace(&provider).is_some() {
                             router = matcher::ContextRouter::load();
                         }
+                        ui::set_endpoint(&provider.base_url);
                         client = LlmClient::new(provider.clone());
                         client.set_reasoning(active_profile.reasoning_budget.clone());
                         rs_agent::config::set_profile_max_tokens(active_profile.ctx);
@@ -968,14 +970,14 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
         if input == "/b" || input.starts_with("/b ") || input == "/box" || input.starts_with("/box ") {
             let parts: Vec<&str> = input.split_whitespace().collect();
             current_box_style = if parts.len() > 1 {
-                let parsed = parts[1].parse::<usize>().unwrap_or((current_box_style % 7) + 1);
-                if (1..=7).contains(&parsed) {
+                let parsed = parts[1].parse::<usize>().unwrap_or((current_box_style % 8) + 1);
+                if (1..=8).contains(&parsed) {
                     parsed
                 } else {
-                    (current_box_style % 7) + 1
+                    (current_box_style % 8) + 1
                 }
             } else {
-                (current_box_style % 7) + 1
+                (current_box_style % 8) + 1
             };
             state::set_box_style(current_box_style);
 
@@ -1082,7 +1084,7 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             };
 
             if tool_calls.is_none() || tool_calls.as_ref().map(|v| v.is_empty()).unwrap_or(true) {
-                let stat_str = renderer.finish_with_print(&stats, history_char_count(&history), current_box_style != 7);
+                let stat_str = renderer.finish_with_print(&stats, history_char_count(&history), current_box_style != 7 && current_box_style != 8);
                 last_stat_line = Some(stat_str);
 
                 let used_model = client.last_model();

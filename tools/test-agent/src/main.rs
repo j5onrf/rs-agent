@@ -309,16 +309,18 @@ impl TestRunner {
         println!("[Pass 8/10] LIVE Terminal UI Box Engine & State Read");
         let expected_lines = [(1, 4), (2, 4), (3, 2), (4, 5), (5, 3), (6, 5)];
         let (lines7, count7) = render_frame("Ling-3.0-tiny", "chat", 7, 1.0);
+        let (lines8, count8) = render_frame("Ling-3.0-tiny", "chat", 8, 1.0);
         let ui_ok = expected_lines.iter().all(|&(style, want)| {
             let (lines, count) = render_frame("Ling-3.0-tiny", "chat", style, 1.0);
             count == want && lines.len() == want && lines.iter().all(|l| !l.is_empty())
-        }) && count7 >= 5 && lines7.len() == count7 && lines7.iter().all(|l| !l.is_empty());
-        self.record(ui_ok, "LIVE UI render_frame() Across Box Styles 1..=7", "All 7 styles rendered expected dimensions");
+        }) && count7 >= 5 && lines7.len() == count7 && lines7.iter().all(|l| !l.is_empty())
+           && count8 == 5 && lines8.len() == 5 && lines8.iter().all(|l| !l.is_empty());
+        self.record(ui_ok, "LIVE UI render_frame() Across Box Styles 1..=8", "All 8 styles rendered expected dimensions");
 
         let box_style = get_box_style();
         let _pad = get_pad();
         self.record(
-            (1..=7).contains(&box_style),
+            (1..=8).contains(&box_style),
             "LIVE AppState Load (box_style & pad)",
             &format!("Active box_style={}", box_style),
         );

@@ -45,7 +45,7 @@ fn save_state(state: &AppState) {
 
 pub fn get_box_style() -> usize {
     let style = load_state().box_style;
-    if (1..=7).contains(&style) {
+    if (1..=8).contains(&style) {
         style
     } else {
         AppState::default().box_style
@@ -54,8 +54,8 @@ pub fn get_box_style() -> usize {
 
 fn apply_box_style(state: &mut AppState, style: usize) {
     state.box_style = style;
-    state.pad = style == 7;
-    state.show_thinking_summaries = if style == 7 { Some(true) } else { None };
+    state.pad = style == 7 || style == 8;
+    state.show_thinking_summaries = if style == 7 || style == 8 { Some(true) } else { None };
 }
 
 pub fn set_box_style(style: usize) {
@@ -100,6 +100,10 @@ mod tests {
         assert_eq!(s.show_thinking_summaries, None);
 
         apply_box_style(&mut s, 7);
+        assert!(s.pad);
+        assert_eq!(s.show_thinking_summaries, Some(true));
+
+        apply_box_style(&mut s, 8);
         assert!(s.pad);
         assert_eq!(s.show_thinking_summaries, Some(true));
     }

@@ -42,7 +42,7 @@
 | <img alt="" src="assets/prompt2.svg" width="14" height="14" /> `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security sandbox |
 
 **In-Session Slash Commands:**
-`/p` profile select • `/ms` model select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/b [1-7]` box themes • `/pad` spacing • `/tk` thinking view • `/r` reset
+`/p` profile select • `/ms` model select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/b [1-8]` box themes • `/pad` spacing • `/tk` thinking view • `/r` reset
 
 ---
 
@@ -58,14 +58,14 @@
 
 ---
 
-## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> CLI Box Styles (`/box [1-7]`)
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> CLI Box Styles (`/box [1-8]`)
 
 * **`/box 1–6`:** Compact header, single-line `❯ ` prompt, `│ ` thinking gutter, inline stats, dense layout (`pad: false`).
-* **`/box 7` *(default)*:** 2-column profile HUD, ruled `────` input bar, `/` command menu, `∴` expanded thinking, spaced layout (`pad: true`).
-* **`/think`:** Cycle reasoning display between expanded `∴` italic (Box 7 default), `│ ` gutter (Boxes 1–6 default), or collapsed `∴ Thought for Xs` (persisted via `"showThinkingSummaries"` in `state.json`).
+* **`/box 7–8` *(Box 7 default)*:** 2-column profile HUD (4-row standard or 3-row compact), ruled `────` input bar, `/` command menu, `∴` expanded thinking, spaced layout (`pad: true`).
+* **`/think`:** Cycle reasoning display between expanded `∴` italic (Box 7/8 default), `│ ` gutter (Boxes 1–6 default), or collapsed `∴ Thought for Xs` (persisted via `"showThinkingSummaries"` in `state.json`).
 
 <details>
-<summary><b>Preview all 7 box themes (halftone skeleton dither, dot slabs, 2-column header)</b></summary>
+<summary><b>Preview all 8 box themes (halftone skeleton dither, dot slabs)</b></summary>
 
 ```yaml
 ╭─ ○ ────────────────────────────────────────╮
@@ -98,22 +98,16 @@
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
 ╭─── rs-agent v0.7.5 ──────────────────────────────────────────────────────────────────────╮
-│   ╭────╮  Ling-3.0-tiny                    │ 6-tool · t350 · adp                         │
-│   │ Li │  lingtiny                         │ Type / for commands · Tab completes         │
-│   ╰────╯  git: main · 11 modified          │ ─────────────────────────────────────────── │
-│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · 10 steps · local :8080          │
-╰──────────────────────────────────────────────────────────────────────────────────────────╯
-╭─── rs-agent v0.7.5 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ purebash · t256 · adp · mcp:photocraft(7)   │
 │   │ Li │  artcraft/photocraft-l            │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · clean                │ ─────────────────────────────────────────── │
-│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · 15 steps · local :8080          │
+│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · 15 steps · local :8080           │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
+
 ╭─── rs-agent v0.7.5 ──────────────────────────────────────────────────────────────────────╮
-│   ╭────╮  DeepSeek-V4.1-Flash              │ core4 · medium                              │
-│   │ De │  tokenlab                         │ Type / for commands · Tab completes         │
-│   ╰────╯  git: main · 7 modified           │ ─────────────────────────────────────────── │
-│   ~/.config/rs-agent/projects/tokenlab     │ ctx 65.5k · 15 steps · tokenlab            │
+│   ╭────╮  nvidia/nemotron-3.5-lightning:fr…│ core4 · medium                              │
+│   │ nv │  nemo                             │ ─────────────────────────────────────────── │
+│   ╰────╯  git: main · 9 modified           │ ctx 65.5k · 10 steps · openrouter           │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 

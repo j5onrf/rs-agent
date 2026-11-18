@@ -282,6 +282,115 @@ fn short_cwd() -> String {
     s
 }
 
+fn render_compact_agent_box(
+    model: &str,
+    profile: &str,
+    meta: Option<&str>,
+    git_info: &str,
+    progress: f64,
+) -> (Vec<String>, usize) {
+    let term_w = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(92);
+    let w = term_w.saturating_sub(2).clamp(48, 92);
+    let ver = env!("CARGO_PKG_VERSION");
+    let title_plain = format!(" rs-agent v{} ", ver);
+    let title_colored = format!(" {ANSI_BRIGHT}rs-agent{ANSI_RESET} {ANSI_DIM}v{}{ANSI_RESET} ", ver);
+    let top_fill = w.saturating_sub(5 + title_plain.chars().count()).max(1);
+    let top = format!("{ANSI_MUTED}╭───{ANSI_RESET}{}{ANSI_MUTED}{}╮{ANSI_RESET}", title_colored, "─".repeat(top_fill));
+    let bot = format!("{ANSI_MUTED}╰{}╯{ANSI_RESET}", "─".repeat(w.saturating_sub(2)));
+
+    let (ch0, ch1) = model_initials(model);
+    let cwd = short_cwd();
+    let in_git = !git_info.is_empty() && git_info != "git: [none]";
+
+    let rows: Vec<String> = if w >= 74 {
+        let left_w = (w - 3) / 2;
+        let right_w = (w - 3) - left_w;
+        let lv = left_w.saturating_sub(11);
+
+        let m_c = clamp_chars(model, lv);
+        let p_c = clamp_chars(profile, lv);
+        let row3_c = if in_git { clamp_chars(git_info, lv) } else { clamp_chars(&cwd, lv) };
+
+        let left: [(String, usize); 3] = [
+            (format!("  {ANSI_BRIGHT}╭────╮{ANSI_RESET}  {ANSI_WHITE}{}{ANSI_RESET}", m_c), 10 + m_c.chars().count()),
+            (format!("  {ANSI_BRIGHT}│ {ANSI_WHITE}{}{}{ANSI_BRIGHT} │{ANSI_RESET}  {ANSI_ACCENT}{}{ANSI_RESET}", ch0, ch1, p_c), 10 + p_c.chars().count()),
+            (format!("  {ANSI_BRIGHT}╰────╯{ANSI_RESET}  {ANSI_MUTED}{}{ANSI_RESET}", row3_c), 10 + row3_c.chars().count()),
+        ];
+
+        let max_tok = crate::config::get_max_tokens();
+        let tok_s = if max_tok >= 1_000_000 {
+            format!("{:.1}M", max_tok as f64 / 1_000_000.0)
+        } else if max_tok >= 1_000 {
+            format!("{:.1}k", max_tok as f64 / 1000.0)
+        } else {
+            format!("{}", max_tok)
+        };
+        let has_task = Path::new("TASK.md").is_file() || Path::new("task.md").is_file();
+        let ep = ENDPOINT_LABEL.lock().map(|g| g.clone()).unwrap_or_default();
+        let rounds = crate::config::get_max_rounds();
+        let status_info = match (has_task, ep.is_empty()) {
+            (true, true) => format!("TASK.md ready · ctx {tok_s} · {rounds} steps"),
+            (true, false) => format!("TASK.md · ctx {tok_s} · {rounds} steps · {ep}"),
+            (false, true) => format!("ctx {tok_s} · {rounds} steps"),
+            (false, false) => format!("ctx {tok_s} · {rounds} steps · {ep}"),
+        };
+
+        let r0 = clamp_chars(meta.unwrap_or(""), right_w.saturating_sub(2));
+        let r1 = "─".repeat(right_w.saturating_sub(2));
+        let r2 = clamp_chars(&status_info, right_w.saturating_sub(1));
+
+        let right: [(String, usize); 3] = [
+            (format!("{ANSI_MUTED}{}{ANSI_RESET}", r0), r0.chars().count()),
+            (format!("{ANSI_MUTED}{}{ANSI_RESET}", r1), r1.chars().count()),
+            (format!("{ANSI_MUTED}{}{ANSI_RESET}", r2), r2.chars().count()),
+        ];
+
+        left.into_iter()
+            .zip(right)
+            .map(|((ls, l_vis), (rs, r_vis))| {
+                let l_pad = " ".repeat((left_w - 1).saturating_sub(l_vis));
+                let r_pad = " ".repeat((right_w - 1).saturating_sub(r_vis));
+                format!("{ANSI_MUTED}│{ANSI_RESET} {ls}{l_pad}{ANSI_MUTED}│{ANSI_RESET} {rs}{r_pad}{ANSI_MUTED}│{ANSI_RESET}")
+            })
+            .collect()
+    } else {
+        let inner = w.saturating_sub(3);
+        let lv = inner.saturating_sub(10);
+        let m_c = clamp_chars(model, lv);
+        let p_c = clamp_chars(profile, lv);
+        let row3_c = if in_git { clamp_chars(git_info, lv) } else { clamp_chars(&cwd, lv) };
+        let items: [(String, usize); 3] = [
+            (format!(" {ANSI_BRIGHT}╭────╮{ANSI_RESET}  {ANSI_WHITE}{}{ANSI_RESET}", m_c), 9 + m_c.chars().count()),
+            (format!(" {ANSI_BRIGHT}│ {ANSI_WHITE}{}{}{ANSI_BRIGHT} │{ANSI_RESET}  {ANSI_ACCENT}{}{ANSI_RESET}", ch0, ch1, p_c), 9 + p_c.chars().count()),
+            (format!(" {ANSI_BRIGHT}╰────╯{ANSI_RESET}  {ANSI_MUTED}{}{ANSI_RESET}", row3_c), 9 + row3_c.chars().count()),
+        ];
+        items
+            .into_iter()
+            .map(|(s, vis)| {
+                let pad = " ".repeat(inner.saturating_sub(vis));
+                format!("{ANSI_MUTED}│{ANSI_RESET} {s}{pad}{ANSI_MUTED}│{ANSI_RESET}")
+            })
+            .collect()
+    };
+
+    let mut all = Vec::with_capacity(5);
+    all.push(top);
+    all.extend(rows);
+    all.push(bot);
+    let total = all.len();
+    if progress >= 1.0 {
+        (all, total)
+    } else {
+        let visible = ((total as f64) * progress).ceil() as usize;
+        let out: Vec<String> = all
+            .into_iter()
+            .enumerate()
+            .map(|(i, l)| if i < visible { l } else { String::new() })
+            .collect();
+        (out, total)
+    }
+}
+
 fn render_agent_box(model: &str, profile: &str, meta: Option<&str>, git_info: &str, progress: f64) -> (Vec<String>, usize) {
     let term_w = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(92);
     let w = term_w.saturating_sub(2).clamp(48, 92);
@@ -809,6 +918,7 @@ fn render_frame_inner(model: &str, profile: &str, meta: Option<&str>, git_info: 
         }
 
         7 => render_agent_box(model, profile, meta, git_info, progress),
+        8 => render_compact_agent_box(model, profile, meta, git_info, progress),
         _ => render_frame_inner(model, profile, meta, git_info, 1, progress),
     }
 }
@@ -842,7 +952,7 @@ pub fn draw_box_with_meta(model: &str, profile: &str, meta: Option<&str>, style:
     let _ = stdout.flush();
 
     let duration = match style {
-        1 | 7 => Duration::from_millis(150),
+        1 | 7 | 8 => Duration::from_millis(150),
         2 | 3 => Duration::from_millis(200),
         4..=6 => Duration::from_millis(550),
         _ => Duration::from_millis(200),
@@ -927,7 +1037,7 @@ const SLASH_COMMANDS: &[(&str, &str)] = &[
     ("/s", "Attach or detach skills"),
     ("/task", "Run autonomous goal loop"),
     ("/t3", "Launch T3 Code ADE"),
-    ("/b", "Cycle box theme (1-7)"),
+    ("/b", "Cycle box theme (1-8)"),
     ("/pad", "Toggle spaced layout"),
     ("/tk", "Cycle thinking view"),
     ("/r", "Reset session"),
