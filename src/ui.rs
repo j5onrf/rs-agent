@@ -233,12 +233,7 @@ pub fn format_endpoint(base_url: &str) -> String {
     let after_scheme = base_url.split("://").nth(1).unwrap_or(base_url);
     let authority = after_scheme.split('/').next().unwrap_or("");
     if crate::client::is_local_endpoint(base_url) {
-        return match authority.rsplit_once(':') {
-            Some((_, port)) if !port.is_empty() && port.chars().all(|c| c.is_ascii_digit()) => {
-                format!("local :{port}")
-            }
-            _ => "local".to_string(),
-        };
+        return "local".to_string();
     }
     let host = authority.split(':').next().unwrap_or(authority);
     host.split('.')
@@ -1443,8 +1438,8 @@ mod tests {
 
     #[test]
     fn test_format_endpoint_handles_local_ports_and_cloud_hosts() {
-        assert_eq!(format_endpoint("http://127.0.0.1:8080/v1/chat/completions"), "local :8080");
-        assert_eq!(format_endpoint("http://[::1]:11434/v1"), "local :11434");
+        assert_eq!(format_endpoint("http://127.0.0.1:8080/v1/chat/completions"), "local");
+        assert_eq!(format_endpoint("http://[::1]:11434/v1"), "local");
         assert_eq!(format_endpoint("https://openrouter.ai/api/v1/chat/completions"), "openrouter");
         assert_eq!(format_endpoint("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"), "googleapis");
         assert_eq!(format_endpoint("https://api.tokenlab.amd.com/v1/chat/completions"), "tokenlab");

@@ -101,7 +101,7 @@
 │   ╭────╮  Ling-3.0-tiny                    │ purebash · t256 · adp · mcp:photocraft(7)   │
 │   │ Li │  artcraft/photocraft-l            │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · clean                │ ─────────────────────────────────────────── │
-│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · 15 steps · local :8080           │
+│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · 15 steps · local                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 
 ╭─── rs-agent v0.7.5 ──────────────────────────────────────────────────────────────────────╮
