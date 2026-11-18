@@ -1,14 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 52" width="900" height="52" role="img" aria-label="Rs-Agent">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 32" width="900" height="32" role="img" aria-label="Rs-Agent">
   <defs>
     <style>
       .cursor { animation: blink 2.2s ease-in-out infinite; }
-      .prompt { animation: glow 4.8s ease-in-out infinite; }
       @keyframes blink {
-        0%, 100% { stroke-opacity: 0.42; }
-        50% { stroke-opacity: 1.0; }
-      }
-      @keyframes glow {
-        0%, 100% { stroke-opacity: 0.72; }
+        0%, 100% { stroke-opacity: 0.45; }
         50% { stroke-opacity: 1.0; }
       }
     </style>
@@ -18,40 +13,40 @@
     </radialGradient>
     <linearGradient id="line_fade_l" gradientUnits="userSpaceOnUse" x1="56" y1="0" x2="426" y2="0">
       <stop offset="0%" stop-color="#1e293b" stop-opacity="0"/>
-      <stop offset="55%" stop-color="#334155" stop-opacity="0.45"/>
-      <stop offset="100%" stop-color="#9a3412" stop-opacity="0.72"/>
+      <stop offset="55%" stop-color="#334155" stop-opacity="0.42"/>
+      <stop offset="100%" stop-color="#9a3412" stop-opacity="0.75"/>
     </linearGradient>
     <linearGradient id="line_fade_r" gradientUnits="userSpaceOnUse" x1="474" y1="0" x2="844" y2="0">
-      <stop offset="0%" stop-color="#9a3412" stop-opacity="0.72"/>
-      <stop offset="45%" stop-color="#334155" stop-opacity="0.45"/>
+      <stop offset="0%" stop-color="#9a3412" stop-opacity="0.75"/>
+      <stop offset="45%" stop-color="#334155" stop-opacity="0.42"/>
       <stop offset="100%" stop-color="#1e293b" stop-opacity="0"/>
     </linearGradient>
   </defs>
 
-  <rect width="900" height="52" rx="10" fill="#0d1117"/>
-  <ellipse cx="450" cy="26" rx="190" ry="20" fill="url(#rust_glow)"/>
+  <rect width="900" height="32" rx="8" fill="#0d1117"/>
+  <ellipse cx="450" cy="16" rx="190" ry="14" fill="url(#rust_glow)"/>
 
-  <line x1="56" y1="26" x2="426" y2="26" stroke="url(#line_fade_l)" stroke-width="1"/>
-  <line x1="474" y1="26" x2="844" y2="26" stroke="url(#line_fade_r)" stroke-width="1"/>
+  <line x1="56" y1="16" x2="426" y2="16" stroke="url(#line_fade_l)" stroke-width="1.2"/>
+  <line x1="474" y1="16" x2="844" y2="16" stroke="url(#line_fade_r)" stroke-width="1.2"/>
 
   <g stroke-linecap="round">
-    <line x1="206" y1="24" x2="206" y2="28" stroke="#334155" stroke-width="1" style="opacity:0.30"/>
-    <line x1="238" y1="24" x2="238" y2="28" stroke="#334155" stroke-width="1" style="opacity:0.34"/>
-    <line x1="270" y1="24" x2="270" y2="28" stroke="#475569" stroke-width="1" style="opacity:0.38"/>
-    <line x1="302" y1="22.5" x2="302" y2="29.5" stroke="#475569" stroke-width="1" style="opacity:0.46"/>
-    <line x1="334" y1="24" x2="334" y2="28" stroke="#9a3412" stroke-width="1" style="opacity:0.48"/>
-    <line x1="366" y1="24" x2="366" y2="28" stroke="#9a3412" stroke-width="1" style="opacity:0.55"/>
-    <line x1="398" y1="22.5" x2="398" y2="29.5" stroke="#ce422b" stroke-width="1" style="opacity:0.65"/>
+    <line x1="206" y1="14" x2="206" y2="18" stroke="#334155" stroke-width="1" style="opacity:0.30"/>
+    <line x1="238" y1="14" x2="238" y2="18" stroke="#334155" stroke-width="1" style="opacity:0.34"/>
+    <line x1="270" y1="14" x2="270" y2="18" stroke="#475569" stroke-width="1" style="opacity:0.38"/>
+    <line x1="302" y1="12.5" x2="302" y2="19.5" stroke="#475569" stroke-width="1" style="opacity:0.46"/>
+    <line x1="334" y1="14" x2="334" y2="18" stroke="#9a3412" stroke-width="1" style="opacity:0.48"/>
+    <line x1="366" y1="14" x2="366" y2="18" stroke="#9a3412" stroke-width="1" style="opacity:0.55"/>
+    <line x1="398" y1="12.5" x2="398" y2="19.5" stroke="#ce422b" stroke-width="1" style="opacity:0.65"/>
 
-    <line x1="502" y1="22.5" x2="502" y2="29.5" stroke="#ce422b" stroke-width="1" style="opacity:0.65"/>
-    <line x1="534" y1="24" x2="534" y2="28" stroke="#9a3412" stroke-width="1" style="opacity:0.55"/>
-    <line x1="566" y1="24" x2="566" y2="28" stroke="#9a3412" stroke-width="1" style="opacity:0.48"/>
-    <line x1="598" y1="22.5" x2="598" y2="29.5" stroke="#475569" stroke-width="1" style="opacity:0.46"/>
-    <line x1="630" y1="24" x2="630" y2="28" stroke="#475569" stroke-width="1" style="opacity:0.38"/>
-    <line x1="662" y1="24" x2="662" y2="28" stroke="#334155" stroke-width="1" style="opacity:0.34"/>
-    <line x1="694" y1="24" x2="694" y2="28" stroke="#334155" stroke-width="1" style="opacity:0.30"/>
+    <line x1="502" y1="12.5" x2="502" y2="19.5" stroke="#ce422b" stroke-width="1" style="opacity:0.65"/>
+    <line x1="534" y1="14" x2="534" y2="18" stroke="#9a3412" stroke-width="1" style="opacity:0.55"/>
+    <line x1="566" y1="14" x2="566" y2="18" stroke="#9a3412" stroke-width="1" style="opacity:0.48"/>
+    <line x1="598" y1="12.5" x2="598" y2="19.5" stroke="#475569" stroke-width="1" style="opacity:0.46"/>
+    <line x1="630" y1="14" x2="630" y2="18" stroke="#475569" stroke-width="1" style="opacity:0.38"/>
+    <line x1="662" y1="14" x2="662" y2="18" stroke="#334155" stroke-width="1" style="opacity:0.34"/>
+    <line x1="694" y1="14" x2="694" y2="18" stroke="#334155" stroke-width="1" style="opacity:0.30"/>
   </g>
 
-  <path class="prompt" d="M442.5 22.5L447 26L442.5 29.5" stroke="#ea580c" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-  <line class="cursor" x1="450" y1="29.8" x2="457" y2="29.8" stroke="#f59e0b" stroke-width="1.55" stroke-linecap="round"/>
+  <path d="M442.5 12.5L447 16L442.5 19.5" stroke="#ea580c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <line class="cursor" x1="450" y1="19.8" x2="457" y2="19.8" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/>
 </svg>
