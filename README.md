@@ -101,19 +101,19 @@
 │   ╭────╮  Ling-3.0-tiny                    │ 6-tool · t350 · adp                         │
 │   │ Li │  lingtiny                         │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · 11 modified          │ ─────────────────────────────────────────── │
-│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · max 10 steps · local :8080      │
+│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · 10 steps · local :8080          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─── rs-agent v0.7.5 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ purebash · t256 · adp · mcp:photocraft(7)   │
 │   │ Li │  artcraft/photocraft-l            │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · clean                │ ─────────────────────────────────────────── │
-│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · max 15 steps · local :8080      │
+│   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · 15 steps · local :8080          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 ╭─── rs-agent v0.7.5 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  DeepSeek-V4.1-Flash              │ core4 · medium                              │
 │   │ De │  tokenlab                         │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · 7 modified           │ ─────────────────────────────────────────── │
-│   ~/.config/rs-agent/projects/tokenlab     │ ctx 65.5k · max 15 steps · tokenlab        │
+│   ~/.config/rs-agent/projects/tokenlab     │ ctx 65.5k · 15 steps · tokenlab            │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 ```
 

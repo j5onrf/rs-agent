@@ -227,6 +227,32 @@ fn render_dot_slab_inner_wipe(model: &str, profile: &str, col: usize) -> (String
     (render_line(&model_clamped, ANSI_WHITE), render_line(&profile_clamped, ANSI_MUTED))
 }
 
+static ENDPOINT_LABEL: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+
+pub fn format_endpoint(base_url: &str) -> String {
+    let after_scheme = base_url.split("://").nth(1).unwrap_or(base_url);
+    let authority = after_scheme.split('/').next().unwrap_or("");
+    if crate::client::is_local_endpoint(base_url) {
+        return match authority.rsplit_once(':') {
+            Some((_, port)) if !port.is_empty() && port.chars().all(|c| c.is_ascii_digit()) => {
+                format!("local :{port}")
+            }
+            _ => "local".to_string(),
+        };
+    }
+    let host = authority.split(':').next().unwrap_or(authority);
+    host.split('.')
+        .find(|seg| !seg.is_empty() && !matches!(*seg, "api" | "www" | "generativelanguage" | "notebooks"))
+        .unwrap_or(host)
+        .to_string()
+}
+
+pub fn set_endpoint(base_url: &str) {
+    if let Ok(mut g) = ENDPOINT_LABEL.lock() {
+        *g = format_endpoint(base_url);
+    }
+}
+
 pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) -> (Vec<String>, usize) {
     let git_info = if style >= 4 { resolve_git_status() } else { String::new() };
     render_frame_inner(model, profile, None, &git_info, style, progress)
@@ -295,10 +321,13 @@ fn render_agent_box(model: &str, profile: &str, meta: Option<&str>, git_info: &s
             format!("{}", max_tok)
         };
         let has_task = Path::new("TASK.md").is_file() || Path::new("task.md").is_file();
-        let status_info = if has_task {
-            format!("TASK.md ready · ctx {} · {} steps", tok_s, crate::config::get_max_rounds())
-        } else {
-            format!("ctx {} · max {} steps · ↑/↓ history", tok_s, crate::config::get_max_rounds())
+        let ep = ENDPOINT_LABEL.lock().map(|g| g.clone()).unwrap_or_default();
+        let rounds = crate::config::get_max_rounds();
+        let status_info = match (has_task, ep.is_empty()) {
+            (true, true) => format!("TASK.md ready · ctx {tok_s} · {rounds} steps"),
+            (true, false) => format!("TASK.md · ctx {tok_s} · {rounds} steps · {ep}"),
+            (false, true) => format!("ctx {tok_s} · {rounds} steps"),
+            (false, false) => format!("ctx {tok_s} · {rounds} steps · {ep}"),
         };
 
         let r0 = clamp_chars(meta.unwrap_or("Tips for getting started"), right_w.saturating_sub(2));
@@ -307,7 +336,7 @@ fn render_agent_box(model: &str, profile: &str, meta: Option<&str>, git_info: &s
         let r3 = clamp_chars(&status_info, right_w.saturating_sub(1));
 
         let right: [(String, usize); 4] = [
-            (format!("\x1b[38;5;215m{}\x1b[0m", r0), r0.chars().count()),
+            (format!("{ANSI_MUTED}{}{ANSI_RESET}", r0), r0.chars().count()),
             (format!("{ANSI_DIM}{}{ANSI_RESET}", r1), r1.chars().count()),
             (format!("{ANSI_MUTED}{}{ANSI_RESET}", r2), r2.chars().count()),
             (format!("{ANSI_MUTED}{}{ANSI_RESET}", r3), r3.chars().count()),
@@ -1300,5 +1329,15 @@ mod tests {
 
         let box_q: Vec<char> = "/box".chars().collect();
         assert!(slash_matches(&box_q).is_empty());
+    }
+
+    #[test]
+    fn test_format_endpoint_handles_local_ports_and_cloud_hosts() {
+        assert_eq!(format_endpoint("http://127.0.0.1:8080/v1/chat/completions"), "local :8080");
+        assert_eq!(format_endpoint("http://[::1]:11434/v1"), "local :11434");
+        assert_eq!(format_endpoint("https://openrouter.ai/api/v1/chat/completions"), "openrouter");
+        assert_eq!(format_endpoint("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"), "googleapis");
+        assert_eq!(format_endpoint("https://api.tokenlab.amd.com/v1/chat/completions"), "tokenlab");
+        assert_eq!(format_endpoint("https://tokenharbor.ai/v1/chat/completions"), "tokenharbor");
     }
 }
