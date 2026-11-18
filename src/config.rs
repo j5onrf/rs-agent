@@ -137,7 +137,7 @@ pub fn get_context_ceilings() -> ContextCeilings {
         ContextCeilings { max_tokens, line_ceiling: 250, char_cap: 20_000, preview_lines: 100, search_cap: 30 }
     } else if max_tokens <= 32_768 {
         ContextCeilings { max_tokens, line_ceiling: 1_000, char_cap: 45_000, preview_lines: 300, search_cap: 50 }
-    } else if max_tokens <= 64_000 {
+    } else if max_tokens <= 65_536 {
         ContextCeilings { max_tokens, line_ceiling: 2_000, char_cap: 90_000, preview_lines: 600, search_cap: 75 }
     } else {
         ContextCeilings { max_tokens, line_ceiling: 4_000, char_cap: 180_000, preview_lines: 1_200, search_cap: 100 }

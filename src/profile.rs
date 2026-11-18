@@ -186,10 +186,12 @@ impl Profile {
                             }
                         }
                         "ctx" | "context_size" => {
-                            if let Ok(n) = val.trim_matches(['"', '\'']).parse::<usize>() {
-                                if n > 0 {
-                                    ctx = Some(n);
-                                }
+                            let s = val.trim_matches(['"', '\'']).trim();
+                            let n = s.parse::<usize>().ok()
+                                .or_else(|| s.strip_suffix(['k', 'K']).and_then(|v| v.parse::<usize>().ok().map(|x| x * 1024)))
+                                .or_else(|| s.strip_suffix(['m', 'M']).and_then(|v| v.parse::<usize>().ok().map(|x| x * 1048576)));
+                            if let Some(x) = n.filter(|&x| x > 0) {
+                                ctx = Some(x);
                             }
                         }
                         "mcp_tools" => {
@@ -1199,8 +1201,10 @@ mod tests {
 
     #[test]
     fn test_profile_parses_ctx_override() {
-        let p = Profile::parse("---\nctx: 65536\n---\nhi");
-        assert_eq!(p.ctx, Some(65536));
+        assert_eq!(Profile::parse("---\nctx: 65536\n---\nhi").ctx, Some(65536));
+        assert_eq!(Profile::parse("---\nctx: 64k\n---\nhi").ctx, Some(65536));
+        assert_eq!(Profile::parse("---\nctx: 128k\n---\nhi").ctx, Some(131072));
+        assert_eq!(Profile::parse("---\nctx: 1m\n---\nhi").ctx, Some(1048576));
     }
 
     #[test]
