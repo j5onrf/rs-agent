@@ -1,3 +1,4 @@
+<p align="center"><img src="assets/banner10.svg" width="900" alt="" /></p>
 <h1><a href="https://github.com/j5onrf/rs-agent"><img alt="Rs-Agent" src="assets/logo.svg" width="36" height="36" /></a> Rs-Agent</h1>
 
 <p>
@@ -44,7 +45,7 @@
 **In-Session Slash Commands:**
 `/p` profile select • `/ms` model select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/b [1-7]` box themes • `/pad` spacing • `/tk` thinking view • `/r` reset
 
-<p align="center"><img src="assets/banner9.svg" width="900" alt="" /></p>
+<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
 
 <h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> Client Surface: T3 Code ADE</h3>
 
@@ -216,7 +217,7 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 | `ta` | **Test Agent** | 10-pass live verification suite checking tools, security boundary, UI, and `--bridge` ACP |
 | `eva` | **Eval Benchmark** | Full-stack `eval-stack` model evaluation runner |
 
-<p align="center"><img src="assets/banner7.svg" width="900" alt="" /></p>
+<p align="center"><img src="assets/banner9.svg" width="900" alt="" /></p>
 
 <h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> Setup &amp; Configuration</h3>
 
@@ -285,3 +286,4 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <a href="LICENSE">MIT License</a>
 </div>
+
