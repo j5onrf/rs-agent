@@ -1,25 +1,26 @@
-<h1><a href="https://github.com/j5onrf/rs-agent"><img alt="Rs-Agent" src="assets/logo.svg" width="36" height="36" /></a> Rs-Agent</h1>
+<p align="center"><img src="assets/banner10.svg" width="900" alt="Rs-Agent Banner" /></p>
+<h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
 
-<p>
-  <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.5.svg?variant=secondary" alt="Version"></a>
-  <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
-  <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=secondary&logo=cplusplus" alt="C++"></a>
-  <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT.svg?variant=secondary" alt="License"></a>
-  <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/status-beta.svg?variant=secondary" alt="Status"></a>
-</p>
+  <p>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.5.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=secondary&logo=cplusplus" alt="C++"></a>
+    <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT.svg?variant=secondary" alt="License"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/status-beta.svg?variant=secondary" alt="Status"></a>
+  </p>
 
-<p>
-  <strong>Sub-millisecond native Rust AI harness for local <code>llama-server</code> GGUF backends and frontier cloud endpoints.</strong><br />
-  Parallel 6-tool kernel &nbsp;•&nbsp; 3-stage resilient edits &nbsp;•&nbsp; Zero-trust path sandbox &nbsp;•&nbsp; Native T3 Code ACP bridge
-</p>
+  <p>
+    <strong>Sub-millisecond native Rust AI harness for local <code>llama-server</code> GGUF backends and frontier cloud endpoints.</strong><br />
+    Parallel 6-tool kernel &nbsp;•&nbsp; 3-stage resilient edits &nbsp;•&nbsp; Zero-trust path sandbox &nbsp;•&nbsp; Native T3 Code ACP bridge
+  </p>
 
-<p>
-  <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>t3code</code> &nbsp;•&nbsp; <code>omarchy</code> &nbsp;•&nbsp; <code>local-first</code>
-</p>
+  <p>
+    <code>gguf</code> &nbsp;•&nbsp; <code>llama.cpp</code> &nbsp;•&nbsp; <code>t3code</code> &nbsp;•&nbsp; <code>omarchy</code> &nbsp;•&nbsp; <code>local-first</code>
+  </p>
 
-<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
+---
 
-<h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> Tested Tiers &amp; Endpoints</h3>
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Tested Tiers & Endpoints
 
 | Tier | Tested Models | Workload |
 | :--- | :--- | :--- |
@@ -31,9 +32,9 @@
 * **Cloud Endpoints:** [Google Gemini](https://ai.google.dev) (`gemini-4-hydrogen`) • [OpenRouter](https://openrouter.ai) • [TokenHarbor](https://tokenharbor.ai) • [AMD Token Lab](https://notebooks.amd.com)
 * **Free Endpoints:** [`gemini-3.5-flash-lite`](https://ai.google.dev) • [`baidu/ernie-5.5-flash-preview:free`](https://openrouter.ai/baidu/ernie-5.5-flash-preview:free) • [`deepseek-v4.1-flash:free`](https://tokenharbor.ai) • [`DeepSeek-V4.1-Flash-1017`](https://notebooks.amd.com)
 
-<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
+---
 
-<h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> Execution Modes &amp; Controls</h3>
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Execution Modes & Controls
 
 | Invocation | Mode | Description |
 | :--- | :--- | :--- |
@@ -44,9 +45,9 @@
 **In-Session Slash Commands:**
 `/p` profile select • `/ms` model select • `/task` goal loop • `/t3` launch ADE • `/s` toggle skills • `/b [1-7]` box themes • `/pad` spacing • `/tk` thinking view • `/r` reset
 
-<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
+---
 
-<h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> Client Surface: T3 Code ADE</h3>
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Client Surface: T3 Code ADE
 
 **[T3 Code](https://t3.codes)** connects to `ai --bridge` over stdio JSON-RPC 2.0 (ACP).
 
@@ -56,9 +57,9 @@
 | **Diff Review** | `session/request_permission` | Split/unified diff gates (*Supervised*, *Auto-accept*, *Auto*, *Full access*) |
 | **Live Controls** | `$skills` · `/commands` · `thought_level` | `$` skill pills, reasoning tier/budget selector, vision input |
 
-<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
+---
 
-<h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> CLI Box Styles (<code>/box [1-7]</code>)</h3>
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> CLI Box Styles (`/box [1-7]`)
 
 * **`/box 1–6`:** Compact header, single-line `❯ ` prompt, `│ ` thinking gutter, inline stats, dense layout (`pad: false`).
 * **`/box 7` *(default)*:** 2-column profile HUD, ruled `────` input bar, `/` command menu, `∴` expanded thinking, spaced layout (`pad: true`).
@@ -119,9 +120,9 @@
 
 </details>
 
-<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
+---
 
-<h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> Runtime Architecture</h3>
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Runtime Architecture
 
 ```yaml
 Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─▶ Workspace Teleport
@@ -140,11 +141,11 @@ Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─�
 * **Sandbox (`security.rs`):** Resolves symlinks to keep file access inside the workspace, and prompts before running risky commands (`rm`, `pip`, `sudo`).
 * **Auto-Scaffold (`profile.rs`):** First load of any new model silently creates `projects/<slug>`, a starter `profiles/<slug>.md` (6-tool + `adapters` for local, `core4` + `ctx: 65536` for cloud), and a `rs-context.md` alias without overwriting existing workspaces.
 
-<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
+---
 
-<h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> Efficiency &amp; Context Scaling</h3>
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Efficiency & Context Scaling
 
-#### Tool Schema Footprint
+### Tool Schema Footprint
 
 | Operational Tier | Frontmatter Flag | Schema Cost | Intended Workload |
 | :--- | :--- | :---: | :--- |
@@ -155,7 +156,7 @@ Terminal Input ─▶ rs-hook.sh (<0.2ms) ─▶ matcher.rs (rs-context.md) ─�
 | **+ Sub-Agent** | `delegate: true` | **+ ~100t** | Attaches isolated `delegate_task` sub-agent to any tier |
 | **Context Router** | *(shell hook)* | **0t** | Sub-millisecond directory/command routing via `rs-context.md` |
 
-#### Context Ceilings (`AI_MAX_TOKENS`)
+### Context Ceilings (`AI_MAX_TOKENS`)
 
 File reads and shell output scale with `AI_MAX_TOKENS`, spilling overflows to `.rs/scratchpad.log`:
 
@@ -166,9 +167,9 @@ File reads and shell output scale with `AI_MAX_TOKENS`, spilling overflows to `.
 | **`64k`** | 2,000 lines | 90,000 chars | 75 matches |
 | **`>= 128k`** | 4,000 lines | 180,000 chars | 100 matches |
 
-<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
+---
 
-<h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> Workspace Profiles &amp; Skills</h3>
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Workspace Profiles & Skills
 
 Configure tool tiers, reasoning, and MCP servers in `profiles/*.md`:
 
@@ -190,9 +191,9 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 * **Skills (`skills/`):** Modular runtime directives toggled via `/s` or T3 Code's `$` picker (`ponytail.md`, `humanizer.md`, `ub-mode.md`).
 * **Global Rules (`system_instructions.md`):** Universal rules injected across every workspace and profile.
 
-<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
+---
 
-<h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> Agent Evaluation (<code>eval-stack</code>)</h3>
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Agent Evaluation (`eval-stack`)
 
 5-stage benchmark via `eva`:
 
@@ -204,9 +205,9 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 | **—** | **Ling-3.0-tiny** *(SLM)* | **162.5%** | **100.0 (A+)** |
 | **—** | **LFM3-1.7B** *(SLM)* | **173.3%** | **100.0 (A+)** |
 
-<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
+---
 
-<h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> Developer Tools (<code>tools/</code>)</h3>
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Developer Tools (`tools/`)
 
 | Binary | Tool | Purpose |
 | :--- | :--- | :--- |
@@ -216,11 +217,11 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 | `ta` | **Test Agent** | 10-pass live verification suite checking tools, security boundary, UI, and `--bridge` ACP |
 | `eva` | **Eval Benchmark** | Full-stack `eval-stack` model evaluation runner |
 
-<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
+---
 
-<h3><img alt="rs-agent" src="assets/prompt.svg" width="22" height="22" /> Setup &amp; Configuration</h3>
+## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Setup & Configuration
 
-<h4><img alt="" src="assets/prompt2.svg" width="18" height="18" /> Quick Start (Linux x86_64)</h4>
+### <img alt="" src="assets/prompt2.svg" width="18" height="18" /> Quick Start (Linux x86_64)
 
 ```bash
 git clone https://github.com/j5onrf/rs-agent.git ~/.config/rs-agent
@@ -280,9 +281,8 @@ AI_MAX_AGENT_ROUNDS="10"
 
 </details>
 
-<p align="center"><img src="assets/banner8.svg" width="900" alt="" /></p>
+---
 
 <div align="center">
   <a href="LICENSE">MIT License</a>
 </div>
-
