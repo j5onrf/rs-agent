@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=rs-rail
+GenericName=AI Agent Surface
+Comment=Native Rust web and desktop surface for rs-agent
+Exec=/home/j5/.config/rs-agent/plugins/rs-rail/launch.sh
+Icon=/home/j5/.config/rs-agent/plugins/rs-rail/../../assets/rs-rail.svg
+Terminal=false
+StartupNotify=true
+Categories=Development;IDE;Utility;
+Keywords=ai;agent;llm;rust;rs-agent;rail;

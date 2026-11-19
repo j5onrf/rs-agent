@@ -2,6 +2,31 @@
 set -euo pipefail
 
 PLUGIN_DIR="$HOME/.config/rs-agent/plugins/rs-rail"
+
+# Auto-register XDG desktop entry & icon for current user on launch
+DESKTOP_DIR="$HOME/.local/share/applications"
+ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
+mkdir -p "$DESKTOP_DIR" "$ICON_DIR"
+
+if [ ! -f "$DESKTOP_DIR/rs-rail.desktop" ] || ! grep -q "$PLUGIN_DIR" "$DESKTOP_DIR/rs-rail.desktop" 2>/dev/null; then
+    cat <<DESKTOP > "$DESKTOP_DIR/rs-rail.desktop"
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=rs-rail
+GenericName=AI Agent Surface
+Comment=Native Rust web and desktop surface for rs-agent
+Exec=$PLUGIN_DIR/launch.sh
+Icon=$PLUGIN_DIR/../../assets/rs-rail.svg
+Terminal=false
+StartupNotify=true
+Categories=Development;IDE;Utility;
+Keywords=ai;agent;llm;rust;rs-agent;rail;
+DESKTOP
+    ln -sf "$PLUGIN_DIR/../../assets/rs-rail.svg" "$ICON_DIR/rs-rail.svg"
+    update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
+fi
+
 BIN="$PLUGIN_DIR/target/release/rs-rail"
 PORT="${RS_RAIL_PORT:-24243}"
 MODE="app"

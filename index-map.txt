@@ -19,6 +19,11 @@
 #   ├── plugins/mcp/photocraft/Readme.md - Headless and live-bridge image editing engine for `rs-agent` via the Model Conte
 #   ├── plugins/mcp/photocraft/mcp-bridge.sh - #!/usr/bin/env bash
 #   ├── plugins/mcp/servers.json         - "servers": {
+#   ├── plugins/rs-rail/Cargo.toml       - name = "rs-rail"
+#   ├── plugins/rs-rail/Readme.md        - Native Rust local HTTP+SSE web surface for `rs-agent` — zero `pi-agent`, zero No
+#   ├── plugins/rs-rail/launch.sh        - #!/usr/bin/env bash
+#   ├── plugins/rs-rail/src/main.rs      - CLI Entrypoint & Runtime Loop
+#   ├── plugins/rs-rail/src/ui.html      - --bg: #0b0c0e;
 #   ├── plugins/t3code/Cargo.toml        - name = "t3code-bridge"
 #   ├── plugins/t3code/Readme.md         - A native Rust Agent Client Protocol (ACP) stdio bridge connecting the `rs-agent`
 #   ├── plugins/t3code/launch.sh         - #!/usr/bin/env bash
@@ -85,6 +90,12 @@
 
 ## Rust API Skeleton:
 
+### `plugins/rs-rail/src/main.rs`
+```rust
+  L1114: async fn main() -> Result<()>;
+  L1134: mod tests;
+```
+
 ### `plugins/t3code/src/main.rs`
 ```rust
   L003: async fn main() -> Result<()>;
@@ -122,7 +133,7 @@
   }
   L139: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
   L156: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff, Mcp { .. } }
-  L1122: async fn main() -> anyhow :: Result<()>;
+  L1124: async fn main() -> anyhow :: Result<()>;
 ```
 
 ### `tools/model-select/src/lib.rs`
@@ -147,7 +158,7 @@
 
 ### `tools/test-agent/src/main.rs`
 ```rust
-  L418: async fn main();
+  L420: async fn main();
 ```
 
 ### `src/adapter.rs`
@@ -259,22 +270,22 @@
   }
   L121: impl Profile {
     L122: pub fn parse(raw_content: &str) -> Self;
-    L226: pub fn hud_summary(&self, is_agent: bool) -> String;
-    L269: pub fn profile_dirs() -> Vec<PathBuf>;
-    L278: pub fn load(profile_name: &str) -> Option<Self>;
-    L349: pub fn list_available() -> Vec<String>;
-    L407: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
-    L434: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
-    L476: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
-    L519: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
-    L752: pub fn ensure_model_workspace(provider: &crate :: config :: ProviderConfig) -> Option<String>;
+    L228: pub fn hud_summary(&self, is_agent: bool) -> String;
+    L271: pub fn profile_dirs() -> Vec<PathBuf>;
+    L280: pub fn load(profile_name: &str) -> Option<Self>;
+    L351: pub fn list_available() -> Vec<String>;
+    L409: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
+    L436: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
+    L478: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
+    L521: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
+    L754: pub fn ensure_model_workspace(provider: &crate :: config :: ProviderConfig) -> Option<String>;
   }
-  L800: pub fn model_slug(raw: &str) -> String;
-  L876: pub fn pick_short_alias(slug: &str, used_aliases: &HashSet<String>, check_path: bool) -> Option<String>;
-  L890: pub fn build_auto_profile_content(model: &str, is_local: bool) -> String;
-  L995: pub fn ensure_workspace_in_root(root: &Path, raw_model: &str, is_local: bool, check_path: bool ,) -> Option<String>;
-  L1100: pub fn build_system_prompt(profile: &Profile, workspace: &Path, is_agent: bool, active_skills: &[String]) -> String;
-  L1130: mod tests;
+  L802: pub fn model_slug(raw: &str) -> String;
+  L878: pub fn pick_short_alias(slug: &str, used_aliases: &HashSet<String>, check_path: bool) -> Option<String>;
+  L892: pub fn build_auto_profile_content(model: &str, is_local: bool) -> String;
+  L997: pub fn ensure_workspace_in_root(root: &Path, raw_model: &str, is_local: bool, check_path: bool ,) -> Option<String>;
+  L1102: pub fn build_system_prompt(profile: &Profile, workspace: &Path, is_agent: bool, active_skills: &[String]) -> String;
+  L1132: mod tests;
 ```
 
 ### `src/security.rs`
@@ -375,14 +386,16 @@
   L020: impl Drop for RawModeGuard {
     L021: fn drop(&mut self);
   }
-  L230: pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) ->(Vec<String>, usize);
-  L787: pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Option<char>;
-  L791: pub fn draw_box_with_meta(model: &str, profile: &str, meta: Option<&str>, style: usize, animate: bool) -> Option<char>;
-  L924: pub enum InputResult { Line(String), Eof }
-  L931: impl Drop for InputGuard {
-    L932: fn drop(&mut self);
+  L232: pub fn format_endpoint(base_url: &str) -> String;
+  L245: pub fn set_endpoint(base_url: &str);
+  L251: pub fn render_frame(model: &str, profile: &str, style: usize, progress: f64) ->(Vec<String>, usize);
+  L921: pub fn draw_box(model: &str, profile: &str, style: usize, animate: bool) -> Option<char>;
+  L925: pub fn draw_box_with_meta(model: &str, profile: &str, meta: Option<&str>, style: usize, animate: bool) -> Option<char>;
+  L1058: pub enum InputResult { Line(String), Eof }
+  L1065: impl Drop for InputGuard {
+    L1066: fn drop(&mut self);
   }
-  L940: pub fn read_ruled_input(status_line: &str, history: &[String], initial_char: Option<char>, minimal: bool ,) -> io :: Result<InputResult>;
-  L1205: pub fn authorize_prompt(violation: &str) -> bool;
-  L1288: mod tests;
+  L1074: pub fn read_ruled_input(status_line: &str, history: &[String], initial_char: Option<char>, minimal: bool ,) -> io :: Result<InputResult>;
+  L1339: pub fn authorize_prompt(violation: &str) -> bool;
+  L1422: mod tests;
 ```
