@@ -1,5 +1,5 @@
 use anyhow::Result;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
@@ -22,11 +22,39 @@ use rs_agent::profile::{build_system_prompt, Profile, ReasoningSetting};
 use rs_agent::security::SecurityBoundary;
 use rs_agent::skill::Skill;
 use rs_agent::state;
-use rs_agent::stream::UsageStats;
 use rs_agent::tools;
 use rs_agent::ui::format_endpoint;
 
 const UI_HTML: &str = include_str!("ui.html");
+
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Serialize, Deserialize)]
+struct RailConfig {
+    #[serde(default = "default_true")]
+    show_right_panel: bool,
+}
+
+impl Default for RailConfig {
+    fn default() -> Self {
+        Self { show_right_panel: true }
+    }
+}
+
+impl RailConfig {
+    fn load(path: &Path) -> Self {
+        fs::read_to_string(path)
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
+    }
+
+    fn save(&self, path: &Path) -> Result<()> {
+        atomic_write(path, &serde_json::to_string_pretty(self)?)
+    }
+}
 
 #[derive(Clone, Serialize)]
 struct DiffLine {
@@ -42,7 +70,7 @@ struct DiffPayload {
     lines: Vec<DiffLine>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Default, Serialize)]
 struct UiTurnItem {
     role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -67,6 +95,16 @@ struct UiTurnItem {
     raw: Option<String>,
 }
 
+#[derive(Clone, Serialize)]
+struct TurnStats {
+    prompt_tokens: usize,
+    completion_tokens: usize,
+    reasoning_tokens: usize,
+    cached_tokens: usize,
+    elapsed_s: f64,
+    tps: f64,
+}
+
 struct SessionState {
     project_name: String,
     workspace: PathBuf,
@@ -83,7 +121,7 @@ struct SessionState {
     active_skills: Vec<String>,
     llm_history: Vec<ChatMessage>,
     ui_history: Vec<UiTurnItem>,
-    last_stats: Option<UsageStats>,
+    last_stats: Option<TurnStats>,
     cancel_flag: Arc<AtomicBool>,
     generation: u64,
 }
@@ -167,6 +205,40 @@ fn is_valid_slug(name: &str) -> bool {
         && name != "."
         && name != ".."
         && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+fn atomic_write(path: &Path, content: &str) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let tmp = path.with_extension(format!("tmp.{}", std::process::id()));
+    fs::write(&tmp, content)?;
+    fs::rename(&tmp, path)?;
+    Ok(())
+}
+
+fn url_decode(s: &str) -> String {
+    let mut bytes = Vec::with_capacity(s.len());
+    let raw = s.as_bytes();
+    let mut i = 0;
+    while i < raw.len() {
+        if raw[i] == b'%' && i + 2 < raw.len() {
+            if let Ok(hex) = std::str::from_utf8(&raw[i + 1..i + 3]) {
+                if let Ok(b) = u8::from_str_radix(hex, 16) {
+                    bytes.push(b);
+                    i += 3;
+                    continue;
+                }
+            }
+        } else if raw[i] == b'+' {
+            bytes.push(b' ');
+            i += 1;
+            continue;
+        }
+        bytes.push(raw[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&bytes).into_owned()
 }
 
 fn git_status_brief(dir: &Path) -> (String, bool) {
@@ -407,31 +479,19 @@ fn update_env_file(
         }
     }
 
-    if let Some(tok) = max_tokens {
-        let mut found = false;
-        for l in &mut lines {
-            if is_env_key(l.trim().trim_start_matches('#').trim(), "AI_MAX_TOKENS") {
-                *l = format!("AI_MAX_TOKENS=\"{tok}\"");
-                found = true;
-                break;
+    for (key, val_opt) in [("AI_MAX_TOKENS", max_tokens), ("AI_MAX_AGENT_ROUNDS", max_rounds)] {
+        if let Some(v) = val_opt {
+            let mut found = false;
+            for l in &mut lines {
+                if is_env_key(l.trim().trim_start_matches('#').trim(), key) {
+                    *l = format!("{key}=\"{v}\"");
+                    found = true;
+                    break;
+                }
             }
-        }
-        if !found {
-            lines.push(format!("AI_MAX_TOKENS=\"{tok}\""));
-        }
-    }
-
-    if let Some(rnd) = max_rounds {
-        let mut found = false;
-        for l in &mut lines {
-            if is_env_key(l.trim().trim_start_matches('#').trim(), "AI_MAX_AGENT_ROUNDS") {
-                *l = format!("AI_MAX_AGENT_ROUNDS=\"{rnd}\"");
-                found = true;
-                break;
+            if !found {
+                lines.push(format!("{key}=\"{v}\""));
             }
-        }
-        if !found {
-            lines.push(format!("AI_MAX_AGENT_ROUNDS=\"{rnd}\""));
         }
     }
 
@@ -476,14 +536,15 @@ fn parse_omarchy_toml(dir: &Path) -> Option<Value> {
             }
         }
     }
-    let panel = map.get("background").or_else(|| map.get("dark_background"))?.clone();
-    let bg = map.get("darker_background").or_else(|| map.get("dark_background")).unwrap_or(&panel).clone();
-    let card = map.get("lighter_background").unwrap_or(&panel).clone();
-    let border = map.get("selection").or_else(|| map.get("muted")).cloned().unwrap_or_else(|| "#333842".into());
-    let text = map.get("foreground").or_else(|| map.get("bright_foreground")).cloned().unwrap_or_else(|| "#e5e7eb".into());
-    let muted = map.get("dark_foreground").or_else(|| map.get("muted")).cloned().unwrap_or_else(|| "#8b92a0".into());
-    let accent = map.get("accent").or_else(|| map.get("green")).or_else(|| map.get("blue")).cloned().unwrap_or_else(|| "#22c55e".into());
-    let cyan = map.get("cyan").or_else(|| map.get("blue")).unwrap_or(&accent).clone();
+    let getk = |keys: &[&str]| -> Option<String> { keys.iter().find_map(|k| map.get(*k)).cloned() };
+    let panel = getk(&["background", "bg", "dark_background", "dark_bg"])?;
+    let bg = getk(&["darker_background", "darker_bg", "dark_background", "dark_bg"]).unwrap_or_else(|| panel.clone());
+    let card = getk(&["lighter_background", "lighter_bg"]).unwrap_or_else(|| panel.clone());
+    let border = getk(&["selection", "selection_background", "muted", "color8"]).unwrap_or_else(|| "#333842".into());
+    let text = getk(&["foreground", "fg", "bright_foreground", "bright_fg"]).unwrap_or_else(|| "#e5e7eb".into());
+    let muted = getk(&["dark_foreground", "dark_fg", "muted", "color8"]).unwrap_or_else(|| "#8b92a0".into());
+    let accent = getk(&["accent", "color4", "blue", "green", "color2"]).unwrap_or_else(|| "#22c55e".into());
+    let cyan = getk(&["cyan", "color6", "blue", "color4"]).unwrap_or_else(|| accent.clone());
     let is_light = dir.join("light.mode").is_file()
         || map.get("mode").is_some_and(|m| m.eq_ignore_ascii_case("light"))
         || is_light_hex(&bg);
@@ -495,32 +556,15 @@ fn parse_omarchy_toml(dir: &Path) -> Option<Value> {
     }))
 }
 
-fn parse_noctalia_json(path: &Path) -> Option<Value> {
-    let raw = fs::read_to_string(path).ok()?;
-    let v: Value = serde_json::from_str(&raw).ok()?;
-    let bg = v.get("mSurface").and_then(|x| x.as_str())?;
-    let panel = v.get("mSurfaceVariant").and_then(|x| x.as_str()).unwrap_or(bg);
-    let card = v.get("mSurfaceContainer").and_then(|x| x.as_str()).unwrap_or(panel);
-    let border = v.get("mOutline").and_then(|x| x.as_str()).unwrap_or("#333842");
-    let text = v.get("mOnSurface").and_then(|x| x.as_str()).unwrap_or("#e5e7eb");
-    let muted = v.get("mOnSurfaceVariant").and_then(|x| x.as_str()).unwrap_or("#8b92a0");
-    let accent = v.get("mPrimary").and_then(|x| x.as_str()).unwrap_or("#22c55e");
-    let cyan = v.get("mSecondary").and_then(|x| x.as_str()).unwrap_or(accent);
-    let mode = if is_light_hex(bg) { "light" } else { "dark" };
-    Some(json!({
-        "id": "noctalia", "name": "Noctalia", "source": "live", "mode": mode,
-        "bg": bg, "panel": panel, "card": card, "border": border,
-        "text": text, "muted": muted, "accent": accent, "cyan": cyan
-    }))
-}
 
 fn load_themes(themes_dir: &Path) -> Vec<Value> {
     let mut out = Vec::new();
     if let Some(home) = dirs::home_dir() {
-        if let Some(t) = parse_omarchy_toml(&home.join(".config/omarchy/current/theme")) {
-            out.push(t);
-        }
-        if let Some(t) = parse_noctalia_json(&home.join(".config/noctalia/colors.json")) {
+        let state_home = std::env::var_os("XDG_STATE_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".local/state"));
+        let cfg_home = std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".config"));
+        let omarchy_t = parse_omarchy_toml(&state_home.join("omarchy/current/theme"))
+            .or_else(|| parse_omarchy_toml(&cfg_home.join("omarchy/current/theme")));
+        if let Some(t) = omarchy_t {
             out.push(t);
         }
     }
@@ -553,11 +597,13 @@ fn load_themes(themes_dir: &Path) -> Vec<Value> {
             "bg": bg, "panel": panel, "card": card, "border": border,
             "text": text, "muted": muted, "accent": accent, "cyan": cyan
         });
-        if let Some(ab) = v.get("active_bg").and_then(|x| x.as_str()) {
-            obj["active_bg"] = Value::String(ab.to_string());
+        for extra in ["active_bg", "active_border"] {
+            if let Some(s) = v.get(extra).and_then(|x| x.as_str()) {
+                obj[extra] = Value::String(s.to_string());
+            }
         }
-        if let Some(abo) = v.get("active_border").and_then(|x| x.as_str()) {
-            obj["active_border"] = Value::String(abo.to_string());
+        if let Some(b) = v.get("semantic_diffs").and_then(|x| x.as_bool()) {
+            obj["semantic_diffs"] = Value::Bool(b);
         }
         out.push(obj);
     }
@@ -588,32 +634,44 @@ fn dirty_project_set(root: &Path) -> std::collections::HashSet<String> {
     set
 }
 
-fn count_workspace_files(dir: &Path) -> usize {
-    let mut count = 0;
+fn list_workspace_files(dir: &Path, root: &Path, include_rs: bool, out: &mut Vec<String>) {
+    if out.len() >= 120 {
+        return;
+    }
     if let Ok(rd) = fs::read_dir(dir) {
-        for ent in rd.flatten() {
+        let mut ents: Vec<_> = rd.flatten().collect();
+        ents.sort_by_key(|e| e.file_name());
+        for ent in ents {
+            if out.len() >= 120 {
+                break;
+            }
             let name = ent.file_name();
             let s = name.to_string_lossy();
-            if s.starts_with('.') {
+            let keep_dot = include_rs && dir == root && s == ".rs";
+            if (!keep_dot && s.starts_with('.')) || s == "target" || s == "node_modules" {
                 continue;
             }
             let p = ent.path();
-            if p.is_dir() {
-                count += count_workspace_files(&p).max(1);
-            } else {
-                count += 1;
+            let Ok(meta) = fs::symlink_metadata(&p) else { continue };
+            if meta.file_type().is_symlink() {
+                continue;
+            }
+            if meta.is_dir() {
+                list_workspace_files(&p, root, include_rs, out);
+            } else if meta.is_file() {
+                if let Ok(rel) = p.strip_prefix(root) {
+                    out.push(rel.to_string_lossy().into_owned());
+                }
             }
         }
     }
-    count
 }
 
 fn clean_project_dir(proj_dir: &Path) -> Result<usize> {
     let mut removed = 0;
     if let Ok(rd) = fs::read_dir(proj_dir) {
         for ent in rd.flatten() {
-            let name = ent.file_name();
-            let s = name.to_string_lossy();
+            let s = ent.file_name().to_string_lossy().into_owned();
             if s == ".rs" || s == ".git" {
                 continue;
             }
@@ -628,6 +686,41 @@ fn clean_project_dir(proj_dir: &Path) -> Result<usize> {
         }
     }
     Ok(removed)
+}
+
+fn export_session_markdown(sess: &SessionState) -> Result<String> {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let filename = format!("chat_{ts}.md");
+    let file_path = sess.workspace.join(".rs/transcripts").join(&filename);
+    let mut md = format!("# rs-rail Transcript — {}\n\n", sess.project_name);
+    for item in &sess.ui_history {
+        match item.role.as_str() {
+            "user" => {
+                let text = item.content.as_deref().unwrap_or("");
+                md.push_str(&format!("**User:**\n\n{text}\n\n---\n\n"));
+            }
+            "assistant" => {
+                if let Some(ref r) = item.reasoning {
+                    md.push_str(&format!("> *Thinking:* {}\n\n", r.replace('\n', "\n> ")));
+                }
+                if let Some(ref text) = item.content {
+                    md.push_str(&format!("**Assistant:**\n\n{text}\n\n---\n\n"));
+                }
+            }
+            "tool_card" => {
+                let name = item.name.as_deref().unwrap_or("tool");
+                let brief = item.brief.as_deref().unwrap_or("");
+                let sum = item.summary.as_deref().unwrap_or("Done");
+                md.push_str(&format!("- `{name}({brief})` → {sum}\n\n"));
+            }
+            _ => {}
+        }
+    }
+    atomic_write(&file_path, &md)?;
+    Ok(format!(".rs/transcripts/{filename}"))
 }
 
 fn build_user_chat_message(text: &str, images: &[String]) -> ChatMessage {
@@ -755,17 +848,40 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         return write_http_json(&mut stream, 200, &json!({ "status": "ok" })).await;
     }
 
+    if method == "GET" && path == "/api/themes" {
+        return write_http_json(&mut stream, 200, &json!({ "themes": load_themes(&app.root.join("plugins/rs-rail/themes")) })).await;
+    }
+
+    if method == "GET" && path == "/api/file" {
+        let rel = query.split('&').find_map(|p| p.strip_prefix("path=")).map(url_decode).unwrap_or_default();
+        let active = app.active_project.lock().await.clone();
+        let proj_dir = app.root.join("projects").join(&active);
+        let bnd = SecurityBoundary::new_headless(&proj_dir);
+        let target = bnd.resolve_path(&rel);
+        if rel.is_empty() || bnd.is_outside(&target) || rel.split('/').any(|s| s == ".git" || s == ".env") {
+            return write_http_err(&mut stream, 403, "Path out of bounds").await;
+        }
+        let Ok(meta) = fs::symlink_metadata(&target) else {
+            return write_http_err(&mut stream, 404, "File not found").await;
+        };
+        if meta.file_type().is_symlink() || !meta.is_file() || meta.len() > 512 * 1024 {
+            return write_http_err(&mut stream, 400, "Cannot preview file").await;
+        }
+        let content = fs::read_to_string(&target).map_err(|e| anyhow::anyhow!(e))?;
+        return write_http_json(&mut stream, 200, &json!({ "path": rel, "content": content })).await;
+    }
+
     if method == "GET" && path == "/api/state" {
-        if let Some(sel) = query.split('&').find_map(|p| p.strip_prefix("project=")).filter(|s| !s.is_empty()) {
-            let clean = sel.replace("%20", " ");
-            if is_valid_slug(&clean) && app.root.join("projects").join(&clean).is_dir() {
-                *app.active_project.lock().await = clean;
+        if let Some(sel) = query.split('&').find_map(|p| p.strip_prefix("project=")).map(url_decode).filter(|s| !s.is_empty()) {
+            if is_valid_slug(&sel) && app.root.join("projects").join(&sel).is_dir() {
+                *app.active_project.lock().await = sel;
             }
         }
 
         let active_name = app.active_project.lock().await.clone();
         let dirty_set = dirty_project_set(&app.root);
         let mut proj_entries = Vec::new();
+        let mut active_files = Vec::new();
         if let Ok(rd) = fs::read_dir(app.root.join("projects")) {
             for ent in rd.flatten() {
                 let p = ent.path();
@@ -785,7 +901,12 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 } else {
                     dirty_set.contains(&name)
                 };
-                let file_count = count_workspace_files(&p);
+                let mut files = Vec::new();
+                list_workspace_files(&p, &p, false, &mut files);
+                let file_count = files.len();
+                if name == active_name {
+                    list_workspace_files(&p, &p, true, &mut active_files);
+                }
                 proj_entries.push(json!({
                     "name": name,
                     "profile_name": prof,
@@ -802,6 +923,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             set_profile_max_tokens(sess.ctx_override);
             let (git, _) = git_status_brief(&sess.workspace);
             let task_md = tools::read_task_spec(&sess.workspace);
+            let memory = fs::read_to_string(sess.workspace.join(".rs/memory.md")).unwrap_or_default();
             let r_str = match &sess.reasoning {
                 Some(ReasoningSetting::Tokens(n)) => n.to_string(),
                 Some(ReasoningSetting::Tier(t)) => t.clone(),
@@ -815,15 +937,12 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "hud_summary": sess.hud_summary,
                 "git": git,
                 "task_md": task_md,
+                "memory": memory,
+                "files": active_files,
                 "reasoning": r_str,
                 "active_skills": sess.active_skills,
                 "history": sess.ui_history,
-                "last_stats": sess.last_stats.as_ref().map(|s| json!({
-                    "prompt_tokens": s.prompt_tokens,
-                    "completion_tokens": s.completion_tokens,
-                    "reasoning_tokens": s.reasoning_tokens,
-                    "cached_tokens": s.cached_tokens
-                }))
+                "last_stats": sess.last_stats
             })
         };
 
@@ -857,7 +976,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "mcp_servers": mcp_list,
                 "ui_prefs": {
                     "pad": state::get_pad(),
-                    "show_thinking": state::get_show_thinking_summaries()
+                    "show_thinking": state::get_show_thinking_summaries(),
+                    "show_right_panel": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).show_right_panel
                 }
             }),
         )
@@ -902,6 +1022,31 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
     }
 
+    if method == "POST" && path == "/api/export" {
+        let active = app.active_project.lock().await.clone();
+        let lock = app.sessions.lock().await;
+        let Some(sess) = lock.get(&active) else {
+            return write_http_err(&mut stream, 404, "Session not found").await;
+        };
+        let rel = export_session_markdown(sess)?;
+        return write_http_json(&mut stream, 200, &json!({ "ok": true, "path": rel })).await;
+    }
+
+    if method == "POST" && path == "/api/memory" {
+        let content = payload.get("content").and_then(|v| v.as_str()).unwrap_or("");
+        let active = app.active_project.lock().await.clone();
+        let mut lock = app.sessions.lock().await;
+        let sess = lock.entry(active.clone()).or_insert_with(|| app.load_or_init_session(&active));
+        atomic_write(&sess.workspace.join(".rs/memory.md"), content)?;
+        if let Some(loaded) = Profile::load(&sess.profile_name) {
+            let sys = build_system_prompt(&loaded, &sess.workspace, sess.is_agent, &sess.active_skills);
+            if let Some(first) = sess.llm_history.first_mut() {
+                first.content = Value::String(sys);
+            }
+        }
+        return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
+    }
+
     if method == "POST" && path == "/api/project/create" {
         let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_ascii_lowercase();
         let prof_name = payload.get("profile").and_then(|v| v.as_str()).unwrap_or("lfm3").trim();
@@ -934,6 +1079,33 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         }
         let removed = clean_project_dir(&proj_dir)?;
         return write_http_json(&mut stream, 200, &json!({ "ok": true, "removed": removed })).await;
+    }
+
+    if method == "POST" && path == "/api/file/delete" {
+        let rel = payload.get("path").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let active = app.active_project.lock().await.clone();
+        let proj_dir = app.root.join("projects").join(&active);
+        let bnd = SecurityBoundary::new_headless(&proj_dir);
+        let target = bnd.resolve_path(rel);
+        let protected_rs = rel == ".rs/config.json" || rel == ".rs/memory.md";
+        if rel.is_empty() || bnd.is_outside(&target) || protected_rs || rel.split('/').any(|s| s == ".git") {
+            return write_http_err(&mut stream, 403, "Forbidden path").await;
+        }
+        let Ok(meta) = fs::symlink_metadata(&target) else {
+            return write_http_err(&mut stream, 404, "File not found").await;
+        };
+        if meta.file_type().is_symlink() || !meta.is_file() {
+            return write_http_err(&mut stream, 400, "Not a regular file").await;
+        }
+        fs::remove_file(&target)?;
+        if let Some(parent) = target.parent() {
+            if parent.file_name().is_some_and(|n| n == "__pycache__")
+                && fs::read_dir(parent).is_ok_and(|mut r| r.next().is_none())
+            {
+                let _ = fs::remove_dir(parent);
+            }
+        }
+        return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
     }
 
     if method == "POST" && path == "/api/settings/provider" {
@@ -1002,6 +1174,12 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         if let Some(show) = payload.get("show_thinking").and_then(|v| v.as_bool()) {
             state::set_show_thinking_summaries(Some(show));
         }
+        if let Some(show_rp) = payload.get("show_right_panel").and_then(|v| v.as_bool()) {
+            let cfg_path = app.root.join("plugins/rs-rail/config.json");
+            let mut cfg = RailConfig::load(&cfg_path);
+            cfg.show_right_panel = show_rp;
+            cfg.save(&cfg_path)?;
+        }
         return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
     }
 
@@ -1026,13 +1204,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             let mcp_path = app.root.join("plugins/mcp/servers.json");
             let mut servers = mcp::load_servers_config();
             servers.insert(name.to_string(), McpServerConfig { command: command.into(), args, env: HashMap::new() });
-            let file_val = json!({ "servers": servers });
-            if let Some(parent) = mcp_path.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            let tmp = mcp_path.with_extension("json.tmp");
-            fs::write(&tmp, serde_json::to_string_pretty(&file_val)?)?;
-            fs::rename(&tmp, &mcp_path)?;
+            atomic_write(&mcp_path, &serde_json::to_string_pretty(&json!({ "servers": servers }))?)?;
             return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
         }
         return write_http_err(&mut stream, 400, "Unknown MCP request").await;
@@ -1087,19 +1259,6 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             ) = {
                 let mut lock = app_clone.sessions.lock().await;
                 let sess = lock.entry(active.clone()).or_insert_with(|| app_clone.load_or_init_session(&active));
-                sess.ui_history.push(UiTurnItem {
-                    role: "user".into(),
-                    images: if images.is_empty() { None } else { Some(images.clone()) },
-                    content: if raw_msg.is_empty() { None } else { Some(raw_msg.clone()) },
-                    reasoning: None,
-                    name: None,
-                    brief: None,
-                    ok: None,
-                    summary: None,
-                    elapsed_s: None,
-                    diff: None,
-                    raw: None,
-                });
                 (
                     sess.workspace.clone(),
                     sess.is_agent,
@@ -1130,7 +1289,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     return;
                 }
             } else {
-                raw_msg
+                raw_msg.clone()
             };
 
             let provider = ProviderConfig::load().await;
@@ -1139,6 +1298,21 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 let _ = tx.send(emit("done", json!({})));
                 return;
             }
+
+            {
+                let mut lock = app_clone.sessions.lock().await;
+                if let Some(sess) = lock.get_mut(&active) {
+                    if sess.generation == start_gen {
+                        sess.ui_history.push(UiTurnItem {
+                            role: "user".into(),
+                            images: if images.is_empty() { None } else { Some(images.clone()) },
+                            content: if raw_msg.is_empty() { None } else { Some(raw_msg) },
+                            ..Default::default()
+                        });
+                    }
+                }
+            }
+
             history.push(build_user_chat_message(&effective_prompt, &images));
             let client = LlmClient::new(provider);
             let boundary = SecurityBoundary::new_headless(&workspace);
@@ -1157,6 +1331,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     break;
                 }
                 let tx_chunk = tx.clone();
+                let llm_t0 = Instant::now();
                 let res = client
                     .stream_chat_raw_with_reasoning(
                         &history,
@@ -1169,6 +1344,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                         },
                     )
                     .await;
+                let llm_elapsed = llm_t0.elapsed().as_secs_f64().max(0.01);
 
                 let (reply, opt_reasoning, tool_calls, stats) = match res {
                     Ok(v) => v,
@@ -1177,21 +1353,38 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                         break;
                     }
                 };
-                last_stats = Some(stats);
+                let prompt_tokens = if stats.prompt_tokens > 0 {
+                    stats.prompt_tokens
+                } else {
+                    history.iter().map(|m| m.content_as_str().chars().count()).sum::<usize>() / 4
+                };
+                let completion_tokens = if stats.completion_tokens > 0 {
+                    stats.completion_tokens
+                } else {
+                    (reply.chars().count() / 4).max(usize::from(!reply.is_empty()))
+                };
+                let reasoning_tokens = if stats.reasoning_tokens > 0 {
+                    stats.reasoning_tokens
+                } else {
+                    opt_reasoning.as_ref().map(|r| (r.chars().count() / 4).max(1)).unwrap_or(0)
+                };
+                let gen_toks = completion_tokens + reasoning_tokens;
+                let tps = if llm_elapsed > 0.01 { gen_toks as f64 / llm_elapsed } else { 0.0 };
+                last_stats = Some(TurnStats {
+                    prompt_tokens,
+                    completion_tokens,
+                    reasoning_tokens,
+                    cached_tokens: stats.cached_tokens,
+                    elapsed_s: llm_elapsed,
+                    tps,
+                });
 
                 if !reply.is_empty() || opt_reasoning.is_some() {
                     new_ui_items.push(UiTurnItem {
                         role: "assistant".into(),
-                        images: None,
                         content: if reply.is_empty() { None } else { Some(reply.clone()) },
                         reasoning: opt_reasoning.clone(),
-                        name: None,
-                        brief: None,
-                        ok: None,
-                        summary: None,
-                        elapsed_s: None,
-                        diff: None,
-                        raw: None,
+                        ..Default::default()
                     });
                 }
 
@@ -1256,24 +1449,18 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                         }
                         for (c_id, c_name, brief, res, elapsed) in futures_util::future::join_all(futs).await {
                             let (ok, summary, raw_txt, resp_txt) = match res {
-                                Ok(o) => {
-                                    let sum = format!("{} line(s)", o.lines().count());
-                                    (true, sum, Some(o.clone()), o)
-                                }
+                                Ok(o) => (true, format!("{} line(s)", o.lines().count()), Some(o.clone()), o),
                                 Err(e) => (false, e.clone(), None, format!("[tool error] {e}")),
                             };
                             let item = UiTurnItem {
                                 role: "tool_card".into(),
-                                images: None,
-                                content: None,
-                                reasoning: None,
                                 name: Some(c_name),
                                 brief: Some(brief),
                                 ok: Some(ok),
                                 summary: Some(summary),
                                 elapsed_s: Some(elapsed),
-                                diff: None,
                                 raw: raw_txt,
+                                ..Default::default()
                             };
                             let _ = tx.send(emit("tool_result", serde_json::to_value(&item).unwrap_or(json!({}))));
                             new_ui_items.push(item);
@@ -1295,7 +1482,6 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                         .unwrap_or("")
                         .to_string();
 
-                    // Security Gate pause when SecurityBoundary flags a mutating/system command
                     let mut preauthorized = false;
                     if fn_name == "run_command" {
                         if let Some(cmd_str) = parsed_args.get("command").and_then(|v| v.as_str()) {
@@ -1320,16 +1506,12 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                                     let msg = format!("Denied by user ({reason})");
                                     let item = UiTurnItem {
                                         role: "tool_card".into(),
-                                        images: None,
-                                        content: None,
-                                        reasoning: None,
                                         name: Some(fn_name.into()),
                                         brief: Some(brief),
                                         ok: Some(false),
                                         summary: Some(msg.clone()),
                                         elapsed_s: Some(0.0),
-                                        diff: None,
-                                        raw: None,
+                                        ..Default::default()
                                     };
                                     let _ = tx.send(emit("tool_result", serde_json::to_value(&item).unwrap_or(json!({}))));
                                     new_ui_items.push(item);
@@ -1360,8 +1542,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                                 let new_txt = if !boundary.is_outside(&p) { fs::read_to_string(&p).ok() } else { None };
                                 if let Some(nt) = new_txt {
                                     let d = compute_diff(pre_txt.as_deref().unwrap_or(""), &nt);
-                                    let sum = format!("Updated {} (+{} -{})", brief, d.adds, d.rems);
-                                    (true, sum, Some(d), None, o)
+                                    (true, format!("Updated {} (+{} -{})", brief, d.adds, d.rems), Some(d), None, o)
                                 } else {
                                     (true, format!("Updated {brief}"), None, None, o)
                                 }
@@ -1375,9 +1556,6 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
 
                     let item = UiTurnItem {
                         role: "tool_card".into(),
-                        images: None,
-                        content: None,
-                        reasoning: None,
                         name: Some(fn_name.into()),
                         brief: Some(brief),
                         ok: Some(ok),
@@ -1385,6 +1563,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                         elapsed_s: Some(elapsed),
                         diff,
                         raw: raw_txt,
+                        ..Default::default()
                     };
                     let _ = tx.send(emit("tool_result", serde_json::to_value(&item).unwrap_or(json!({}))));
                     new_ui_items.push(item);
@@ -1497,15 +1676,11 @@ mod tests {
         fs::create_dir_all(tmp.join("themes")).unwrap();
         fs::write(tmp.join("themes/claude.json"), r##"{"name":"Claude","bg":"#141413","accent":"#d97757"}"##).unwrap();
         fs::write(tmp.join("colors.toml"), "background = \"#0a1220\"\naccent = \"#78dce8\" # hex comment\n").unwrap();
-        fs::write(tmp.join("colors.json"), r##"{"mSurface":"#f8fafc","mOnSurface":"#0f172a","mPrimary":"#2563eb"}"##).unwrap();
 
         let om = parse_omarchy_toml(&tmp).unwrap();
         assert_eq!(om["accent"], "#78dce8");
         assert_eq!(om["mode"], "dark");
 
-        let noc = parse_noctalia_json(&tmp.join("colors.json")).unwrap();
-        assert_eq!(noc["mode"], "light");
-        assert_eq!(noc["accent"], "#2563eb");
 
         let custom = load_themes(&tmp.join("themes"));
         assert!(custom.iter().any(|t| t["id"] == "custom:claude" && t["accent"] == "#d97757"));
@@ -1539,5 +1714,56 @@ mod tests {
         let arr = mm.content.as_array().unwrap();
         assert_eq!(arr.len(), 2);
         assert_eq!(arr[1]["image_url"]["url"], "data:image/png;base64,AAAA");
+    }
+
+    #[test]
+    fn test_list_workspace_files_url_decode_and_export_markdown() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_ws_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join(".rs")).unwrap();
+        fs::create_dir_all(tmp.join("src")).unwrap();
+        fs::write(tmp.join(".rs/config.json"), "{}").unwrap();
+        fs::write(tmp.join("a.py"), "x=1").unwrap();
+        fs::write(tmp.join("src/b.rs"), "fn main(){}").unwrap();
+
+        let mut files = Vec::new();
+        fs::create_dir_all(tmp.join("__pycache__")).unwrap();
+        fs::write(tmp.join("__pycache__/a.pyc"), "pyc").unwrap();
+        list_workspace_files(&tmp, &tmp, false, &mut files);
+        assert_eq!(files, vec!["__pycache__/a.pyc", "a.py", "src/b.rs"]);
+        let mut with_rs = Vec::new();
+        list_workspace_files(&tmp, &tmp, true, &mut with_rs);
+        assert_eq!(with_rs, vec![".rs/config.json", "__pycache__/a.pyc", "a.py", "src/b.rs"]);
+
+        let rcfg_path = tmp.join("rail_cfg.json");
+        assert!(RailConfig::load(&rcfg_path).show_right_panel);
+        RailConfig { show_right_panel: false }.save(&rcfg_path).unwrap();
+        assert!(!RailConfig::load(&rcfg_path).show_right_panel);
+        assert_eq!(url_decode("src%2Fb%20c.rs"), "src/b c.rs");
+
+        let sess = SessionState {
+            project_name: "demo".into(),
+            workspace: tmp.clone(),
+            profile_name: "demo".into(),
+            is_agent: true,
+            adapters: false,
+            delegate: false,
+            tier: ToolTier::Core4,
+            mcp_servers: Vec::new(),
+            mcp_tools: Vec::new(),
+            ctx_override: None,
+            hud_summary: String::new(),
+            reasoning: None,
+            active_skills: Vec::new(),
+            llm_history: Vec::new(),
+            ui_history: vec![UiTurnItem { role: "user".into(), content: Some("hi".into()), ..Default::default() }],
+            last_stats: None,
+            cancel_flag: Arc::new(AtomicBool::new(false)),
+            generation: 0,
+        };
+        let rel = export_session_markdown(&sess).unwrap();
+        assert!(rel.starts_with(".rs/transcripts/chat_"));
+        assert!(tmp.join(&rel).is_file());
+        let _ = fs::remove_dir_all(&tmp);
     }
 }

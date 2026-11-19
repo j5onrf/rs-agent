@@ -7,25 +7,25 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
 <style>
   :root {
-    --bg: #0b0c0e;
-    --panel: #111317;
-    --card: #171a20;
-    --hover: #1e222a;
-    --border: #252932;
-    --nav-bg: #0e1014;
-    --code-bg: #0f1115;
+    --bg: #0c0c0e;
+    --panel: #111215;
+    --card: #18191d;
+    --hover: #202228;
+    --border: #26282e;
+    --nav-bg: #0e0f12;
+    --code-bg: #0f1014;
+    --code-border: #26282e;
+    --code-head: #111215;
     --text: #e5e7eb;
-    --muted: #8b92a0;
+    --muted: #8e95a3;
     --dim: #5c6370;
     --accent: #22c55e;
     --accent-fg: #05140a;
     --accent-bg: rgba(34, 197, 94, 0.12);
-    --user-bg: #163022;
-    --user-border: #244f36;
+    --user-bg: #16261d;
+    --user-border: #244732;
     --user-text: #ecfdf5;
     --cyan: #38bdf8;
-    --warn: #f59e0b;
-    --red: #ef4444;
     --err-text: #fca5a5;
     --del-bg: rgba(239, 68, 68, 0.14);
     --del-text: #fca5a5;
@@ -60,10 +60,10 @@
   /* Main 3-pane body */
   .main { flex: 1; display: flex; min-height: 0; }
   .sidebar-left { width: 235px; min-width: 200px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
-  .sidebar-right { width: 270px; min-width: 220px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .sidebar-right { width: 280px; min-width: 235px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .sidebar-left.hidden, .sidebar-right.hidden { display: none; }
   .sec-head { padding: 10px 12px 8px; font-size: 12px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-  .sidebar-right .sec-head { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); border-bottom: none; padding-bottom: 6px; }
+  .rs-head { padding: 8px 12px 6px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
   .proj-list { flex: 1; overflow-y: auto; padding: 6px 6px 12px; }
   .proj-item { padding: 6px 8px; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; border: 1px solid transparent; }
   .proj-item:hover { background: var(--hover); }
@@ -86,6 +86,26 @@
   .ph-kbd { font-size: 10px; color: var(--dim); border: 1px solid var(--border); background: var(--card); border-radius: 4px; padding: 1px 5px; }
   .ph-row { color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
 
+  /* Right Sidebar 2-Pane Split (ThinkRail proportions: Top Files + Bottom [TASK | Memory]) */
+  .rs-top { flex: 1; display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid var(--border); }
+  .file-list { flex: 1; overflow-y: auto; padding: 2px 6px 8px; display: flex; flex-direction: column; gap: 1px; }
+  .file-row { padding: 5px 8px; border-radius: 5px; display: flex; align-items: center; justify-content: space-between; gap: 6px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); cursor: pointer; }
+  .file-row:hover { background: var(--hover); color: var(--text); }
+  .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-del { background: transparent; border: none; color: var(--dim); cursor: pointer; font-size: 10px; padding: 1px 4px; border-radius: 4px; display: none; }
+  .file-row:hover .file-del, .file-del.arm { display: inline-block; }
+  .file-del.arm { color: var(--err-text); background: var(--del-bg); }
+  .rs-bot { height: 42%; min-height: 170px; display: flex; flex-direction: column; flex-shrink: 0; }
+  .rs-tabs { display: flex; gap: 4px; }
+  .rs-tab { background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 2px 7px; font-size: 11px; color: var(--dim); cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 500; }
+  .rs-tab.active { background: var(--card); border-color: var(--border); color: var(--text); }
+  .rs-pane { flex: 1; display: none; flex-direction: column; min-height: 0; }
+  .rs-pane.open { display: flex; }
+  .task-body { flex: 1; overflow-y: auto; padding: 6px 12px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: pre-wrap; line-height: 1.45; }
+  .mem-input { flex: 1; margin: 4px 10px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 7px 8px; font-family: var(--mono); font-size: 11.5px; color: var(--text); resize: none; outline: none; line-height: 1.45; }
+  .mem-input:focus { border-color: var(--accent); }
+  .rs-note { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
   /* Center Chat */
   .center { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   .stream { flex: 1; overflow-y: auto; padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; }
@@ -103,20 +123,28 @@
   .ans-row { display: flex; align-items: flex-start; gap: 9px; line-height: 1.55; }
   .bullet { color: var(--cyan); font-size: 12px; margin-top: 2px; flex-shrink: 0; }
   .ans-body { flex: 1; min-width: 0; word-break: break-word; }
+  .ans-body h2, .ans-body h3, .ans-body h4 { margin: 10px 0 6px; font-weight: 600; color: var(--text); }
+  .ans-body h2 { font-size: 15px; } .ans-body h3 { font-size: 14px; } .ans-body h4 { font-size: 13px; }
   .ans-body p { margin: 0 0 8px; }
   .ans-body p:last-child { margin-bottom: 0; }
-  .ans-body code { font-family: var(--mono); font-size: var(--code-size); background: var(--card); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); font-variant-ligatures: var(--ligatures); }
-  .code-wrap { position: relative; margin: 8px 0; border: 1px solid var(--border); border-radius: 8px; background: var(--code-bg); overflow: hidden; }
-  .code-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 10px; background: var(--panel); border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .ans-body ul { margin: 0 0 8px; padding-left: 18px; }
+  .ans-body li { margin: 2px 0; }
+  .ans-body hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+  .ans-body code { font-family: var(--mono); font-size: var(--code-size); background: var(--card); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--code-border); font-variant-ligatures: var(--ligatures); }
+  .code-wrap { position: relative; margin: 8px 0; border: 1px solid var(--code-border); border-radius: 8px; background: var(--code-bg); overflow: hidden; }
+  .code-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 10px; background: var(--code-head); border-bottom: 1px solid var(--code-border); font-size: 11px; color: var(--muted); font-family: var(--mono); }
   .code-wrap pre { margin: 0; padding: 10px 12px; overflow-x: auto; font-family: var(--mono); font-size: var(--code-size); line-height: 1.45; font-variant-ligatures: var(--ligatures); }
 
-  /* Tool Cards */
+  /* Tool Cards & Framed Error Card */
   .tool-card { border: 1px solid var(--border); background: var(--panel); border-radius: 8px; overflow: hidden; }
   .tool-head { padding: 7px 11px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: var(--mono); font-size: 12px; cursor: pointer; }
   .tool-title { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tool-brief { color: var(--muted); }
   .tool-summary { color: var(--dim); font-size: 11.5px; padding: 0 11px 7px 26px; font-family: var(--mono); }
   .tool-err { color: var(--err-text); }
+  .err-card { max-width: 880px; width: 100%; margin: 0 auto; border: 1px solid rgba(239,68,68,.42); background: var(--del-bg); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .err-msg { color: var(--err-text); font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
+  .err-acts { display: flex; justify-content: flex-end; }
   .diff-box { border-top: 1px solid var(--border); background: var(--code-bg); font-family: var(--mono); font-size: var(--code-size); overflow-x: auto; padding: 4px 0; font-variant-ligatures: var(--ligatures); }
   .diff-line { padding: 1px 10px; white-space: pre; display: flex; gap: 10px; }
   .diff-line.del { background: var(--del-bg); color: var(--del-text); }
@@ -134,7 +162,8 @@
 
   /* Composer */
   .composer-wrap { padding: 10px 24px 14px; border-top: 1px solid var(--border); background: var(--bg); }
-  .composer { position: relative; max-width: 880px; margin: 0 auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+  .composer { position: relative; max-width: 880px; margin: 0 auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s; }
+  .composer:focus-within { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
   .img-strip { display: none; gap: 6px; flex-wrap: wrap; }
   .img-strip.open { display: flex; }
   .img-thumb { position: relative; width: 44px; height: 44px; border-radius: 6px; border: 1px solid var(--border); overflow: hidden; background: var(--bg); }
@@ -159,11 +188,7 @@
   .ac-key { font-family: var(--mono); color: var(--text); font-weight: 600; white-space: nowrap; }
   .ac-desc { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* Right sidebar (TASK.md) */
-  .task-body { flex: 1; overflow-y: auto; padding: 10px 12px; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: pre-wrap; line-height: 1.5; }
-  .task-foot { padding: 10px 12px 14px; border-top: 1px solid var(--border); display: flex; gap: 6px; flex-shrink: 0; }
-
-  /* Settings Modal */
+  /* Modals */
   .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.68); display: none; align-items: center; justify-content: center; z-index: 50; }
   .modal-backdrop.open { display: flex; }
   .modal { width: 760px; max-width: 94vw; height: 540px; max-height: 88vh; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.6); }
@@ -173,10 +198,10 @@
   .nav-group { font-size: 10.5px; color: var(--dim); padding: 8px 10px 4px; font-weight: 600; letter-spacing: .06em; }
   .nav-btn { text-align: left; background: transparent; border: 1px solid transparent; padding: 7px 10px; border-radius: 6px; cursor: pointer; color: var(--muted); }
   .nav-btn:hover { background: var(--hover); color: var(--text); }
-  .nav-btn.active { background: var(--accent-bg); border-color: rgba(34,197,94,.45); color: var(--accent); font-weight: 500; }
+  .nav-btn.active { background: var(--accent-bg); border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent); font-weight: 500; }
   .modal-pane { flex: 1; padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
   .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; gap: 12px; }
-  .setting-row.active-slot { border-color: rgba(34,197,94,.5); background: rgba(34,197,94,.06); }
+  .setting-row.active-slot { border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: var(--accent-bg); }
   .field { display: flex; flex-direction: column; gap: 5px; }
   .field input, .field select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; color: var(--text); }
   .switch { width: 32px; height: 18px; border-radius: 99px; border: 1px solid var(--border); background: var(--bg); position: relative; cursor: pointer; flex-shrink: 0; transition: background .15s; }
@@ -193,6 +218,7 @@
   .theme-meta { min-width: 0; display: flex; flex-direction: column; }
   .theme-name { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .theme-tag { font-size: 10px; color: var(--dim); }
+  .file-view-pre { flex: 1; margin: 0; padding: 12px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; overflow: auto; font-family: var(--mono); font-size: var(--code-size); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
   .muted { color: var(--muted); font-size: 12px; }
   .empty-state { margin: auto; text-align: center; color: var(--dim); max-width: 420px; line-height: 1.6; }
 </style>
@@ -207,11 +233,12 @@
       <span class="pill" id="tb-git">git: —</span>
     </div>
     <div class="tb-right">
+      <span class="pill" id="tb-stats" style="display:none;"></span>
       <span class="pill" id="tb-ctx">
         <span id="tb-usage">ctx 8.2k</span>
         <span class="ctx-bar"><span class="ctx-fill" id="tb-ctx-fill"></span></span>
       </span>
-      <button class="btn btn-sm btn-icon" id="btn-toggle-task" title="Toggle TASK.md / TODO" aria-label="Toggle task panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5.5 8l1.7 1.7 3.3-3.4"/></svg></button>
+      <button class="btn btn-sm btn-icon" id="btn-toggle-task" title="Toggle Workspace Panel (Files, TASK, Memory, Export)" aria-label="Toggle workspace panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5.5 8l1.7 1.7 3.3-3.4"/></svg></button>
       <button class="btn btn-sm btn-icon" id="btn-settings" title="Settings" aria-label="Settings"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="5.5" cy="4.5" r="1.5" fill="var(--card)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10.5" cy="8" r="1.5" fill="var(--card)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="6.5" cy="11.5" r="1.5" fill="var(--card)"/></svg></button>
     </div>
   </header>
@@ -265,11 +292,32 @@
       </div>
     </section>
 
-    <aside class="sidebar-right hidden" id="sidebar-right">
-      <div class="sec-head"><span>TASK.md / TODO</span></div>
-      <div class="task-body" id="task-body">No TASK.md found in workspace.</div>
-      <div class="task-foot">
-        <button class="btn btn-sm btn-primary" id="btn-run-task" style="width:100%;justify-content:center;">Run /task Loop</button>
+    <aside class="sidebar-right" id="sidebar-right">
+      <div class="rs-top">
+        <div class="rs-head">
+          <span>Files (<span id="files-count">0</span>)</span>
+          <button class="btn btn-sm" id="btn-export-md" title="Save session to .rs/transcripts/">Export .md</button>
+        </div>
+        <div class="file-list" id="file-list"></div>
+      </div>
+      <div class="rs-bot">
+        <div class="rs-head">
+          <div class="rs-tabs">
+            <button class="rs-tab active" id="rs-tab-task">TASK.md</button>
+            <button class="rs-tab" id="rs-tab-mem">Memory</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+            <span class="rs-note" id="rs-note"></span>
+            <button class="btn btn-sm" id="btn-run-task">Run</button>
+            <button class="btn btn-sm" id="btn-save-mem" style="display:none;">Save</button>
+          </div>
+        </div>
+        <div class="rs-pane open" id="rs-pane-task">
+          <div class="task-body" id="task-body">No TASK.md found.</div>
+        </div>
+        <div class="rs-pane" id="rs-pane-mem">
+          <textarea class="mem-input" id="mem-input" placeholder="Workspace .rs/memory.md rules..."></textarea>
+        </div>
       </div>
     </aside>
   </div>
@@ -314,10 +362,24 @@
         <label class="muted">Profile</label>
         <select id="np-prof"></select>
       </div>
+      <div class="tool-err" id="np-err"></div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px;">
         <button class="btn" id="btn-cancel-np">Cancel</button>
         <button class="btn btn-primary" id="btn-create-np">Create</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- File Preview Modal -->
+<div class="modal-backdrop" id="modal-file">
+  <div class="modal">
+    <div class="modal-head">
+      <span id="mf-title" style="font-family:var(--mono);font-size:12px;">file</span>
+      <button class="btn btn-sm" id="btn-close-file">✕</button>
+    </div>
+    <div class="modal-pane" style="padding:12px;">
+      <pre class="file-view-pre" id="mf-body"></pre>
     </div>
   </div>
 </div>
@@ -327,32 +389,35 @@ let STATE = null;
 let ACTIVE_TAB = "providers";
 let STREAMING = false;
 let skillFilter = "";
+let lastSentPayload = null;
 
 const BUILTIN_THEMES = [
-  { id:"dark-green",   name:"Dark Green",   mode:"dark",  bg:"#0b0c0e", panel:"#111317", card:"#171a20", border:"#252932", text:"#e5e7eb", muted:"#8b92a0", accent:"#22c55e", cyan:"#38bdf8" },
-  { id:"dark-red",     name:"Dark Red",     mode:"dark",  bg:"#0b0c0e", panel:"#111317", card:"#171a20", border:"#252932", text:"#e5e7eb", muted:"#8b92a0", accent:"#ef4444", cyan:"#f87171" },
-  { id:"dark-blue",    name:"Dark Blue",    mode:"dark",  bg:"#0b0c0e", panel:"#111317", card:"#171a20", border:"#252932", text:"#e5e7eb", muted:"#8b92a0", accent:"#3b82f6", cyan:"#60a5fa" },
-  { id:"dark-purple",  name:"Dark Purple",  mode:"dark",  bg:"#0b0c0e", panel:"#111317", card:"#171a20", border:"#252932", text:"#e5e7eb", muted:"#8b92a0", accent:"#a855f7", cyan:"#c084fc" },
-  { id:"dark-orange",  name:"Dark Orange",  mode:"dark",  bg:"#0b0c0e", panel:"#111317", card:"#171a20", border:"#252932", text:"#e5e7eb", muted:"#8b92a0", accent:"#f97316", cyan:"#fb923c" },
-  { id:"light-green",  name:"Light Green",  mode:"light", bg:"#f6f7f9", panel:"#ffffff", card:"#f0f2f5", border:"#d8dee6", text:"#111827", muted:"#4b5563", accent:"#16a34a", cyan:"#16a34a" },
-  { id:"light-red",    name:"Light Red",    mode:"light", bg:"#f6f7f9", panel:"#ffffff", card:"#f0f2f5", border:"#d8dee6", text:"#111827", muted:"#4b5563", accent:"#dc2626", cyan:"#dc2626" },
-  { id:"light-blue",   name:"Light Blue",   mode:"light", bg:"#f6f7f9", panel:"#ffffff", card:"#f0f2f5", border:"#d8dee6", text:"#111827", muted:"#4b5563", accent:"#2563eb", cyan:"#2563eb" },
-  { id:"light-purple", name:"Light Purple", mode:"light", bg:"#f6f7f9", panel:"#ffffff", card:"#f0f2f5", border:"#d8dee6", text:"#111827", muted:"#4b5563", accent:"#9333ea", cyan:"#9333ea" },
-  { id:"light-orange", name:"Light Orange", mode:"light", bg:"#f6f7f9", panel:"#ffffff", card:"#f0f2f5", border:"#d8dee6", text:"#111827", muted:"#4b5563", accent:"#ea580c", cyan:"#ea580c" }
+  { id:"dark-default", name:"Dark Default", mode:"dark", bg:"#131314", panel:"#1e1f20", card:"#282a2c", border:"#333538", text:"#e3e3e3", muted:"#c4c7c5", accent:"#8ab4f8", cyan:"#8ab4f8", active_bg:"#222730", active_border:"#3b485d", semantic_diffs:true },
+  { id:"dark-green",   name:"Dark Green",   mode:"dark", bg:"#131314", panel:"#1e1f20", card:"#282a2c", border:"#333538", text:"#e3e3e3", muted:"#c4c7c5", accent:"#81c995", cyan:"#81c995", active_bg:"#1d2820", active_border:"#324636", semantic_diffs:true }
 ];
 
 const DEFAULT_APPEARANCE = {
-  theme: "dark-green",
+  theme: "dark-default",
   uiFont: "JetBrains Mono",
   codeFont: "JetBrains Mono",
   codeSize: 12,
   ligatures: false
 };
 
-function hexLum(hex) {
+function hexRgb(hex) {
   const h = String(hex || "").replace("#", "");
-  if (h.length < 6) return 0;
-  return (parseInt(h.slice(0,2), 16) * 299 + parseInt(h.slice(2,4), 16) * 587 + parseInt(h.slice(4,6), 16) * 114) / 1000;
+  if (h.length < 6) return [0, 0, 0];
+  return [parseInt(h.slice(0,2), 16) || 0, parseInt(h.slice(2,4), 16) || 0, parseInt(h.slice(4,6), 16) || 0];
+}
+
+function hexLum(hex) {
+  const [r, g, b] = hexRgb(hex);
+  return (r * 299 + g * 587 + b * 114) / 1000;
+}
+
+function isRedAccent(hex) {
+  const [r, g, b] = hexRgb(hex);
+  return r > 170 && g < 95 && b < 95;
 }
 
 function getAppearance() {
@@ -380,6 +445,12 @@ function applyAppearance(next) {
 
   const isLight = t.mode === "light";
   const accentFg = hexLum(t.accent) > 130 ? "#05140a" : "#ffffff";
+  const semantic = !!t.semantic_diffs || isRedAccent(t.accent);
+  const addColor = semantic ? (isLight ? "#16a34a" : "#22c55e") : t.accent;
+  const addText = semantic
+    ? (isLight ? "#15803d" : "#86efac")
+    : (isLight ? `color-mix(in srgb, ${t.accent} 85%, #000000)` : `color-mix(in srgb, ${t.accent} 65%, #ffffff)`);
+
   const vars = {
     "--bg": t.bg, "--panel": t.panel, "--card": t.card, "--border": t.border,
     "--text": t.text, "--muted": t.muted,
@@ -387,10 +458,12 @@ function applyAppearance(next) {
     "--hover": `color-mix(in srgb, ${t.text} 6%, ${t.card})`,
     "--nav-bg": `color-mix(in srgb, ${t.bg} 55%, ${t.panel})`,
     "--code-bg": `color-mix(in srgb, ${t.bg} 75%, ${t.panel})`,
+    "--code-border": t.semantic_diffs ? t.border : `color-mix(in srgb, ${t.accent} 24%, ${t.border})`,
+    "--code-head": t.semantic_diffs ? t.panel : `color-mix(in srgb, ${t.accent} 7%, ${t.panel})`,
     "--accent": t.accent, "--accent-fg": accentFg,
     "--accent-bg": `color-mix(in srgb, ${t.accent} 14%, transparent)`,
-    "--user-bg": `color-mix(in srgb, ${t.accent} 16%, ${t.panel})`,
-    "--user-border": `color-mix(in srgb, ${t.accent} 42%, ${t.border})`,
+    "--user-bg": t.semantic_diffs ? (isLight ? "#dcfce7" : "#16261d") : `color-mix(in srgb, ${t.accent} 16%, ${t.panel})`,
+    "--user-border": t.semantic_diffs ? (isLight ? "#86efac" : "#244732") : `color-mix(in srgb, ${t.accent} 42%, ${t.border})`,
     "--user-text": t.text,
     "--active-bg": t.active_bg || `color-mix(in srgb, ${t.accent} 16%, ${t.panel})`,
     "--active-border": t.active_border || `color-mix(in srgb, ${t.accent} 48%, ${t.border})`,
@@ -398,8 +471,8 @@ function applyAppearance(next) {
     "--err-text": isLight ? "#dc2626" : "#fca5a5",
     "--del-bg": isLight ? "rgba(220,38,38,0.10)" : "rgba(239,68,68,0.14)",
     "--del-text": isLight ? "#b91c1c" : "#fca5a5",
-    "--add-bg": isLight ? "rgba(22,163,74,0.12)" : "rgba(34,197,94,0.14)",
-    "--add-text": isLight ? "#15803d" : "#86efac",
+    "--add-bg": `color-mix(in srgb, ${addColor} 14%, transparent)`,
+    "--add-text": addText,
   };
   const root = document.documentElement.style;
   for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
@@ -427,19 +500,50 @@ const SLASH_CMDS = [
   { cmd: "/p", desc: "Select agent profile" },
   { cmd: "/ms", desc: "Providers & models" },
   { cmd: "/tk", desc: "Toggle auto-expand thinking" },
+  { cmd: "/export", desc: "Export transcript to .rs/transcripts/" },
 ];
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function renderProseBlock(raw) {
+  const inline = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  const lines = raw.split("\n");
+  let html = "", inList = false, para = [];
+  const flushPara = () => { if (para.length) { html += `<p>${para.map(inline).join("<br>")}</p>`; para = []; } };
+  const closeList = () => { if (inList) { html += "</ul>"; inList = false; } };
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) { flushPara(); closeList(); continue; }
+    if (t === "---" || t === "***") { flushPara(); closeList(); html += "<hr>"; continue; }
+    const hm = line.match(/^(#{1,3})\s+(.+)$/);
+    if (hm) {
+      flushPara(); closeList();
+      const tag = hm[1].length === 1 ? "h2" : (hm[1].length === 2 ? "h3" : "h4");
+      html += `<${tag}>${inline(hm[2])}</${tag}>`;
+      continue;
+    }
+    const lm = line.match(/^\s*[-*]\s+(.+)$/);
+    if (lm) {
+      flushPara();
+      if (!inList) { html += "<ul>"; inList = true; }
+      html += `<li>${inline(lm[1])}</li>`;
+      continue;
+    }
+    closeList();
+    para.push(line);
+  }
+  flushPara();
+  closeList();
+  return html;
+}
 
 function renderMarkdown(text) {
   const parts = String(text || "").split(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g);
   let html = "";
   for (let i = 0; i < parts.length; i++) {
     if (i % 3 === 0) {
-      let seg = esc(parts[i]).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-      const paras = seg.split(/\n{2,}/).filter(Boolean).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
-      html += paras;
+      html += renderProseBlock(parts[i]);
     } else if (i % 3 === 1) {
       const lang = esc(parts[i] || "text");
       const code = esc(parts[i + 1] || "");
@@ -472,30 +576,47 @@ function openSettings(tab) {
   renderModalTab();
 }
 
+function setRsNote(msg) {
+  const el = $("rs-note");
+  el.textContent = msg;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.textContent = ""; }, 4000);
+}
+
 function renderAll() {
   if (!STATE) return;
   const ap = STATE.active_project;
-  const headLabel = ap.profile_name && ap.profile_name !== ap.name
-    ? `${ap.name} · ${ap.profile_name}`
-    : ap.name;
+  const headLabel = ap.profile_name && ap.profile_name !== ap.name ? `${ap.name} · ${ap.profile_name}` : ap.name;
   $("tb-profile").textContent = `${headLabel} · ${ap.hud_summary}`;
   $("tb-git").textContent = ap.git || "git: [none]";
   $("btn-model-pill").textContent = `${STATE.provider.model} · ${STATE.provider.endpoint}`;
   $("btn-img").style.display = STATE.provider.is_local ? "none" : "inline-flex";
 
+  $("sidebar-right").classList.toggle("hidden", STATE.ui_prefs?.show_right_panel === false);
   const ctxMax = STATE.provider.max_tokens || 8192;
   const ctxLbl = ctxMax >= 1000 ? `${(ctxMax/1000).toFixed(1)}k` : ctxMax;
+  const stPill = $("tb-stats");
   if (ap.last_stats) {
-    const used = (ap.last_stats.prompt_tokens || 0) + (ap.last_stats.completion_tokens || 0);
+    const s = ap.last_stats;
+    const fmtK = (n) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
+    const used = (s.prompt_tokens || 0) + (s.completion_tokens || 0);
     const pct = Math.min(100, (used / Math.max(1, ctxMax)) * 100);
+    const cPct = s.cached_tokens > 0 && s.prompt_tokens > 0
+      ? Math.min(100, Math.round((s.cached_tokens / s.prompt_tokens) * 100))
+      : 0;
+    const chPart = cPct > 0 ? `CH ${cPct}% · ` : "";
+    const spdPart = `${(s.tps || 0).toFixed(1)} t/s`;
+    stPill.textContent = `${chPart}${spdPart}`;
+    stPill.style.display = "inline-flex";
     $("tb-usage").textContent = `${pct.toFixed(1)}% / ${ctxLbl}`;
     $("tb-ctx-fill").style.width = `${pct}%`;
   } else {
+    stPill.style.display = "none";
     $("tb-usage").textContent = `ctx ${ctxLbl}`;
     $("tb-ctx-fill").style.width = "0%";
   }
 
-  // Projects list (T3-style badge, scoped git dot, hover clean + hover card)
+  // Projects list
   const plist = $("proj-list");
   plist.innerHTML = "";
   const hc = $("proj-hover");
@@ -522,8 +643,7 @@ function renderAll() {
       const r = el.getBoundingClientRect();
       const kbd = idx < 9 ? `<span class="ph-kbd">Ctrl+${idx + 1}</span>` : "";
       const filesTxt = p.file_count ? `${p.file_count} file(s)` : "empty";
-      const gitTxt = p.dirty ? "modified" : "clean";
-      hc.innerHTML = `<div class="ph-top"><span>${esc(p.name)}</span>${kbd}</div><div class="ph-row"><span>Profile</span><span>${esc(p.profile_name)}</span></div><div class="ph-row"><span>Workspace</span><span>${filesTxt}</span></div><div class="ph-row"><span>Git</span><span>${gitTxt}</span></div>`;
+      hc.innerHTML = `<div class="ph-top"><span>${esc(p.name)}</span>${kbd}</div><div class="ph-row"><span>Profile</span><span>${esc(p.profile_name)}</span></div><div class="ph-row"><span>Workspace</span><span>${filesTxt}</span></div><div class="ph-row"><span>Git</span><span>${p.dirty ? "modified" : "clean"}</span></div>`;
       hc.style.left = `${r.right + 8}px`;
       hc.style.top = `${Math.min(r.top, window.innerHeight - 110)}px`;
       hc.classList.add("open");
@@ -532,9 +652,17 @@ function renderAll() {
     plist.appendChild(el);
   });
 
-  $("sel-reasoning").value = ap.reasoning || "";
+  const rSel = $("sel-reasoning");
+  if (ap.reasoning && !Array.from(rSel.options).some(o => o.value === ap.reasoning)) {
+    const opt = document.createElement("option");
+    opt.value = ap.reasoning;
+    opt.textContent = /^\d+$/.test(ap.reasoning) ? `t${ap.reasoning}` : ap.reasoning;
+    rSel.appendChild(opt);
+  }
+  rSel.value = ap.reasoning || "";
 
-  // Active skill chips only (0..3)
+
+
   const sbar = $("skills-bar");
   sbar.innerHTML = "";
   for (const sk of ap.active_skills) {
@@ -546,11 +674,49 @@ function renderAll() {
     sbar.appendChild(chip);
   }
 
-  // Task panel
-  $("task-body").textContent = ap.task_md || (ap.is_agent ? "No TASK.md found. Click below to type /task <goal>." : "Chat mode (no tools). Switch to an agent project to run /task.");
+  // Right sidebar: Top Files + Bottom [TASK | Memory]
+  const files = ap.files || [];
+  $("files-count").textContent = files.length;
+  const flist = $("file-list");
+  flist.innerHTML = "";
+  if (!files.length) {
+    flist.innerHTML = `<div class="muted" style="padding:4px 8px;">Empty workspace</div>`;
+  } else {
+    for (const f of files) {
+      const row = document.createElement("div");
+      row.className = "file-row";
+      row.innerHTML = `<span class="file-name" title="${esc(f)}">${esc(f)}</span><button class="file-del" title="Delete file">✕</button>`;
+      row.onclick = async () => {
+        try {
+          const res = await api(`/api/file?path=${encodeURIComponent(f)}`);
+          $("mf-title").textContent = res.path;
+          $("mf-body").textContent = res.content;
+          $("modal-file").classList.add("open");
+        } catch (err) { setRsNote(err.message); }
+      };
+      const del = row.querySelector(".file-del");
+      del.onclick = async (e) => {
+        e.stopPropagation();
+        if (!del.classList.contains("arm")) {
+          del.classList.add("arm");
+          del.textContent = "del?";
+          setTimeout(() => { del.classList.remove("arm"); del.textContent = "✕"; }, 2200);
+          return;
+        }
+        await api("/api/file/delete", { path: f });
+        await loadState();
+      };
+      flist.appendChild(row);
+    }
+  }
+
+  $("task-body").textContent = ap.task_md || (ap.is_agent ? "No TASK.md found. Click /task above to run or set a goal." : "Chat mode (no tools).");
   const rt = $("btn-run-task");
   rt.disabled = !ap.is_agent;
-  rt.textContent = !ap.is_agent ? "Agent Projects Only" : (ap.task_md ? "Run /task Loop" : "Type /task <goal>");
+  rt.textContent = !ap.is_agent ? "Chat" : (ap.task_md ? "Run" : "/task");
+
+  const memEl = $("mem-input");
+  if (document.activeElement !== memEl) memEl.value = ap.memory || "";
 
   applyAppearance();
   renderHistory();
@@ -569,13 +735,9 @@ function renderHistory() {
   const wrap = document.createElement("div");
   wrap.className = "turn-wrap";
   for (const m of msgs) {
-    if (m.role === "user") {
-      wrap.appendChild(buildUserEl(m.content || "", m.images || []));
-    } else if (m.role === "assistant") {
-      wrap.appendChild(buildAssistantEl(m.reasoning || "", m.content || ""));
-    } else if (m.role === "tool_card") {
-      wrap.appendChild(buildToolCard(m));
-    }
+    if (m.role === "user") wrap.appendChild(buildUserEl(m.content || "", m.images || []));
+    else if (m.role === "assistant") wrap.appendChild(buildAssistantEl(m.reasoning || "", m.content || ""));
+    else if (m.role === "tool_card") wrap.appendChild(buildToolCard(m));
   }
   stream.appendChild(wrap);
   stream.scrollTop = stream.scrollHeight;
@@ -664,20 +826,16 @@ function buildToolCard(t) {
 
 async function runLocalSlash(text) {
   const low = text.toLowerCase();
-  if (low === "/r" || low === "/reset") {
-    await api("/api/reset", {}); await loadState(); return true;
-  }
-  if (low === "/p" || low === "/profile") {
-    openSettings("profiles"); return true;
-  }
-  if (low === "/ms" || low === "/model") {
-    openSettings("providers"); return true;
-  }
-  if (low === "/tk" || low === "/think") {
-    await api("/api/settings/ui", { show_thinking: STATE?.ui_prefs?.show_thinking === false }); await loadState(); return true;
-  }
-  if (low === "/s" || low === "/skill") {
-    openSettings("skills"); return true;
+  if (low === "/r" || low === "/reset") { await api("/api/reset", {}); await loadState(); return true; }
+  if (low === "/p" || low === "/profile") { openSettings("profiles"); return true; }
+  if (low === "/ms" || low === "/model") { openSettings("providers"); return true; }
+  if (low === "/tk" || low === "/think") { await api("/api/settings/ui", { show_thinking: STATE?.ui_prefs?.show_thinking === false }); await loadState(); return true; }
+  if (low === "/s" || low === "/skill") { openSettings("skills"); return true; }
+  if (low === "/export") {
+    const res = await api("/api/export", {});
+    $("sidebar-right").classList.remove("hidden");
+    setRsNote(`Saved ${res.path}`);
+    return true;
   }
   if (low.startsWith("/s ") || low.startsWith("/skill ")) {
     const arg = text.split(/\s+/)[1]?.toLowerCase() || "";
@@ -722,10 +880,10 @@ function addImageFiles(files) {
   }
 }
 
-async function sendMessage(overrideText) {
+async function sendMessage(overrideText, overrideImgs) {
   if (STREAMING) return;
   const text = overrideText !== undefined ? overrideText : $("msg-input").value.trim();
-  const imgs = overrideText !== undefined ? [] : [...pendingImages];
+  const imgs = overrideText !== undefined ? (overrideImgs || []) : [...pendingImages];
   if (!text && !imgs.length) return;
   if (overrideText === undefined) {
     $("msg-input").value = "";
@@ -735,6 +893,7 @@ async function sendMessage(overrideText) {
   closeAc();
   if (!imgs.length && text.startsWith("/") && await runLocalSlash(text)) return;
 
+  lastSentPayload = { text, imgs };
   STREAMING = true;
   $("btn-send").style.display = "none";
   $("btn-stop").style.display = "inline-flex";
@@ -833,11 +992,13 @@ async function sendMessage(overrideText) {
     $("btn-stop").style.display = "none";
     await loadState();
     if (chatErr) {
-      const er = document.createElement("div");
-      er.className = "tool-err";
-      er.style.cssText = "max-width:880px;width:100%;margin:0 auto;";
-      er.textContent = `✗ ${chatErr}`;
-      stream.appendChild(er);
+      const ec = document.createElement("div");
+      ec.className = "err-card";
+      ec.innerHTML = `<div class="err-msg">⚠ ${esc(chatErr)}</div><div class="err-acts"><button class="btn btn-sm">Try again</button></div>`;
+      ec.querySelector("button").onclick = () => {
+        if (lastSentPayload) sendMessage(lastSentPayload.text, lastSentPayload.imgs);
+      };
+      stream.appendChild(ec);
       stream.scrollTop = stream.scrollHeight;
     }
   }
@@ -887,20 +1048,14 @@ function renderModalTab() {
       const q = skillFilter.trim().toLowerCase();
       const filtered = (STATE.skills || []).filter((s) => !q || s.toLowerCase().includes(q));
       list.innerHTML = "";
-      if (!filtered.length) {
-        list.innerHTML = `<div class="muted">No matching skills in ~/.config/rs-agent/skills/</div>`;
-        return;
-      }
+      if (!filtered.length) { list.innerHTML = `<div class="muted">No matching skills in ~/.config/rs-agent/skills/</div>`; return; }
       for (const sk of filtered) {
         const on = active.includes(sk);
         const full = !on && active.length >= 3;
         const row = document.createElement("div");
         row.className = "setting-row" + (on ? " active-slot" : "");
-        row.innerHTML = `<div><strong>${esc(sk)}</strong><div class="muted">~/.config/rs-agent/skills/${esc(sk)}.md</div></div><button class="switch ${on ? "on" : ""}" ${full ? "disabled" : ""} title="${full ? "Max 3 skills active" : "Toggle skill"}"></button>`;
-        row.querySelector("button").onclick = async () => {
-          await api("/api/settings/profile", { skill_toggle: sk });
-          await loadState();
-        };
+        row.innerHTML = `<div><strong>${esc(sk)}</strong><div class="muted">~/.config/rs-agent/skills/${esc(sk)}.md</div></div><button class="switch ${on ? "on" : ""}" ${full ? "disabled" : ""}></button>`;
+        row.querySelector("button").onclick = async () => { await api("/api/settings/profile", { skill_toggle: sk }); await loadState(); };
         list.appendChild(row);
       }
     };
@@ -929,8 +1084,10 @@ function renderModalTab() {
         e.target.textContent = "Probing...";
         try {
           const res = await api("/api/settings/mcp", { inspect: m.name });
-          alert(`${m.name} (${res.tools.length} tools):\n` + res.tools.map(t => "• " + t.function.name).join("\n"));
-        } catch (err) { alert("Error: " + err.message); }
+          $("mf-title").textContent = `MCP: ${m.name} (${res.tools.length} tools)`;
+          $("mf-body").textContent = res.tools.map(t => `• ${t.function.name} — ${t.function.description || ""}`).join("\n");
+          $("modal-file").classList.add("open");
+        } catch (err) { $("mf-title").textContent = "MCP Error"; $("mf-body").textContent = err.message; $("modal-file").classList.add("open"); }
         e.target.textContent = "Inspect Tools";
       };
       pane.appendChild(row);
@@ -959,7 +1116,7 @@ function renderModalTab() {
     for (const t of allThemes()) {
       const card = document.createElement("button");
       card.className = "theme-card" + (ap.theme === t.id ? " active" : "");
-      const tag = t.source === "live" ? "desktop" : (t.source === "custom" ? "custom" : t.mode);
+      const tag = t.source === "live" ? "desktop" : (t.source === "custom" ? "custom" : (t.semantic_diffs ? "cli" : t.mode));
       card.innerHTML = `<span class="theme-swatch" style="background:linear-gradient(135deg, ${esc(t.bg)} 50%, ${esc(t.accent)} 50%)"></span><span class="theme-meta"><span class="theme-name">${esc(t.name)}</span><span class="theme-tag">${esc(tag)}</span></span>`;
       card.onclick = () => { applyAppearance({ theme: t.id }); renderModalTab(); };
       grid.appendChild(card);
@@ -1056,6 +1213,11 @@ const toggleLeft = () => {
 $("btn-toggle-proj").onclick = toggleLeft;
 if (localStorage.getItem("rs_rail_left_hidden") === "1") $("sidebar-left").classList.add("hidden");
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    $("modal-settings").classList.remove("open");
+    $("modal-new-proj").classList.remove("open");
+    $("modal-file").classList.remove("open");
+  }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") { e.preventDefault(); toggleLeft(); }
   if ((e.ctrlKey || e.metaKey) && /^[1-9]$/.test(e.key) && STATE?.projects?.[+e.key - 1]) { e.preventDefault(); loadState(STATE.projects[+e.key - 1].name); }
 });
@@ -1069,7 +1231,20 @@ $("msg-input").addEventListener("paste", (e) => {
 });
 $("btn-send").onclick = () => sendMessage();
 $("btn-stop").onclick = () => api("/api/stop", {});
-$("btn-toggle-task").onclick = () => $("sidebar-right").classList.toggle("hidden");
+$("btn-toggle-task").onclick = async () => {
+  const hidden = $("sidebar-right").classList.toggle("hidden");
+  await api("/api/settings/ui", { show_right_panel: !hidden });
+};
+$("rs-tab-task").onclick = () => {
+  $("rs-tab-task").classList.add("active"); $("rs-tab-mem").classList.remove("active");
+  $("rs-pane-task").classList.add("open"); $("rs-pane-mem").classList.remove("open");
+  $("btn-run-task").style.display = "inline-flex"; $("btn-save-mem").style.display = "none";
+};
+$("rs-tab-mem").onclick = () => {
+  $("rs-tab-mem").classList.add("active"); $("rs-tab-task").classList.remove("active");
+  $("rs-pane-mem").classList.add("open"); $("rs-pane-task").classList.remove("open");
+  $("btn-save-mem").style.display = "inline-flex"; $("btn-run-task").style.display = "none";
+};
 $("btn-run-task").onclick = () => {
   const ap = STATE?.active_project;
   if (!ap?.is_agent) return;
@@ -1082,9 +1257,23 @@ $("btn-run-task").onclick = () => {
   }
   sendMessage("/task");
 };
+$("btn-save-mem").onclick = async () => {
+  try {
+    await api("/api/memory", { content: $("mem-input").value });
+    setRsNote("Memory saved ✓");
+    await loadState();
+  } catch (err) { setRsNote(err.message); }
+};
+$("btn-export-md").onclick = async () => {
+  try {
+    const res = await api("/api/export", {});
+    setRsNote(`Saved ${res.path}`);
+  } catch (err) { setRsNote(err.message); }
+};
 $("btn-settings").onclick = () => openSettings();
 $("btn-model-pill").onclick = () => openSettings("providers");
 $("btn-close-settings").onclick = () => $("modal-settings").classList.remove("open");
+$("btn-close-file").onclick = () => $("modal-file").classList.remove("open");
 document.querySelectorAll(".nav-btn").forEach(b => b.onclick = () => {
   ACTIVE_TAB = b.dataset.tab; renderModalTab();
 });
@@ -1095,23 +1284,16 @@ $("msg-input").addEventListener("click", () => updateAutocomplete());
 document.addEventListener("click", (e) => { if (!e.target.closest(".composer")) closeAc(); });
 $("msg-input").addEventListener("keydown", (e) => {
   if ($("ac-pop").classList.contains("open") && acItems.length) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault(); acHl = (acHl + 1) % acItems.length; updateAutocomplete(); return;
-    }
-    if (e.key === "ArrowUp") {
-      e.preventDefault(); acHl = (acHl + acItems.length - 1) % acItems.length; updateAutocomplete(); return;
-    }
-    if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
-      e.preventDefault(); pickAcItem(acHl); return;
-    }
-    if (e.key === "Escape") {
-      e.preventDefault(); closeAc(); return;
-    }
+    if (e.key === "ArrowDown") { e.preventDefault(); acHl = (acHl + 1) % acItems.length; updateAutocomplete(); return; }
+    if (e.key === "ArrowUp") { e.preventDefault(); acHl = (acHl + acItems.length - 1) % acItems.length; updateAutocomplete(); return; }
+    if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) { e.preventDefault(); pickAcItem(acHl); return; }
+    if (e.key === "Escape") { e.preventDefault(); closeAc(); return; }
   }
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 
 $("btn-new-proj").onclick = () => {
+  $("np-err").textContent = "";
   const sel = $("np-prof");
   sel.innerHTML = (STATE?.profiles || ["chat"]).map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join("");
   $("modal-new-proj").classList.add("open");
@@ -1126,12 +1308,34 @@ $("btn-create-np").onclick = async () => {
     $("modal-new-proj").classList.remove("open");
     await loadState(created.name);
   } catch (err) {
-    alert("Error: " + err.message);
+    $("np-err").textContent = err.message;
   }
 };
 
 const params = new URLSearchParams(location.search);
 loadState(params.get("project") || "");
+
+let lastThemeSig = "", lastThemeSync = 0;
+async function syncThemes(force) {
+  if (document.hidden || !STATE) return;
+  const id = getAppearance().theme;
+  if (!force && id !== "omarchy" && !id.startsWith("custom:")) return;
+  const now = Date.now();
+  if (!force && now - lastThemeSync < 1500) return;
+  lastThemeSync = now;
+  try {
+    const res = await api("/api/themes");
+    const sig = JSON.stringify(res.themes || []);
+    if (sig !== lastThemeSig) {
+      lastThemeSig = sig;
+      STATE.themes = res.themes || [];
+      applyAppearance();
+      if ($("modal-settings").classList.contains("open") && ACTIVE_TAB === "appearance") renderModalTab();
+    }
+  } catch {}
+}
+window.addEventListener("focus", () => syncThemes(false));
+document.addEventListener("visibilitychange", () => { if (!document.hidden) syncThemes(false); });
 </script>
 <div class="proj-hover" id="proj-hover"></div>
 </body>

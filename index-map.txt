@@ -22,8 +22,11 @@
 #   ├── plugins/rs-rail/Cargo.toml       - name = "rs-rail"
 #   ├── plugins/rs-rail/Readme.md        - Native Rust local HTTP+SSE web surface for `rs-agent` — zero `pi-agent`, zero No
 #   ├── plugins/rs-rail/launch.sh        - #!/usr/bin/env bash
+#   ├── plugins/rs-rail/rs-rail.desktop  - [Desktop Entry]
 #   ├── plugins/rs-rail/src/main.rs      - CLI Entrypoint & Runtime Loop
-#   ├── plugins/rs-rail/src/ui.html      - --bg: #0b0c0e;
+#   ├── plugins/rs-rail/src/ui.html      - --bg: #0c0c0e;
+#   ├── plugins/rs-rail/themes/claude.json - "name": "Claude",
+#   ├── plugins/rs-rail/themes/noctalia.json - "name": "Noctalia",
 #   ├── plugins/t3code/Cargo.toml        - name = "t3code-bridge"
 #   ├── plugins/t3code/Readme.md         - A native Rust Agent Client Protocol (ACP) stdio bridge connecting the `rs-agent`
 #   ├── plugins/t3code/launch.sh         - #!/usr/bin/env bash
@@ -44,13 +47,13 @@
 #   ├── profiles/qwen38.md               - Qwen3.8-35B-Distill (Local)
 #   ├── profiles/sage.md                 - InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent
 #   ├── profiles/tokenlab.md             - AMD Token Lab DeepSeek-V4.1-Flash Systems & Coding Engineer
-#   ├── projects/groot/New Document.txt
-#   ├── projects/lfm3/New Document.txt
-#   ├── projects/ling-tiny/math_utils.py - #!/usr/bin/env python3
+#   ├── projects/flint/math_demo.py      - def is_prime(n):
+#   ├── projects/gem35/math_demo.py      - def is_prime(n):
+#   ├── projects/groot/math_demo.py      - def is_prime(n):
+#   ├── projects/lfm3/math_demo.py       - def is_prime(n):
 #   ├── projects/nemo/math_utils.py      - #!/usr/bin/env python3
 #   ├── projects/sage/test_calc.py       - def add(a, b):
 #   ├── projects/tokenlab/calc.py        - def add(a, b):
-#   ├── projects/tokenlab/test_calc.py   - import unittest
 #   ├── rs-context.md                    - Rs-Agent Context Router
 #   ├── rs-hook.sh                       - Rs-Agent shell hook (minimal: < 0.2ms, Bash & Zsh, macOS & Linux)
 #   ├── skills/humanizer.md              - Anti-AI Slop Humanizer Directive
@@ -92,8 +95,11 @@
 
 ### `plugins/rs-rail/src/main.rs`
 ```rust
-  L1114: async fn main() -> Result<()>;
-  L1134: mod tests;
+  L040: impl Default for RailConfig {
+    L041: fn default() -> Self;
+  }
+  L1604: async fn main() -> Result<()>;
+  L1624: mod tests;
 ```
 
 ### `plugins/t3code/src/main.rs`
@@ -189,15 +195,15 @@
   }
   L095: pub struct LlmClient
   L102: pub fn is_local_endpoint(url: &str) -> bool;
-  L386: impl LlmClient {
-    L387: pub fn set_reasoning(&self, setting: Option<ReasoningSetting>);
-    L397: pub fn last_model(&self) -> String;
-    L401: pub fn new(config: ProviderConfig) -> Self;
-    L834: pub async fn stream_chat_raw_with_reasoning<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, reasoning_override: Option<Option<ReasoningSetting>>, mut on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
-    L853: pub async fn stream_chat_raw<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
-    L866: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>;
+  L390: impl LlmClient {
+    L391: pub fn set_reasoning(&self, setting: Option<ReasoningSetting>);
+    L401: pub fn last_model(&self) -> String;
+    L405: pub fn new(config: ProviderConfig) -> Self;
+    L838: pub async fn stream_chat_raw_with_reasoning<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, reasoning_override: Option<Option<ReasoningSetting>>, mut on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
+    L857: pub async fn stream_chat_raw<F>(&self, messages: &[ChatMessage], tools: Option<Value>, cancel_flag: Option<Arc<AtomicBool>>, on_chunk: F ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>where F: FnMut(&str, bool) + Send ,;
+    L870: pub async fn stream_chat(&self, messages: &[ChatMessage], tools: Option<Value>, renderer: &mut StreamRenderer, spinner: &mut InlineSpinner ,) -> Result<(String, Option<String>, Option<Vec<Value>>, UsageStats)>;
   }
-  L960: mod tests;
+  L964: mod tests;
 ```
 
 ### `src/config.rs`
@@ -212,18 +218,18 @@
     L074: pub fn load_or_default<P: AsRef<Path>>(workspace: P) -> Self;
     L084: pub fn save<P: AsRef<Path>>(&self, workspace: P) -> Result<()>;
   }
-  L093: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
-  L102: pub fn get_env_path() -> PathBuf;
-  L108: pub fn set_profile_max_tokens(val: Option<usize>);
-  L112: pub fn get_max_tokens() -> usize;
-  L125: pub fn get_max_rounds() -> usize;
-  L134: pub fn get_context_ceilings() -> ContextCeilings;
-  L147: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, ... (5 fields) }
-  L184: impl ProviderConfig {
-    L185: pub async fn load() -> Self;
+  L096: pub struct ContextCeilings { pub max_tokens: usize, pub line_ceiling: usize, pub char_cap: usize, ... (5 fields) }
+  L105: pub fn get_env_path() -> PathBuf;
+  L111: pub fn set_profile_max_tokens(val: Option<usize>);
+  L115: pub fn get_max_tokens() -> usize;
+  L128: pub fn get_max_rounds() -> usize;
+  L137: pub fn get_context_ceilings() -> ContextCeilings;
+  L150: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, ... (5 fields) }
+  L187: impl ProviderConfig {
+    L188: pub async fn load() -> Self;
   }
-  L263: pub fn load_global_instructions() -> Option<String>;
-  L285: mod tests;
+  L266: pub fn load_global_instructions() -> Option<String>;
+  L288: mod tests;
 ```
 
 ### `src/matcher.rs`
@@ -284,8 +290,8 @@
   L878: pub fn pick_short_alias(slug: &str, used_aliases: &HashSet<String>, check_path: bool) -> Option<String>;
   L892: pub fn build_auto_profile_content(model: &str, is_local: bool) -> String;
   L997: pub fn ensure_workspace_in_root(root: &Path, raw_model: &str, is_local: bool, check_path: bool ,) -> Option<String>;
-  L1102: pub fn build_system_prompt(profile: &Profile, workspace: &Path, is_agent: bool, active_skills: &[String]) -> String;
-  L1132: mod tests;
+  L1105: pub fn build_system_prompt(profile: &Profile, workspace: &Path, is_agent: bool, active_skills: &[String]) -> String;
+  L1135: mod tests;
 ```
 
 ### `src/security.rs`
@@ -297,10 +303,10 @@
     L140: pub fn child<P: AsRef<Path>>(&self, workspace: P) -> Self;
     L146: pub fn resolve_path(&self, target: &str) -> PathBuf;
     L157: pub fn is_outside(&self, path: &Path) -> bool; // Walk up to closest existing ancestor to canonicalize.
-    L231: pub fn check_command(&self, cmd: &str) -> Option<&'static str>;
-    L308: pub fn authorize(&self, violation: &str) -> bool;
+    L259: pub fn check_command(&self, cmd: &str) -> Option<&'static str>;
+    L336: pub fn authorize(&self, violation: &str) -> bool;
   }
-  L331: mod tests;
+  L359: mod tests;
 ```
 
 ### `src/skill.rs`
