@@ -662,7 +662,7 @@ fn load_themes(themes_dir: &Path) -> Vec<Value> {
             "bg": bg, "panel": panel, "card": card, "border": border,
             "text": text, "muted": muted, "accent": accent, "cyan": cyan
         });
-        for extra in ["active_bg", "active_border", "user_bg", "user_border"] {
+        for extra in ["active_bg", "active_border", "user_bg", "user_border", "topbar_bg"] {
             if let Some(s) = v.get(extra).and_then(|x| x.as_str()) {
                 obj[extra] = Value::String(s.to_string());
             }

@@ -12,5 +12,6 @@
   "active_bg": "#242424",
   "active_border": "#303030",
   "user_bg": "#242424",
-  "user_border": "#2e2e2e"
+  "user_border": "#2e2e2e",
+  "topbar_bg": "#000000"
 }

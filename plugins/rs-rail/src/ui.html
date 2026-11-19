@@ -52,19 +52,21 @@
   .app { display: flex; flex-direction: column; height: 100vh; }
 
   /* Topbar */
-  .topbar { height: 42px; min-height: 42px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; gap: 12px; }
+  .topbar { height: 42px; min-height: 42px; background: var(--topbar-bg, var(--panel)); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; gap: 12px; }
   .tb-left, .tb-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .brand { font-weight: 700; letter-spacing: .3px; display: flex; align-items: center; gap: 6px; color: var(--text); white-space: nowrap; }
-  .pill { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-size: 12px; color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
-  .ctx-bar { width: 56px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
-  .ctx-fill { display: block; height: 100%; background: var(--accent); width: 0%; transition: width .2s; }
-  .btn { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; color: var(--text); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .pill { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 3px 8px; font-size: 12px; color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; cursor: default; user-select: none; transition: background .12s, color .12s; }
+  .pill:hover { background: var(--hover); color: var(--text); }
+  .ctx-bar { width: 56px; height: 6px; background: color-mix(in srgb, var(--text) 20%, transparent); border-radius: 99px; overflow: hidden; flex-shrink: 0; }
+  .ctx-fill { display: block; height: 100%; background: var(--accent); border-radius: 99px; width: 0%; transition: width .2s, background .2s; }
+  .btn { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 12px; color: var(--text); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
   .btn:hover { background: var(--hover); }
   .btn-primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
   .btn-primary:hover { filter: brightness(1.08); }
   .btn-danger { background: var(--del-bg); color: var(--err-text); border-color: rgba(239,68,68,.4); }
   .btn-sm { padding: 2px 8px; font-size: 11px; }
   .btn-icon { padding: 4px 6px; }
+  #btn-close-app { margin-left: 10px; border-radius: 50%; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
   .btn-send-circle { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background .12s, border-color .12s, color .12s, filter .12s; }
   .btn-send-circle:hover { background: var(--hover); color: var(--text); }
   .btn-send-circle.ready { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
@@ -127,21 +129,24 @@
 
   /* Center Chat */
   .center { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-  .stream { flex: 1; overflow-y: auto; padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .stream { flex: 1; overflow-y: auto; padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 35%, transparent) transparent; }
+  .stream::-webkit-scrollbar, .proj-list::-webkit-scrollbar, .file-list::-webkit-scrollbar, .modal-pane::-webkit-scrollbar { width: 6px; }
+  .stream::-webkit-scrollbar-track, .proj-list::-webkit-scrollbar-track, .file-list::-webkit-scrollbar-track, .modal-pane::-webkit-scrollbar-track { background: transparent; }
+  .stream::-webkit-scrollbar-thumb, .proj-list::-webkit-scrollbar-thumb, .file-list::-webkit-scrollbar-thumb, .modal-pane::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 35%, transparent); border-radius: 99px; }
+  .stream::-webkit-scrollbar-thumb:hover, .proj-list::-webkit-scrollbar-thumb:hover, .file-list::-webkit-scrollbar-thumb:hover, .modal-pane::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--muted) 65%, transparent); }
   .turn-wrap { max-width: 880px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
   .msg-user { align-self: flex-end; background: var(--user-bg); border: 1px solid var(--user-border); color: var(--user-text); padding: 8px 13px; border-radius: 10px; max-width: 78%; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
   .msg-assistant { display: flex; flex-direction: column; gap: 8px; }
   .think-box { color: var(--dim); font-size: 12px; }
-  .think-box summary { cursor: pointer; user-select: none; list-style: none; display: inline-flex; align-items: center; gap: 7px; padding: 2px 0; border: none; background: transparent; color: var(--muted); font-size: 12px; outline: none; }
+  .think-box summary { cursor: pointer; user-select: none; list-style: none; display: inline-flex; align-items: center; gap: 7px; padding: 3px 8px; margin-left: -8px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--muted); font-size: 12px; outline: none; transition: background .12s, border-color .12s, color .12s; }
   .think-box summary::-webkit-details-marker { display: none; }
   .think-step { color: var(--text); font-weight: 500; }
   .think-meta { color: var(--muted); }
-  .think-box summary:hover .think-meta, .think-box summary:hover .think-chev { color: var(--text); opacity: 1; }
-  .think-chev { transition: transform .15s; flex-shrink: 0; opacity: 0.7; }
+  .think-chev { transition: transform .15s; flex-shrink: 0; opacity: 0.6; }
+  .think-box summary:hover { background: var(--card); border-color: var(--border); }
+  .think-box summary:hover .think-step, .think-box summary:hover .think-meta, .think-box summary:hover .think-chev { color: var(--text); opacity: 1; }
   .think-box[open] .think-chev { transform: rotate(90deg); }
-  .think-body { display: flex; align-items: flex-start; gap: 7px; margin: 5px 0 4px 6px; padding-left: 12px; border-left: 1px solid var(--border); color: var(--muted); opacity: 0.85; font-style: italic; font-size: 12px; line-height: 1.48; }
-  .think-star { flex-shrink: 0; opacity: 0.72; margin-top: 2px; }
-  .think-text { white-space: pre-wrap; min-width: 0; }
+  .think-body { white-space: pre-wrap; margin: 5px 0 4px 6px; padding-left: 12px; border-left: 1px solid var(--border); color: var(--muted); opacity: 0.85; font-style: italic; font-size: 12px; line-height: 1.48; }
   .ans-row { display: flex; align-items: flex-start; gap: 9px; line-height: 1.55; }
   .bullet { color: var(--cyan); font-size: 12px; margin-top: 2px; flex-shrink: 0; }
   .ans-body { flex: 1; min-width: 0; word-break: break-word; }
@@ -184,7 +189,7 @@
 
   /* Composer */
   .composer-wrap { padding: 8px 24px 16px; background: var(--bg); }
-  .composer { position: relative; max-width: 880px; margin: 0 auto; background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s; }
+  .composer { position: relative; max-width: 880px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s; }
   .composer:focus-within { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
   .img-strip { display: none; gap: 6px; flex-wrap: wrap; }
   .img-strip.open { display: flex; }
@@ -253,7 +258,7 @@
     <div class="tb-left">
       <div class="brand"><svg width="18" height="18" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M49 24 L72 47 L50 69 L24 69"/></svg><span>RS Rail</span></div>
       <button class="btn btn-sm btn-icon" id="btn-toggle-proj" title="Toggle Projects Sidebar (Ctrl+B)" aria-label="Toggle sidebar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg></button>
-      <button class="btn btn-sm" id="tb-profile" style="color:var(--muted);">—</button>
+      <span class="pill" id="tb-profile">—</span>
       <span class="pill" id="tb-git">git: —</span>
     </div>
     <div class="tb-right">
@@ -262,7 +267,7 @@
         <span id="tb-usage">ctx 8.2k</span>
         <span class="ctx-bar"><span class="ctx-fill" id="tb-ctx-fill"></span></span>
       </span>
-      <button class="btn btn-sm btn-icon" id="btn-toggle-task" title="Toggle Workspace Panel (Files, TASK, Memory, Export)" aria-label="Toggle workspace panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5.5 8l1.7 1.7 3.3-3.4"/></svg></button>
+      <button class="btn btn-sm btn-icon" id="btn-toggle-task" title="Toggle Workspace Panel (Files, TASK, Memory, Export)" aria-label="Toggle workspace panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="10" y1="2.5" x2="10" y2="13.5"/></svg></button>
       <button class="btn btn-sm btn-icon" id="btn-settings" title="Settings" aria-label="Settings"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="5.5" cy="4.5" r="1.5" fill="var(--card)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10.5" cy="8" r="1.5" fill="var(--card)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="6.5" cy="11.5" r="1.5" fill="var(--card)"/></svg></button>
       <button class="btn btn-sm btn-icon" id="btn-close-app" aria-label="Close RS Rail"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button>
     </div>
@@ -481,6 +486,7 @@ function applyAppearance(next) {
     "--code-head": t.panel,
     "--accent": t.accent, "--accent-fg": accentFg,
     "--accent-bg": `color-mix(in srgb, ${t.accent} 14%, transparent)`,
+    "--topbar-bg": t.topbar_bg || t.panel,
     "--user-bg": t.user_bg || `color-mix(in srgb, ${t.accent} ${isLight ? "11%" : "16%"}, ${t.panel})`,
     "--user-border": t.user_border || `color-mix(in srgb, ${t.accent} ${isLight ? "34%" : "42%"}, ${t.border})`,
     "--user-text": t.text,
@@ -526,7 +532,7 @@ const SLASH_CMDS = [
   { cmd: "/s", desc: "Attach or detach skills (max 3)" },
   { cmd: "/p", desc: "Select agent profile" },
   { cmd: "/ms", desc: "Providers & models" },
-  { cmd: "/tk", desc: "Toggle auto-expand thinking" },
+  { cmd: "/tk", desc: "Toggle auto-expand steps" },
   { cmd: "/export", desc: "Export transcript to .rs/transcripts/" },
 ];
 
@@ -688,11 +694,15 @@ function renderAll() {
     stPill.textContent = `${chPart}${spdPart}`;
     stPill.style.display = "inline-flex";
     $("tb-usage").textContent = `${pct.toFixed(1)}% / ${ctxLbl}`;
-    $("tb-ctx-fill").style.width = `${pct}%`;
+    const fill = $("tb-ctx-fill");
+    fill.style.width = `${pct}%`;
+    fill.style.background = pct > 85 ? "var(--err-text)" : (pct > 70 ? "var(--warn-text)" : "var(--accent)");
   } else {
     stPill.style.display = "none";
     $("tb-usage").textContent = `ctx ${ctxLbl}`;
-    $("tb-ctx-fill").style.width = "0%";
+    const fill = $("tb-ctx-fill");
+    fill.style.width = "0%";
+    fill.style.background = "var(--accent)";
   }
 
   // Projects list
@@ -809,6 +819,10 @@ function renderAll() {
   if (document.activeElement !== memEl) memEl.value = ap.memory || "";
 
   applyAppearance();
+  const msgInp = $("msg-input");
+  if (msgInp && (!msgInp.value || msgInp.value.startsWith("/task "))) {
+    msgInp.placeholder = `Message ${ap.name}... (/ commands, Enter to send)`;
+  }
   updateSendReady();
   renderHistory();
   if ($("modal-settings").classList.contains("open")) renderModalTab();
@@ -892,11 +906,11 @@ const THINK_CHEV = `<svg class="think-chev" width="11" height="11" viewBox="0 0 
 const THINK_STAR = `<svg class="think-star" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>`;
 function thinkMeta(len, elapsed) {
   if (typeof elapsed === "number") return elapsed >= 10 ? `${Math.round(elapsed)}s` : `${elapsed.toFixed(1)}s`;
-  return `~${Math.max(1, Math.round(len / 4))}t`;
+  return `${Math.max(1, Math.round(len / 4))}t`;
 }
 
 function stepTitle(n) {
-  return STATE?.active_project?.is_agent ? `Step ${n}` : "Thought";
+  return STATE?.active_project?.is_agent ? `${n} Step` : "Thought";
 }
 
 function buildAssistantEl(reasoning, content, elapsed, step) {
@@ -906,7 +920,7 @@ function buildAssistantEl(reasoning, content, elapsed, step) {
     const det = document.createElement("details");
     det.className = "think-box";
     if (STATE?.ui_prefs?.show_thinking !== false) det.open = true;
-    det.innerHTML = `<summary><span class="think-step">${esc(stepTitle(step || 1))}</span><span class="think-meta">${thinkMeta(reasoning.length, elapsed)}</span>${THINK_CHEV}</summary><div class="think-body">${THINK_STAR}<span class="think-text">${esc(reasoning)}</span></div>`;
+    det.innerHTML = `<summary><span class="think-step">${esc(stepTitle(step || 1))}</span><span class="think-meta">${thinkMeta(reasoning.length, elapsed)}</span>${THINK_CHEV}</summary><div class="think-body">${esc(reasoning)}</div>`;
     box.appendChild(det);
   }
   if (content) {
@@ -1068,9 +1082,9 @@ async function sendMessage(overrideText, overrideImgs) {
         thinkDet = document.createElement("details");
         thinkDet.className = "think-box";
         if (STATE?.ui_prefs?.show_thinking !== false) thinkDet.open = true;
-        thinkDet.innerHTML = `<summary><span class="think-step">${esc(stepTitle(liveStep))}</span><span class="think-meta"></span>${THINK_CHEV}</summary><div class="think-body">${THINK_STAR}<span class="think-text"></span></div>`;
+        thinkDet.innerHTML = `<summary><span class="think-step">${esc(stepTitle(liveStep))}</span><span class="think-meta"></span>${THINK_CHEV}</summary><div class="think-body"></div>`;
         thinkCount = thinkDet.querySelector(".think-meta");
-        thinkBody = thinkDet.querySelector(".think-text");
+        thinkBody = thinkDet.querySelector(".think-body");
         liveAsst.prepend(thinkDet);
       }
       thinkCount.textContent = thinkMeta(curThink.length, (performance.now() - thinkT0) / 1000);
@@ -1325,7 +1339,7 @@ function renderModalTab() {
 
     const r = document.createElement("div");
     r.className = "setting-row";
-    r.innerHTML = `<div><strong>Auto-Expand Thinking</strong><div class="muted">Synced with CLI <code>/tk</code> via state.json</div></div><button class="btn btn-sm">${STATE.ui_prefs.show_thinking !== false ? "On" : "Collapsed"}</button>`;
+    r.innerHTML = `<div><strong>Auto-Expand Steps</strong><div class="muted">Expand reasoning steps by default · Synced with CLI <code>/tk</code> via state.json</div></div><button class="btn btn-sm">${STATE.ui_prefs.show_thinking !== false ? "Expanded" : "Collapsed"}</button>`;
     r.querySelector("button").onclick = async () => { await api("/api/settings/ui", { show_thinking: STATE.ui_prefs.show_thinking === false }); await loadState(); };
     pane.appendChild(r);
   }
@@ -1468,7 +1482,7 @@ $("btn-export-md").onclick = async () => {
   } catch (err) { setRsNote(err.message); }
 };
 $("btn-settings").onclick = () => openSettings();
-$("btn-profiles-nav").onclick = $("tb-profile").onclick = () => openSettings("profiles");
+$("btn-profiles-nav").onclick = () => openSettings("profiles");
 $("btn-close-app").onclick = async () => {
   try { await api("/api/shutdown", {}); } catch {}
   window.close();
