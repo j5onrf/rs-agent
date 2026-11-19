@@ -67,7 +67,7 @@
 | :--- | :--- | :--- |
 | **Frameless App** | `rail` · `rr` | Dedicated standalone desktop app window (`--app=http://127.0.0.1:24243`) |
 | **Browser Tab** | `rail web` · `rr web` | Standard browser tab via `xdg-open` |
-| **Themes & Fonts** | Settings & Appearance | 10 monochrome themes (Dark/Light × 5 colors), live Omarchy & Noctalia desktop sync, custom `themes/*.json`, JetBrains Mono |
+| **Themes & Fonts** | Settings & Appearance | 3 built-in themes (`Dark Default`, `Dark Green`, `Pure Light`), live Omarchy & Noctalia sync, custom `themes/*.json`, `JetBrains Mono` / `Geist` / `Fira Code`, optional syntax highlighting |
 
 ---
 

@@ -44,7 +44,7 @@ if [ ! -f "$BIN" ]; then
 fi
 
 if ! curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then
-    nohup "$BIN" >/tmp/rs-rail.log 2>&1 &
+    nohup "$BIN" >"${XDG_RUNTIME_DIR:-/tmp}/rs-rail-$(id -u).log" 2>&1 &
     for _ in $(seq 1 20); do
         curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1 && break
         sleep 0.1

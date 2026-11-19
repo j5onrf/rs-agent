@@ -62,6 +62,13 @@ fn history_char_count(history: &[ChatMessage]) -> usize {
     history.iter().map(|m| m.content_as_str().chars().count()).sum()
 }
 
+fn persist_cli_history(workspace: &Path, history: &[ChatMessage]) {
+    let mut s = state::load_workspace_session(workspace);
+    s.messages = history.iter().skip(1).cloned().collect();
+    s.ui_history = None;
+    state::save_workspace_session(workspace, &s);
+}
+
 fn instance_lock_dir() -> PathBuf {
     #[cfg(target_os = "linux")]
     {
@@ -546,6 +553,7 @@ async fn execute_task_loop(
         }
 
         if !ran_tools && tools::is_task_complete(&reply) {
+            persist_cli_history(target_dir, history);
             println!(
                 "  \x1b[1;32m✓ [Task Loop] Goal completed in {} step(s) ({} tool action(s) executed)!\x1b[0m\n",
                 turn + 1,
@@ -557,6 +565,7 @@ async fn execute_task_loop(
         if !ran_tools {
             history.push(ChatMessage::user("Continue with the next action."));
         }
+        persist_cli_history(target_dir, history);
     }
 
     println!("  \x1b[1;33m▲ [Task Loop] Reached max limit ({}) without completion marker.\x1b[0m\n", max_rounds);
@@ -641,6 +650,11 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
     let mut system_prompt =
         rs_agent::profile::build_system_prompt(&active_profile, target_dir, cfg.is_agent, &active_skills);
     let mut history = vec![ChatMessage::system(&system_prompt)];
+    let saved_session = state::load_workspace_session(target_dir);
+    if !saved_session.messages.is_empty() {
+        history.extend(saved_session.messages);
+        println!("  \x1b[2mResumed {} message(s) · /r to reset\x1b[0m\n", history.len() - 1);
+    }
     let mcp_servers = active_profile.mcp_servers.clone();
     let mut active_tools = if cfg.is_agent {
         Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &mcp_servers, &active_profile.mcp_tools).await)
@@ -650,7 +664,13 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
 
     let mut spinner = InlineSpinner::new();
     let mut last_stat_line: Option<String> = None;
-    let mut input_history: Vec<String> = Vec::new();
+    let mut input_history: Vec<String> = history
+        .iter()
+        .skip(1)
+        .filter(|m| m.role == "user")
+        .map(|m| m.content_as_str().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
     let mut router = matcher::ContextRouter::load();
     let mut max_rounds = rs_agent::config::get_max_rounds();
 
@@ -857,7 +877,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                     second_line = format_instance_label(cfg.is_agent, &cfg.profile_name, instance_num);
 
                     history.clear();
+                    input_history.clear();
                     last_stat_line = None;
+                    state::clear_workspace_session(target_dir);
                     history.push(ChatMessage::system(&system_prompt));
                     active_tools = if cfg.is_agent {
                         Some(tools::get_tools_schema_with_mcp(&cfg.tier, cfg.delegate, &new_mcp, &active_profile.mcp_tools).await)
@@ -992,7 +1014,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
             let _ = io::stdout().flush();
 
             history.clear();
+            input_history.clear();
             last_stat_line = None;
+            state::clear_workspace_session(target_dir);
             system_prompt =
                 rs_agent::profile::build_system_prompt(&active_profile, target_dir, cfg.is_agent, &active_skills);
             history.push(ChatMessage::system(&system_prompt));
@@ -1115,6 +1139,9 @@ async fn run_session(target_dir: &Path, is_agent_init: bool) -> anyhow::Result<(
                 println!();
             }
             execute_tool_batch(&calls, target_dir, &boundary, cfg.adapters, &mut history, &mut spinner).await;
+        }
+        if history.len() > 1 {
+            persist_cli_history(target_dir, &history);
         }
     }
 

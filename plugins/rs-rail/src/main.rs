@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -35,11 +35,13 @@ fn default_true() -> bool {
 struct RailConfig {
     #[serde(default = "default_true")]
     show_right_panel: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    last_project: Option<String>,
 }
 
 impl Default for RailConfig {
     fn default() -> Self {
-        Self { show_right_panel: true }
+        Self { show_right_panel: true, last_project: None }
     }
 }
 
@@ -56,21 +58,21 @@ impl RailConfig {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct DiffLine {
-    kind: &'static str,
+    kind: String,
     num: usize,
     text: String,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct DiffPayload {
     adds: usize,
     rems: usize,
     lines: Vec<DiffLine>,
 }
 
-#[derive(Clone, Default, Serialize)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 struct UiTurnItem {
     role: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -95,7 +97,7 @@ struct UiTurnItem {
     raw: Option<String>,
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct TurnStats {
     prompt_tokens: usize,
     completion_tokens: usize,
@@ -132,6 +134,8 @@ struct AppRuntime {
     active_project: Mutex<String>,
     pending_perms: Mutex<HashMap<u64, oneshot::Sender<bool>>>,
     next_perm_id: AtomicU64,
+    active_clients: AtomicUsize,
+    client_seq: AtomicU64,
 }
 
 impl AppRuntime {
@@ -139,12 +143,18 @@ impl AppRuntime {
         let root = dirs::home_dir()
             .map(|h| h.join(".config/rs-agent"))
             .unwrap_or_else(|| PathBuf::from("."));
+        let initial = RailConfig::load(&root.join("plugins/rs-rail/config.json"))
+            .last_project
+            .filter(|p| is_valid_slug(p) && root.join("projects").join(p).is_dir())
+            .unwrap_or_else(|| "chat".into());
         Self {
             root,
             sessions: Mutex::new(HashMap::new()),
-            active_project: Mutex::new("chat".into()),
+            active_project: Mutex::new(initial),
             pending_perms: Mutex::new(HashMap::new()),
             next_perm_id: AtomicU64::new(1),
+            active_clients: AtomicUsize::new(0),
+            client_seq: AtomicU64::new(0),
         }
     }
 
@@ -171,10 +181,38 @@ impl AppRuntime {
             }
         }
 
+        let saved = state::load_workspace_session(&proj_dir);
+        let active_skills: Vec<String> = saved
+            .active_skills
+            .into_iter()
+            .filter(|sk| Skill::load(sk).is_some())
+            .take(3)
+            .collect();
+        let reasoning = match saved.reasoning {
+            Some(ref r) if r.is_empty() => None,
+            Some(ref r) => ReasoningSetting::parse(r),
+            None => None,
+        };
+
         let prof = Profile::load(&cfg.profile_name).unwrap_or_else(|| Profile::parse("ROLE: Assistant."));
+        if is_agent && !proj_dir.join(".rs/config.json").is_file() {
+            cfg.tier = prof.tier.clone();
+            cfg.adapters = prof.adapters;
+            cfg.delegate = prof.delegate;
+            let _ = cfg.save(&proj_dir);
+        }
         let hud_summary = prof.hud_summary(cfg.is_agent);
         set_profile_max_tokens(prof.ctx);
-        let sys = build_system_prompt(&prof, &proj_dir, cfg.is_agent, &[]);
+        let sys = build_system_prompt(&prof, &proj_dir, cfg.is_agent, &active_skills);
+        let final_reasoning = if reasoning.is_some() { reasoning } else if saved.reasoning.is_some() { None } else { prof.reasoning_budget };
+
+        let mut llm_history = vec![ChatMessage::system(sys)];
+        llm_history.extend(saved.messages.clone());
+        let ui_history: Vec<UiTurnItem> = saved
+            .ui_history
+            .and_then(|v| serde_json::from_value(v).ok())
+            .unwrap_or_else(|| ui_items_from_messages(&saved.messages));
+        let last_stats: Option<TurnStats> = saved.last_stats.and_then(|v| serde_json::from_value(v).ok());
 
         SessionState {
             project_name: project.into(),
@@ -188,11 +226,11 @@ impl AppRuntime {
             mcp_tools: prof.mcp_tools,
             ctx_override: prof.ctx,
             hud_summary,
-            reasoning: prof.reasoning_budget,
-            active_skills: Vec::new(),
-            llm_history: vec![ChatMessage::system(sys)],
-            ui_history: Vec::new(),
-            last_stats: None,
+            reasoning: final_reasoning,
+            active_skills,
+            llm_history,
+            ui_history,
+            last_stats,
             cancel_flag: Arc::new(AtomicBool::new(false)),
             generation: 0,
         }
@@ -293,17 +331,17 @@ fn compute_diff(old_text: &str, new_text: &str) -> DiffPayload {
     let added = &new_lines[prefix..new_lines.len() - suffix];
     let mut lines = Vec::new();
     if prefix > 0 {
-        lines.push(DiffLine { kind: "ctx", num: prefix, text: old_lines[prefix - 1].to_string() });
+        lines.push(DiffLine { kind: "ctx".into(), num: prefix, text: old_lines[prefix - 1].to_string() });
     }
     for (i, l) in removed.iter().take(12).enumerate() {
-        lines.push(DiffLine { kind: "del", num: prefix + i + 1, text: (*l).to_string() });
+        lines.push(DiffLine { kind: "del".into(), num: prefix + i + 1, text: (*l).to_string() });
     }
     for (i, l) in added.iter().take(12).enumerate() {
-        lines.push(DiffLine { kind: "add", num: prefix + i + 1, text: (*l).to_string() });
+        lines.push(DiffLine { kind: "add".into(), num: prefix + i + 1, text: (*l).to_string() });
     }
     if suffix > 0 {
         let idx = old_lines.len() - suffix;
-        lines.push(DiffLine { kind: "ctx", num: idx + 1, text: old_lines[idx].to_string() });
+        lines.push(DiffLine { kind: "ctx".into(), num: idx + 1, text: old_lines[idx].to_string() });
     }
     DiffPayload { adds: added.len(), rems: removed.len(), lines }
 }
@@ -376,13 +414,18 @@ fn read_env_slots(env_path: &Path) -> (Vec<EnvSlotView>, usize, usize) {
                 .iter()
                 .find_map(|l| {
                     let t = l.trim();
-                    if !t.starts_with('#') && is_env_key(t, &mv) {
-                        Some(extract_quoted_val(t).to_string())
-                    } else {
-                        None
-                    }
+                    (!t.starts_with('#') && is_env_key(t, &mv))
+                        .then(|| extract_quoted_val(t).to_string())
+                        .filter(|s| !s.is_empty())
                 })
-                .filter(|s| !s.is_empty())
+                .or_else(|| {
+                    lines.iter().find_map(|l| {
+                        let u = l.trim().trim_start_matches('#').trim();
+                        is_env_key(u, &mv)
+                            .then(|| extract_quoted_val(u).to_string())
+                            .filter(|s| !s.is_empty())
+                    })
+                })
                 .unwrap_or_else(|| def_m.into());
             slots.push(EnvSlotView { id: pfx.into(), name: name.into(), model, is_active: active });
         }
@@ -395,7 +438,8 @@ fn read_env_slots(env_path: &Path) -> (Vec<EnvSlotView>, usize, usize) {
         let mut found = false;
         let mut active = false;
         let mut name = format!("Custom {i}");
-        let mut model = "default".to_string();
+        let mut active_model: Option<String> = None;
+        let mut fallback_model: Option<String> = None;
         for l in &lines {
             let t = l.trim();
             let u = t.trim_start_matches('#').trim();
@@ -407,14 +451,19 @@ fn read_env_slots(env_path: &Path) -> (Vec<EnvSlotView>, usize, usize) {
                 if !v.is_empty() {
                     name = v.into();
                 }
-            } else if !t.starts_with('#') && is_env_key(t, &mv) {
-                let v = extract_quoted_val(t);
+            } else if is_env_key(u, &mv) {
+                let v = extract_quoted_val(u);
                 if !v.is_empty() {
-                    model = v.into();
+                    if !t.starts_with('#') {
+                        active_model = Some(v.into());
+                    } else if fallback_model.is_none() {
+                        fallback_model = Some(v.into());
+                    }
                 }
             }
         }
         if found {
+            let model = active_model.or(fallback_model).unwrap_or_else(|| "default".into());
             slots.push(EnvSlotView { id: format!("CUSTOM{i}"), name, model, is_active: active });
         }
     }
@@ -462,19 +511,35 @@ fn update_env_file(
             .chain((1..=9).map(|i| format!("CUSTOM{i}")))
             .collect();
 
+        let is_custom_target = activate && target.starts_with("CUSTOM");
         for line in &mut lines {
             let trimmed = line.trim();
+            let was_commented = trimmed.starts_with('#');
             let uncommented = trimmed.trim_start_matches('#').trim_start();
+            let mut replacement: Option<String> = None;
             for pfx in &prefixes {
                 let kv = format!("{pfx}_API_KEY");
                 if is_env_key(uncommented, &kv) {
-                    if activate && pfx == target {
-                        *line = uncommented.to_string();
+                    replacement = Some(if activate && pfx == target && is_valid_slot_val(extract_quoted_val(uncommented)) {
+                        uncommented.to_string()
                     } else {
-                        *line = format!("#{uncommented}");
-                    }
+                        format!("#{uncommented}")
+                    });
                     break;
                 }
+            }
+            if replacement.is_none() && is_custom_target && was_commented {
+                for suffix in ["_NAME", "_URL", "_MODEL"] {
+                    if is_env_key(uncommented, &format!("{target}{suffix}"))
+                        && is_valid_slot_val(extract_quoted_val(uncommented))
+                    {
+                        replacement = Some(uncommented.to_string());
+                        break;
+                    }
+                }
+            }
+            if let Some(next) = replacement {
+                *line = next;
             }
         }
     }
@@ -615,7 +680,7 @@ fn dirty_project_set(root: &Path) -> std::collections::HashSet<String> {
     if let Ok(out) = std::process::Command::new("git")
         .arg("-C")
         .arg(root)
-        .args(["--no-optional-locks", "status", "--porcelain", "-uall", "--", "projects/"])
+        .args(["--no-optional-locks", "status", "--porcelain", "--untracked-files=normal", "--", "projects/"])
         .output()
     {
         for line in String::from_utf8_lossy(&out.stdout).lines() {
@@ -723,6 +788,106 @@ fn export_session_markdown(sess: &SessionState) -> Result<String> {
     Ok(format!(".rs/transcripts/{filename}"))
 }
 
+fn ui_items_from_messages(msgs: &[ChatMessage]) -> Vec<UiTurnItem> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < msgs.len() {
+        let m = &msgs[i];
+        match m.role.as_str() {
+            "user" => {
+                let (content, images) = match &m.content {
+                    Value::String(s) => (if s.is_empty() { None } else { Some(s.clone()) }, None),
+                    Value::Array(parts) => {
+                        let mut txt = String::new();
+                        let mut imgs = Vec::new();
+                        for p in parts {
+                            if let Some(t) = p.get("text").and_then(|v| v.as_str()) {
+                                txt.push_str(t);
+                            } else if let Some(u) = p.pointer("/image_url/url").and_then(|v| v.as_str()) {
+                                imgs.push(u.to_string());
+                            }
+                        }
+                        (if txt.is_empty() { None } else { Some(txt) }, if imgs.is_empty() { None } else { Some(imgs) })
+                    }
+                    _ => (None, None),
+                };
+                out.push(UiTurnItem { role: "user".into(), content, images, ..Default::default() });
+            }
+            "assistant" => {
+                let txt = m.content_as_str();
+                if !txt.is_empty() || m.reasoning_content.is_some() {
+                    out.push(UiTurnItem {
+                        role: "assistant".into(),
+                        content: if txt.is_empty() { None } else { Some(txt.to_string()) },
+                        reasoning: m.reasoning_content.clone(),
+                        ..Default::default()
+                    });
+                }
+                if let Some(calls) = m.tool_calls.as_ref().and_then(|v| v.as_array()) {
+                    let mut tool_outputs: HashMap<&str, &str> = HashMap::new();
+                    let mut j = i + 1;
+                    while j < msgs.len() && msgs[j].role == "tool" {
+                        if let Some(id) = msgs[j].tool_call_id.as_deref() {
+                            tool_outputs.insert(id, msgs[j].content_as_str());
+                        }
+                        j += 1;
+                    }
+                    for c in calls {
+                        let cid = c["id"].as_str().unwrap_or("");
+                        let cname = c["function"]["name"].as_str().unwrap_or("tool");
+                        let raw_a = c["function"]["arguments"].as_str().unwrap_or("{}");
+                        let brief = serde_json::from_str::<Value>(raw_a)
+                            .ok()
+                            .and_then(|v| v.get("path").or_else(|| v.get("command")).or_else(|| v.get("pattern")).and_then(|x| x.as_str()).map(ToString::to_string))
+                            .unwrap_or_default();
+                        let res_txt = tool_outputs.get(cid).copied().unwrap_or("");
+                        let ok = !res_txt.starts_with("[tool error]") && !res_txt.starts_with("[denied]");
+                        let summary = res_txt.lines().next().unwrap_or("Done").trim().to_string();
+                        out.push(UiTurnItem {
+                            role: "tool_card".into(),
+                            name: Some(cname.into()),
+                            brief: Some(brief),
+                            ok: Some(ok),
+                            summary: Some(summary),
+                            raw: if res_txt.is_empty() { None } else { Some(res_txt.to_string()) },
+                            ..Default::default()
+                        });
+                    }
+                    i = j;
+                    continue;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    out
+}
+
+fn save_rail_session(sess: &SessionState) {
+    let r_str = sess.reasoning.as_ref().map(|r| match r {
+        ReasoningSetting::Tokens(n) => n.to_string(),
+        ReasoningSetting::Tier(t) => t.clone(),
+    });
+    let snap = state::WorkspaceSession {
+        messages: sess.llm_history.iter().skip(1).cloned().collect(),
+        ui_history: serde_json::to_value(&sess.ui_history).ok(),
+        last_stats: sess.last_stats.as_ref().and_then(|s| serde_json::to_value(s).ok()),
+        active_skills: sess.active_skills.clone(),
+        reasoning: Some(r_str.unwrap_or_default()),
+    };
+    state::save_workspace_session(&sess.workspace, &snap);
+}
+
+fn set_last_project(root: &Path, name: &str) {
+    let cfg_path = root.join("plugins/rs-rail/config.json");
+    let mut cfg = RailConfig::load(&cfg_path);
+    if cfg.last_project.as_deref() != Some(name) {
+        cfg.last_project = Some(name.to_string());
+        let _ = cfg.save(&cfg_path);
+    }
+}
+
 fn build_user_chat_message(text: &str, images: &[String]) -> ChatMessage {
     if images.is_empty() {
         return ChatMessage::user(text);
@@ -764,6 +929,25 @@ async fn write_http_err(stream: &mut TcpStream, status: u16, msg: &str) -> Resul
     Ok(())
 }
 
+fn is_local_host(h: &str) -> bool {
+    matches!(h, "127.0.0.1" | "localhost" | "[::1]")
+        || h.starts_with("127.0.0.1:")
+        || h.starts_with("localhost:")
+        || h.starts_with("[::1]:")
+}
+
+#[inline]
+fn should_shutdown(active_clients: usize, cur_seq: u64, seq_at_drop: u64) -> bool {
+    active_clients == 0 && cur_seq == seq_at_drop
+}
+
+fn is_local_origin(o: &str) -> bool {
+    matches!(o, "http://127.0.0.1" | "http://localhost" | "http://[::1]")
+        || o.starts_with("http://127.0.0.1:")
+        || o.starts_with("http://localhost:")
+        || o.starts_with("http://[::1]:")
+}
+
 async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()> {
     let mut buf = Vec::with_capacity(4096);
     let mut tmp = [0u8; 2048];
@@ -802,14 +986,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         if let Some(v) = low.strip_prefix("content-length:") {
             content_len = v.trim().parse().unwrap_or(0);
         } else if let Some(v) = low.strip_prefix("host:") {
-            let h = v.trim();
-            host_ok = h.starts_with("127.0.0.1") || h.starts_with("localhost") || h.starts_with("[::1]");
+            host_ok = is_local_host(v.trim());
         } else if let Some(v) = low.strip_prefix("origin:") {
-            let o = v.trim();
-            origin_ok = o.starts_with("http://127.0.0.1:")
-                || o.starts_with("http://localhost:")
-                || o == "http://127.0.0.1"
-                || o == "http://localhost";
+            origin_ok = is_local_origin(v.trim());
         } else if let Some(v) = low.strip_prefix("sec-fetch-site:") {
             let s = v.trim();
             fetch_site_ok = s == "same-origin" || s == "none";
@@ -835,6 +1014,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
     }
 
     if method == "GET" && path == "/" {
+        app.client_seq.fetch_add(1, Ordering::SeqCst);
         let hdr = format!(
             "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
             UI_HTML.len()
@@ -848,6 +1028,49 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         return write_http_json(&mut stream, 200, &json!({ "status": "ok" })).await;
     }
 
+    if method == "GET" && path == "/api/live" {
+        let hdr = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream; charset=utf-8\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n: ok\n\n";
+        stream.write_all(hdr.as_bytes()).await?;
+        stream.flush().await?;
+
+        app.active_clients.fetch_add(1, Ordering::SeqCst);
+        app.client_seq.fetch_add(1, Ordering::SeqCst);
+
+        let mut ping = tokio::time::interval(std::time::Duration::from_secs(25));
+        ping.tick().await;
+        loop {
+            tokio::select! {
+                res = stream.read(&mut tmp) => {
+                    match res {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {}
+                    }
+                }
+                _ = ping.tick() => {
+                    if stream.write_all(b":\n\n").await.is_err() || stream.flush().await.is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        let seq_at_drop = app.client_seq.load(Ordering::SeqCst);
+        if app.active_clients.fetch_sub(1, Ordering::SeqCst) == 1 {
+            let app_exit = Arc::clone(&app);
+            tokio::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                if should_shutdown(
+                    app_exit.active_clients.load(Ordering::SeqCst),
+                    app_exit.client_seq.load(Ordering::SeqCst),
+                    seq_at_drop,
+                ) {
+                    std::process::exit(0);
+                }
+            });
+        }
+        return Ok(());
+    }
+
     if method == "GET" && path == "/api/themes" {
         return write_http_json(&mut stream, 200, &json!({ "themes": load_themes(&app.root.join("plugins/rs-rail/themes")) })).await;
     }
@@ -858,7 +1081,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         let proj_dir = app.root.join("projects").join(&active);
         let bnd = SecurityBoundary::new_headless(&proj_dir);
         let target = bnd.resolve_path(&rel);
-        if rel.is_empty() || bnd.is_outside(&target) || rel.split('/').any(|s| s == ".git" || s == ".env") {
+        if rel.is_empty() || bnd.is_outside(&target) || rel.split(['/', '\\']).any(|s| s == ".git" || s == ".env") {
             return write_http_err(&mut stream, 403, "Path out of bounds").await;
         }
         let Ok(meta) = fs::symlink_metadata(&target) else {
@@ -867,13 +1090,17 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         if meta.file_type().is_symlink() || !meta.is_file() || meta.len() > 512 * 1024 {
             return write_http_err(&mut stream, 400, "Cannot preview file").await;
         }
-        let content = fs::read_to_string(&target).map_err(|e| anyhow::anyhow!(e))?;
+        let bytes = fs::read(&target)?;
+        let Ok(content) = String::from_utf8(bytes) else {
+            return write_http_err(&mut stream, 400, "Binary file cannot be previewed").await;
+        };
         return write_http_json(&mut stream, 200, &json!({ "path": rel, "content": content })).await;
     }
 
     if method == "GET" && path == "/api/state" {
         if let Some(sel) = query.split('&').find_map(|p| p.strip_prefix("project=")).map(url_decode).filter(|s| !s.is_empty()) {
             if is_valid_slug(&sel) && app.root.join("projects").join(&sel).is_dir() {
+                set_last_project(&app.root, &sel);
                 *app.active_project.lock().await = sel;
             }
         }
@@ -905,7 +1132,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 list_workspace_files(&p, &p, false, &mut files);
                 let file_count = files.len();
                 if name == active_name {
-                    list_workspace_files(&p, &p, true, &mut active_files);
+                    active_files = files;
                 }
                 proj_entries.push(json!({
                     "name": name,
@@ -1008,6 +1235,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
 
     if method == "POST" && path == "/api/reset" {
         let active = app.active_project.lock().await.clone();
+        state::clear_workspace_session(&app.root.join("projects").join(&active));
         let mut lock = app.sessions.lock().await;
         let next_gen = lock
             .get(&active)
@@ -1050,10 +1278,13 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
     if method == "POST" && path == "/api/project/create" {
         let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_ascii_lowercase();
         let prof_name = payload.get("profile").and_then(|v| v.as_str()).unwrap_or("lfm3").trim();
-        if !is_valid_slug(&name) {
+        if !is_valid_slug(&name) || name == "chat" {
             return write_http_err(&mut stream, 400, "Invalid project slug").await;
         }
         let proj_dir = app.root.join("projects").join(&name);
+        if proj_dir.join(".rs/config.json").exists() {
+            return write_http_err(&mut stream, 409, "Project already exists").await;
+        }
         let prof = Profile::load(prof_name).unwrap_or_else(|| Profile::parse("ROLE: Assistant."));
         let cfg = WorkspaceConfig {
             profile_name: prof_name.to_string(),
@@ -1063,6 +1294,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             delegate: prof.delegate,
         };
         cfg.save(&proj_dir)?;
+        set_last_project(&app.root, &name);
         *app.active_project.lock().await = name.clone();
         return write_http_json(&mut stream, 200, &json!({ "name": name })).await;
     }
@@ -1098,6 +1330,19 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             return write_http_err(&mut stream, 400, "Not a regular file").await;
         }
         fs::remove_file(&target)?;
+        if rel == ".rs/session.json" {
+            let mut lock = app.sessions.lock().await;
+            let next_gen = lock
+                .get(&active)
+                .map(|s| {
+                    s.cancel_flag.store(true, Ordering::SeqCst);
+                    s.generation + 1
+                })
+                .unwrap_or(1);
+            let mut fresh = app.load_or_init_session(&active);
+            fresh.generation = next_gen;
+            lock.insert(active, fresh);
+        }
         if let Some(parent) = target.parent() {
             if parent.file_name().is_some_and(|n| n == "__pycache__")
                 && fs::read_dir(parent).is_ok_and(|mut r| r.next().is_none())
@@ -1156,17 +1401,17 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             } else if sess.active_skills.len() < 3 && Skill::load(sk).is_some() {
                 sess.active_skills.push(sk.to_string());
             }
-            if let Some(loaded) = Profile::load(&sess.profile_name) {
-                let sys = build_system_prompt(&loaded, &sess.workspace, sess.is_agent, &sess.active_skills);
-                if let Some(first) = sess.llm_history.first_mut() {
-                    first.content = Value::String(sys);
-                }
+            let loaded = Profile::load(&sess.profile_name).unwrap_or_else(|| Profile::parse("ROLE: Assistant."));
+            let sys = build_system_prompt(&loaded, &sess.workspace, sess.is_agent, &sess.active_skills);
+            if let Some(first) = sess.llm_history.first_mut() {
+                first.content = Value::String(sys);
             }
         }
 
         if let Some(r_raw) = payload.get("reasoning").and_then(|v| v.as_str()) {
             sess.reasoning = if r_raw.is_empty() { None } else { ReasoningSetting::parse(r_raw) };
         }
+        save_rail_session(sess);
         return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
     }
 
@@ -1325,9 +1570,13 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
 
             let mut new_ui_items = Vec::new();
             let mut last_stats = None;
+            let mut round0_failed = false;
 
             for _round in 0..max_rounds {
                 if cancel_flag.load(Ordering::SeqCst) {
+                    if new_ui_items.is_empty() {
+                        round0_failed = true;
+                    }
                     break;
                 }
                 let tx_chunk = tx.clone();
@@ -1349,7 +1598,13 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 let (reply, opt_reasoning, tool_calls, stats) = match res {
                     Ok(v) => v,
                     Err(e) => {
-                        let _ = tx.send(emit("error", json!({ "message": e.to_string() })));
+                        let rolled_back = new_ui_items.is_empty();
+                        if rolled_back {
+                            round0_failed = true;
+                        }
+                        if !cancel_flag.load(Ordering::SeqCst) {
+                            let _ = tx.send(emit("error", json!({ "message": e.to_string(), "rolled_back": rolled_back })));
+                        }
                         break;
                     }
                 };
@@ -1389,6 +1644,12 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 }
 
                 let Some(calls) = tool_calls.filter(|c| !c.is_empty() && is_agent) else {
+                    if cancel_flag.load(Ordering::SeqCst) && reply.is_empty() && opt_reasoning.is_none() {
+                        if new_ui_items.is_empty() {
+                            round0_failed = true;
+                        }
+                        break;
+                    }
                     history.push(ChatMessage::assistant_with_reasoning(reply.clone(), opt_reasoning));
                     if cancel_flag.load(Ordering::SeqCst) {
                         break;
@@ -1576,10 +1837,17 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 let mut lock = app_clone.sessions.lock().await;
                 if let Some(sess) = lock.get_mut(&active) {
                     if sess.generation == start_gen {
-                        sess.llm_history = history;
-                        sess.ui_history.extend(new_ui_items);
-                        if last_stats.is_some() {
-                            sess.last_stats = last_stats;
+                        if round0_failed {
+                            if sess.ui_history.last().is_some_and(|m| m.role == "user") {
+                                sess.ui_history.pop();
+                            }
+                        } else {
+                            sess.llm_history = history;
+                            sess.ui_history.extend(new_ui_items);
+                            if last_stats.is_some() {
+                                sess.last_stats = last_stats;
+                            }
+                            save_rail_session(sess);
                         }
                     }
                 }
@@ -1624,6 +1892,27 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_load_or_init_session_recreates_missing_config() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_init_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("projects/demo")).unwrap();
+
+        let app = AppRuntime {
+            root: tmp.clone(),
+            sessions: Mutex::new(HashMap::new()),
+            active_project: Mutex::new("chat".into()),
+            pending_perms: Mutex::new(HashMap::new()),
+            next_perm_id: AtomicU64::new(1),
+            active_clients: AtomicUsize::new(0),
+            client_seq: AtomicU64::new(0),
+        };
+        let sess = app.load_or_init_session("demo");
+        assert!(sess.is_agent);
+        assert!(tmp.join("projects/demo/.rs/config.json").is_file());
+        let _ = fs::remove_dir_all(&tmp);
+    }
 
     #[test]
     fn test_valid_slug_rejects_traversal() {
@@ -1737,8 +2026,10 @@ mod tests {
 
         let rcfg_path = tmp.join("rail_cfg.json");
         assert!(RailConfig::load(&rcfg_path).show_right_panel);
-        RailConfig { show_right_panel: false }.save(&rcfg_path).unwrap();
-        assert!(!RailConfig::load(&rcfg_path).show_right_panel);
+        RailConfig { show_right_panel: false, last_project: Some("ling-tiny".into()) }.save(&rcfg_path).unwrap();
+        let loaded_rcfg = RailConfig::load(&rcfg_path);
+        assert!(!loaded_rcfg.show_right_panel);
+        assert_eq!(loaded_rcfg.last_project.as_deref(), Some("ling-tiny"));
         assert_eq!(url_decode("src%2Fb%20c.rs"), "src/b c.rs");
 
         let sess = SessionState {
@@ -1765,5 +2056,71 @@ mod tests {
         assert!(rel.starts_with(".rs/transcripts/chat_"));
         assert!(tmp.join(&rel).is_file());
         let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_local_host_and_origin_rejects_subdomain_spoofing() {
+        assert!(is_local_host("127.0.0.1:24243"));
+        assert!(is_local_host("localhost:24243"));
+        assert!(is_local_host("[::1]:24243"));
+        assert!(!is_local_host("localhost.evil.com:24243"));
+        assert!(!is_local_host("127.0.0.1.evil.com"));
+
+        assert!(is_local_origin("http://127.0.0.1:24243"));
+        assert!(is_local_origin("http://localhost"));
+        assert!(!is_local_origin("http://localhost.evil.com:24243"));
+    }
+
+    #[test]
+    fn test_env_custom_slot_reads_commented_model_and_skips_placeholders() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_custom_{}.env", std::process::id()));
+        fs::write(
+            &tmp,
+            "#GEMINI_API_KEY=\"AQ.your-key-here\"\n# CUSTOM2_NAME=\"AMD Token Lab\"\n# CUSTOM2_API_KEY=\"tl-real-123\"\n# CUSTOM2_URL=\"https://api.tokenlab.amd.com/v1/chat/completions\"\n# CUSTOM2_MODEL=\"DeepSeek-V4.1-Flash\"\n",
+        )
+        .unwrap();
+
+        let (slots, _, _) = read_env_slots(&tmp);
+        assert_eq!(slots.len(), 1);
+        assert_eq!(slots[0].id, "CUSTOM2");
+        assert_eq!(slots[0].model, "DeepSeek-V4.1-Flash");
+
+        update_env_file(&tmp, Some("CUSTOM2"), None, None).unwrap();
+        let saved = fs::read_to_string(&tmp).unwrap();
+        let _ = fs::remove_file(&tmp);
+
+        assert!(saved.contains("CUSTOM2_API_KEY=\"tl-real-123\""));
+        assert!(saved.contains("CUSTOM2_URL=\"https://api.tokenlab.amd.com/v1/chat/completions\""));
+        assert!(saved.contains("#GEMINI_API_KEY=\"AQ.your-key-here\""));
+    }
+
+    #[test]
+    fn test_should_shutdown_guards_reload_race() {
+        assert!(should_shutdown(0, 3, 3));
+        assert!(!should_shutdown(1, 4, 3));
+        assert!(!should_shutdown(0, 4, 3));
+    }
+
+    #[test]
+    fn test_ui_items_from_messages_reconstructs_cli_turns() {
+        let mut assistant_tc = ChatMessage::assistant("");
+        assistant_tc.tool_calls = Some(json!([{
+            "id": "call_1",
+            "type": "function",
+            "function": { "name": "read_file", "arguments": "{\"path\":\"a.py\"}" }
+        }]));
+        let msgs = vec![
+            ChatMessage::user("inspect a.py"),
+            assistant_tc,
+            ChatMessage::tool_response("call_1".into(), "print(1)\n".into()),
+            ChatMessage::assistant_with_reasoning("Looks good.", Some("checked".into())),
+        ];
+        let items = ui_items_from_messages(&msgs);
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].role, "user");
+        assert_eq!(items[1].role, "tool_card");
+        assert_eq!(items[1].brief.as_deref(), Some("a.py"));
+        assert_eq!(items[2].role, "assistant");
+        assert_eq!(items[2].reasoning.as_deref(), Some("checked"));
     }
 }

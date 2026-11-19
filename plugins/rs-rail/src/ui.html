@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>rs-rail</title>
+<meta name="color-scheme" content="dark light" />
+<meta name="darkreader-lock" />
+<title>RS Rail</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
 <style>
   :root {
@@ -33,6 +35,13 @@
     --add-text: #86efac;
     --mono: "JetBrains Mono", "JetBrainsMono Nerd Font", "JetBrainsMono NF", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     --sans: "JetBrains Mono", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --warn-bg: rgba(245, 158, 11, 0.08);
+    --warn-border: rgba(245, 158, 11, 0.45);
+    --warn-text: #fcd34d;
+    --syn-kw: #8ab4f8;
+    --syn-str: #86efac;
+    --syn-num: #fcd34d;
+    --syn-cmt: #717885;
     --code-size: 12px;
     --ligatures: none;
   }
@@ -56,6 +65,16 @@
   .btn-danger { background: var(--del-bg); color: var(--err-text); border-color: rgba(239,68,68,.4); }
   .btn-sm { padding: 2px 8px; font-size: 11px; }
   .btn-icon { padding: 4px 6px; }
+  .btn-send-circle { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background .12s, border-color .12s, color .12s, filter .12s; }
+  .btn-send-circle:hover { background: var(--hover); color: var(--text); }
+  .btn-send-circle.ready { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+  .btn-send-circle.ready:hover { filter: brightness(1.08); }
+  .btn-send-circle.stop { background: var(--del-bg); border-color: rgba(239,68,68,.45); color: var(--err-text); }
+  .btn-send-circle.stop:hover { filter: brightness(1.08); }
+  .tok-k { color: var(--syn-kw); }
+  .tok-s { color: var(--syn-str); }
+  .tok-n { color: var(--syn-num); }
+  .tok-c { color: var(--syn-cmt); font-style: italic; }
 
   /* Main 3-pane body */
   .main { flex: 1; display: flex; min-height: 0; }
@@ -127,7 +146,7 @@
   .ans-body h2 { font-size: 15px; } .ans-body h3 { font-size: 14px; } .ans-body h4 { font-size: 13px; }
   .ans-body p { margin: 0 0 8px; }
   .ans-body p:last-child { margin-bottom: 0; }
-  .ans-body ul { margin: 0 0 8px; padding-left: 18px; }
+  .ans-body ul, .ans-body ol { margin: 0 0 8px; padding-left: 18px; }
   .ans-body li { margin: 2px 0; }
   .ans-body hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
   .ans-body code { font-family: var(--mono); font-size: var(--code-size); background: var(--card); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--code-border); font-variant-ligatures: var(--ligatures); }
@@ -146,17 +165,17 @@
   .err-msg { color: var(--err-text); font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
   .err-acts { display: flex; justify-content: flex-end; }
   .diff-box { border-top: 1px solid var(--border); background: var(--code-bg); font-family: var(--mono); font-size: var(--code-size); overflow-x: auto; padding: 4px 0; font-variant-ligatures: var(--ligatures); }
-  .diff-line { padding: 1px 10px; white-space: pre; display: flex; gap: 10px; }
-  .diff-line.del { background: var(--del-bg); color: var(--del-text); }
-  .diff-line.add { background: var(--add-bg); color: var(--add-text); }
-  .diff-line.ctx { color: var(--dim); }
-  .diff-num { width: 32px; text-align: right; color: var(--dim); user-select: none; flex-shrink: 0; }
+  .diff-line { padding: 0 10px 0 0; white-space: pre; display: flex; gap: 10px; }
+  .diff-line.ctx { color: var(--muted); }
+  .diff-num { width: 46px; padding: 1px 6px; text-align: right; color: var(--dim); user-select: none; flex-shrink: 0; }
+  .diff-line.del .diff-num { background: var(--del-bg); color: var(--del-text); }
+  .diff-line.add .diff-num { background: var(--add-bg); color: var(--add-text); }
   .tool-raw { border-top: 1px solid var(--border); padding: 8px 11px; margin: 0; font-family: var(--mono); font-size: var(--code-size); color: var(--muted); white-space: pre-wrap; max-height: 240px; overflow-y: auto; display: none; font-variant-ligatures: var(--ligatures); }
   .tool-card.open .tool-raw { display: block; }
 
   /* Security Gate Card */
-  .gate-card { border: 1px solid rgba(245,158,11,.45); background: rgba(245,158,11,.08); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
-  .gate-title { color: #fcd34d; font-weight: 600; font-size: 12px; }
+  .gate-card { border: 1px solid var(--warn-border); background: var(--warn-bg); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .gate-title { color: var(--warn-text); font-weight: 600; font-size: 12px; }
   .gate-cmd { font-family: var(--mono); font-size: 12px; background: var(--bg); padding: 6px 8px; border-radius: 5px; border: 1px solid var(--border); overflow-x: auto; }
   .gate-actions { display: flex; gap: 8px; }
 
@@ -175,7 +194,9 @@
   .comp-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
   .comp-left, .comp-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .comp-select { background: var(--card); border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; font-size: 11.5px; color: var(--muted); }
-  .skill-chip { font-size: 11px; padding: 2px 7px; border-radius: 99px; border: 1px solid var(--cyan); color: var(--cyan); background: rgba(56,189,248,.12); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .skill-chip { font-size: 11px; padding: 2px 7px; border-radius: 99px; border: 1px solid var(--cyan); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 14%, transparent); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .skill-chip.off { border-color: var(--border); color: var(--muted); background: var(--card); opacity: .72; }
+  .skill-chip.off:hover { opacity: 1; color: var(--text); }
   .chip-x { opacity: .65; font-size: 10px; line-height: 1; padding: 0 1px; }
   .chip-x:hover { opacity: 1; color: var(--err-text); }
 
@@ -227,7 +248,7 @@
 <div class="app">
   <header class="topbar">
     <div class="tb-left">
-      <div class="brand" title="rs-agent"><svg width="18" height="18" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M49 24 L72 47 L50 69 L24 69"/></svg><span>rs-rail</span></div>
+      <div class="brand"><svg width="18" height="18" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M49 24 L72 47 L50 69 L24 69"/></svg><span>RS Rail</span></div>
       <button class="btn btn-sm btn-icon" id="btn-toggle-proj" title="Toggle Projects Sidebar (Ctrl+B)" aria-label="Toggle sidebar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg></button>
       <span class="pill" id="tb-profile">—</span>
       <span class="pill" id="tb-git">git: —</span>
@@ -255,8 +276,8 @@
     <section class="center">
       <div class="stream" id="stream">
         <div class="empty-state" id="empty-state">
-          <div style="font-size:15px;color:var(--text);font-weight:600;margin-bottom:6px;">rs-agent Native Surface</div>
-          <div>Direct in-process <code>rs-agent</code> runtime — parallel tools, 3-stage resilient edits, and <code>SecurityBoundary</code> gating.</div>
+          <div style="font-size:16px;color:var(--text);font-weight:600;margin-bottom:6px;">Ready</div>
+          <div>Loading workspace...</div>
         </div>
       </div>
 
@@ -284,8 +305,8 @@
               <div id="skills-bar" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
             </div>
             <div class="comp-right">
-              <button class="btn btn-sm btn-primary" id="btn-send">Send ↵</button>
-              <button class="btn btn-sm btn-danger" id="btn-stop" style="display:none;">Stop ■</button>
+              <button class="btn-send-circle" id="btn-send" aria-label="Send message"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12.5V3.5"/><path d="M4 7.5L8 3.5l4 4"/></svg></button>
+              <button class="btn-send-circle stop" id="btn-stop" title="Stop generation" aria-label="Stop generation" style="display:none;"><svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><rect x="1.5" y="1.5" width="9" height="9" rx="2"/></svg></button>
             </div>
           </div>
         </div>
@@ -296,7 +317,7 @@
       <div class="rs-top">
         <div class="rs-head">
           <span>Files (<span id="files-count">0</span>)</span>
-          <button class="btn btn-sm" id="btn-export-md" title="Save session to .rs/transcripts/">Export .md</button>
+          <div style="display:flex;gap:5px;align-items:center;"><button class="btn btn-sm" id="btn-reset" style="display:none;">Reset</button><button class="btn btn-sm" id="btn-export-md" title="Save session to .rs/transcripts/">Export .md</button></div>
         </div>
         <div class="file-list" id="file-list"></div>
       </div>
@@ -392,8 +413,9 @@ let skillFilter = "";
 let lastSentPayload = null;
 
 const BUILTIN_THEMES = [
-  { id:"dark-default", name:"Dark Default", mode:"dark", bg:"#131314", panel:"#1e1f20", card:"#282a2c", border:"#333538", text:"#e3e3e3", muted:"#c4c7c5", accent:"#8ab4f8", cyan:"#8ab4f8", active_bg:"#222730", active_border:"#3b485d", semantic_diffs:true },
-  { id:"dark-green",   name:"Dark Green",   mode:"dark", bg:"#131314", panel:"#1e1f20", card:"#282a2c", border:"#333538", text:"#e3e3e3", muted:"#c4c7c5", accent:"#81c995", cyan:"#81c995", active_bg:"#1d2820", active_border:"#324636", semantic_diffs:true }
+  { id:"dark-default", name:"Dark Default", mode:"dark",  bg:"#131314", panel:"#1e1f20", card:"#282a2c", border:"#333538", text:"#e3e3e3", muted:"#c4c7c5", accent:"#1a73e8", cyan:"#669df6", active_bg:"#1b2538", active_border:"#2f4c7a" },
+  { id:"dark-green",   name:"Dark Green",   mode:"dark",  bg:"#131314", panel:"#1e1f20", card:"#282a2c", border:"#333538", text:"#e3e3e3", muted:"#c4c7c5", accent:"#1e8e3e", cyan:"#5bb974", active_bg:"#18291e", active_border:"#2b5337" },
+  { id:"pure-light",   name:"Pure Light",   mode:"light", bg:"#ffffff", panel:"#f8f9fa", card:"#f1f3f4", border:"#dadce0", text:"#1f1f1f", muted:"#5f6368", accent:"#1a73e8", cyan:"#1a73e8", active_bg:"#e8f0fe", active_border:"#a8c7fa" }
 ];
 
 const DEFAULT_APPEARANCE = {
@@ -404,20 +426,11 @@ const DEFAULT_APPEARANCE = {
   ligatures: false
 };
 
-function hexRgb(hex) {
-  const h = String(hex || "").replace("#", "");
-  if (h.length < 6) return [0, 0, 0];
-  return [parseInt(h.slice(0,2), 16) || 0, parseInt(h.slice(2,4), 16) || 0, parseInt(h.slice(4,6), 16) || 0];
-}
-
 function hexLum(hex) {
-  const [r, g, b] = hexRgb(hex);
+  const h = String(hex || "").replace("#", "");
+  if (h.length < 6) return 0;
+  const r = parseInt(h.slice(0,2), 16) || 0, g = parseInt(h.slice(2,4), 16) || 0, b = parseInt(h.slice(4,6), 16) || 0;
   return (r * 299 + g * 587 + b * 114) / 1000;
-}
-
-function isRedAccent(hex) {
-  const [r, g, b] = hexRgb(hex);
-  return r > 170 && g < 95 && b < 95;
 }
 
 function getAppearance() {
@@ -444,12 +457,7 @@ function applyAppearance(next) {
   if (!t) t = BUILTIN_THEMES[0];
 
   const isLight = t.mode === "light";
-  const accentFg = hexLum(t.accent) > 130 ? "#05140a" : "#ffffff";
-  const semantic = !!t.semantic_diffs || isRedAccent(t.accent);
-  const addColor = semantic ? (isLight ? "#16a34a" : "#22c55e") : t.accent;
-  const addText = semantic
-    ? (isLight ? "#15803d" : "#86efac")
-    : (isLight ? `color-mix(in srgb, ${t.accent} 85%, #000000)` : `color-mix(in srgb, ${t.accent} 65%, #ffffff)`);
+  const accentFg = hexLum(t.accent) > 145 ? "#05140a" : "#ffffff";
 
   const vars = {
     "--bg": t.bg, "--panel": t.panel, "--card": t.card, "--border": t.border,
@@ -457,13 +465,13 @@ function applyAppearance(next) {
     "--dim": `color-mix(in srgb, ${t.muted} 70%, ${t.bg})`,
     "--hover": `color-mix(in srgb, ${t.text} 6%, ${t.card})`,
     "--nav-bg": `color-mix(in srgb, ${t.bg} 55%, ${t.panel})`,
-    "--code-bg": `color-mix(in srgb, ${t.bg} 75%, ${t.panel})`,
-    "--code-border": t.semantic_diffs ? t.border : `color-mix(in srgb, ${t.accent} 24%, ${t.border})`,
-    "--code-head": t.semantic_diffs ? t.panel : `color-mix(in srgb, ${t.accent} 7%, ${t.panel})`,
+    "--code-bg": `color-mix(in srgb, ${t.bg} ${isLight ? "35%" : "75%"}, ${t.panel})`,
+    "--code-border": t.border,
+    "--code-head": t.panel,
     "--accent": t.accent, "--accent-fg": accentFg,
     "--accent-bg": `color-mix(in srgb, ${t.accent} 14%, transparent)`,
-    "--user-bg": t.semantic_diffs ? (isLight ? "#dcfce7" : "#16261d") : `color-mix(in srgb, ${t.accent} 16%, ${t.panel})`,
-    "--user-border": t.semantic_diffs ? (isLight ? "#86efac" : "#244732") : `color-mix(in srgb, ${t.accent} 42%, ${t.border})`,
+    "--user-bg": `color-mix(in srgb, ${t.accent} ${isLight ? "11%" : "16%"}, ${t.panel})`,
+    "--user-border": `color-mix(in srgb, ${t.accent} ${isLight ? "34%" : "42%"}, ${t.border})`,
     "--user-text": t.text,
     "--active-bg": t.active_bg || `color-mix(in srgb, ${t.accent} 16%, ${t.panel})`,
     "--active-border": t.active_border || `color-mix(in srgb, ${t.accent} 48%, ${t.border})`,
@@ -471,10 +479,18 @@ function applyAppearance(next) {
     "--err-text": isLight ? "#dc2626" : "#fca5a5",
     "--del-bg": isLight ? "rgba(220,38,38,0.10)" : "rgba(239,68,68,0.14)",
     "--del-text": isLight ? "#b91c1c" : "#fca5a5",
-    "--add-bg": `color-mix(in srgb, ${addColor} 14%, transparent)`,
-    "--add-text": addText,
+    "--add-bg": isLight ? "rgba(22,163,74,0.10)" : "rgba(34,197,94,0.14)",
+    "--add-text": isLight ? "#15803d" : "#86efac",
+    "--warn-bg": isLight ? "rgba(217,119,6,0.10)" : "rgba(245,158,11,0.08)",
+    "--warn-border": isLight ? "rgba(217,119,6,0.45)" : "rgba(245,158,11,0.45)",
+    "--warn-text": isLight ? "#b45309" : "#fcd34d",
+    "--syn-kw": isLight ? "#1d4ed8" : "#8ab4f8",
+    "--syn-str": isLight ? "#15803d" : "#86efac",
+    "--syn-num": isLight ? "#b45309" : "#fcd34d",
+    "--syn-cmt": `color-mix(in srgb, ${t.muted} 70%, ${t.bg})`,
   };
   const root = document.documentElement.style;
+  root.colorScheme = isLight ? "light" : "dark";
   for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
   const uiMap = {
     "JetBrains Mono": '"JetBrains Mono", "JetBrainsMono Nerd Font", "JetBrainsMono NF", ui-monospace, monospace',
@@ -507,11 +523,13 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 function renderProseBlock(raw) {
-  const inline = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-  const lines = raw.split("\n");
-  let html = "", inList = false, para = [];
+  const inline = (s) => esc(s).replace(/`([^`]+)`|\*\*([^*]+)\*\*/g, (_, code, bold) =>
+    code !== undefined ? `<code>${code}</code>` : `<strong>${bold}</strong>`
+  );
+  const lines = raw.split(/\r?\n/);
+  let html = "", listTag = "", para = [];
   const flushPara = () => { if (para.length) { html += `<p>${para.map(inline).join("<br>")}</p>`; para = []; } };
-  const closeList = () => { if (inList) { html += "</ul>"; inList = false; } };
+  const closeList = () => { if (listTag) { html += `</${listTag}>`; listTag = ""; } };
   for (const line of lines) {
     const t = line.trim();
     if (!t) { flushPara(); closeList(); continue; }
@@ -523,11 +541,13 @@ function renderProseBlock(raw) {
       html += `<${tag}>${inline(hm[2])}</${tag}>`;
       continue;
     }
-    const lm = line.match(/^\s*[-*]\s+(.+)$/);
-    if (lm) {
+    const ulm = line.match(/^\s*[-*]\s+(.+)$/);
+    const olm = !ulm && line.match(/^\s*\d+\.\s+(.+)$/);
+    if (ulm || olm) {
       flushPara();
-      if (!inList) { html += "<ul>"; inList = true; }
-      html += `<li>${inline(lm[1])}</li>`;
+      const tag = ulm ? "ul" : "ol";
+      if (listTag !== tag) { closeList(); html += `<${tag}>`; listTag = tag; }
+      html += `<li>${inline((ulm || olm)[1])}</li>`;
       continue;
     }
     closeList();
@@ -538,18 +558,36 @@ function renderProseBlock(raw) {
   return html;
 }
 
+function highlightCode(raw) {
+  const re = /(\/\/[^\n]*|#[^\n]*|\/\*[\s\S]*?\*\/)|("{3}[\s\S]*?"{3}|'{3}[\s\S]*?'{3}|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|\b(fn|let|mut|pub|struct|enum|impl|trait|match|if|elif|else|for|while|loop|return|use|mod|async|await|const|static|type|where|def|class|import|from|try|except|finally|raise|with|as|pass|in|not|and|or|is|lambda|yield|None|True|False|function|export|default|switch|case|break|continue|new|this|true|false|null|undefined|var|int|void|bool|str|self|Self)\b|\b(\d+(?:\.\d+)?)\b/g;
+  let out = "", last = 0, m;
+  while ((m = re.exec(raw)) !== null) {
+    if (m.index > last) out += esc(raw.slice(last, m.index));
+    const cls = m[1] ? "tok-c" : m[2] ? "tok-s" : m[3] ? "tok-k" : "tok-n";
+    out += `<span class="${cls}">${esc(m[0])}</span>`;
+    last = re.lastIndex;
+  }
+  return out + esc(raw.slice(last));
+}
+
 function renderMarkdown(text) {
-  const parts = String(text || "").split(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g);
-  let html = "";
-  for (let i = 0; i < parts.length; i++) {
-    if (i % 3 === 0) {
-      html += renderProseBlock(parts[i]);
-    } else if (i % 3 === 1) {
-      const lang = esc(parts[i] || "text");
-      const code = esc(parts[i + 1] || "");
-      html += `<div class="code-wrap"><div class="code-head"><span>${lang}</span><button class="btn btn-sm" onclick="navigator.clipboard.writeText(this.closest('.code-wrap').querySelector('pre').innerText)">Copy</button></div><pre>${code}</pre></div>`;
-      i++;
-    }
+  const src = String(text || "");
+  const re = /```([^\n`]*)\r?\n([\s\S]*?)```/g;
+  const codeBlock = (lang, code) =>
+    `<div class="code-wrap"><div class="code-head"><span>${esc(lang.trim() || "text")}</span><button class="btn btn-sm" onclick="navigator.clipboard.writeText(this.closest('.code-wrap').querySelector('pre').innerText)">Copy</button></div><pre>${highlightCode(code)}</pre></div>`;
+  let html = "", last = 0, m;
+  while ((m = re.exec(src)) !== null) {
+    if (m.index > last) html += renderProseBlock(src.slice(last, m.index));
+    html += codeBlock(m[1], m[2]);
+    last = re.lastIndex;
+  }
+  const tail = src.slice(last);
+  const open = tail.match(/^([\s\S]*?)```([^\n`]*)\r?\n([\s\S]*)$/);
+  if (open) {
+    if (open[1]) html += renderProseBlock(open[1]);
+    html += codeBlock(open[2], open[3]);
+  } else if (tail) {
+    html += renderProseBlock(tail);
   }
   return html || "<p></p>";
 }
@@ -565,6 +603,7 @@ async function api(path, body) {
 }
 
 async function loadState(project) {
+  closeAc();
   const q = project ? `?project=${encodeURIComponent(project)}` : "";
   STATE = await api(`/api/state${q}`);
   renderAll();
@@ -574,6 +613,34 @@ function openSettings(tab) {
   if (tab) ACTIVE_TAB = tab;
   $("modal-settings").classList.add("open");
   renderModalTab();
+}
+
+function loadPinnedMap() {
+  try { return JSON.parse(localStorage.getItem("rs_rail_pinned_skills") || "{}"); }
+  catch { return {}; }
+}
+function savePinnedMap(map) {
+  localStorage.setItem("rs_rail_pinned_skills", JSON.stringify(map));
+}
+function syncPinnedSkills(proj, activeSkills) {
+  const map = loadPinnedMap();
+  const list = Array.isArray(map[proj]) ? [...map[proj]] : [];
+  let changed = false;
+  for (const sk of activeSkills) {
+    if (!list.includes(sk)) { list.push(sk); changed = true; }
+  }
+  const avail = new Set(STATE?.skills || []);
+  const clean = avail.size ? list.filter((s) => avail.has(s)) : list;
+  if (clean.length !== list.length) changed = true;
+  if (changed) { map[proj] = clean; savePinnedMap(map); }
+  return clean;
+}
+function unpinSkill(proj, sk) {
+  const map = loadPinnedMap();
+  if (Array.isArray(map[proj])) {
+    map[proj] = map[proj].filter((x) => x !== sk);
+    savePinnedMap(map);
+  }
 }
 
 function setRsNote(msg) {
@@ -591,6 +658,8 @@ function renderAll() {
   $("tb-git").textContent = ap.git || "git: [none]";
   $("btn-model-pill").textContent = `${STATE.provider.model} · ${STATE.provider.endpoint}`;
   $("btn-img").style.display = STATE.provider.is_local ? "none" : "inline-flex";
+  disarmReset();
+  $("btn-reset").style.display = (ap.history && ap.history.length) ? "inline-flex" : "none";
 
   $("sidebar-right").classList.toggle("hidden", STATE.ui_prefs?.show_right_panel === false);
   const ctxMax = STATE.provider.max_tokens || 8192;
@@ -598,7 +667,6 @@ function renderAll() {
   const stPill = $("tb-stats");
   if (ap.last_stats) {
     const s = ap.last_stats;
-    const fmtK = (n) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : `${n}`;
     const used = (s.prompt_tokens || 0) + (s.completion_tokens || 0);
     const pct = Math.min(100, (used / Math.max(1, ctxMax)) * 100);
     const cPct = s.cached_tokens > 0 && s.prompt_tokens > 0
@@ -663,14 +731,25 @@ function renderAll() {
 
 
 
+  const pinned = syncPinnedSkills(ap.name, ap.active_skills || []);
   const sbar = $("skills-bar");
   sbar.innerHTML = "";
-  for (const sk of ap.active_skills) {
+  for (const sk of pinned) {
+    const on = (ap.active_skills || []).includes(sk);
     const chip = document.createElement("button");
-    chip.className = "skill-chip";
-    chip.title = "Active for next turn (click to remove)";
+    chip.className = "skill-chip" + (on ? "" : " off");
     chip.innerHTML = `<span>${esc(sk)}</span><span class="chip-x">✕</span>`;
-    chip.onclick = async () => { await api("/api/settings/profile", { skill_toggle: sk }); await loadState(); };
+    chip.onclick = async () => {
+      if (!on && (ap.active_skills || []).length >= 3) return;
+      await api("/api/settings/profile", { skill_toggle: sk });
+      await loadState();
+    };
+    chip.querySelector(".chip-x").onclick = async (e) => {
+      e.stopPropagation();
+      unpinSkill(ap.name, sk);
+      if (on) { await api("/api/settings/profile", { skill_toggle: sk }); await loadState(); }
+      else renderAll();
+    };
     sbar.appendChild(chip);
   }
 
@@ -690,7 +769,7 @@ function renderAll() {
         try {
           const res = await api(`/api/file?path=${encodeURIComponent(f)}`);
           $("mf-title").textContent = res.path;
-          $("mf-body").textContent = res.content;
+          $("mf-body").innerHTML = highlightCode(res.content);
           $("modal-file").classList.add("open");
         } catch (err) { setRsNote(err.message); }
       };
@@ -719,6 +798,7 @@ function renderAll() {
   if (document.activeElement !== memEl) memEl.value = ap.memory || "";
 
   applyAppearance();
+  updateSendReady();
   renderHistory();
   if ($("modal-settings").classList.contains("open")) renderModalTab();
 }
@@ -728,7 +808,7 @@ function renderHistory() {
   const msgs = STATE.active_project.history || [];
   if (!msgs.length) {
     stream.innerHTML = "";
-    stream.appendChild($("empty-state") || createEmpty());
+    stream.appendChild(createEmpty());
     return;
   }
   stream.innerHTML = "";
@@ -769,7 +849,23 @@ function createEmpty() {
   const d = document.createElement("div");
   d.id = "empty-state";
   d.className = "empty-state";
-  d.innerHTML = `<div style="font-size:15px;color:var(--text);font-weight:600;margin-bottom:6px;">rs-agent Native Surface</div><div>Direct in-process <code>rs-agent</code> runtime — parallel tools, 3-stage resilient edits, and <code>SecurityBoundary</code> gating.</div>`;
+  const ap = STATE?.active_project;
+  const model = STATE?.provider?.model || "";
+  if (!ap) {
+    d.innerHTML = `<div style="font-size:16px;color:var(--text);font-weight:600;margin-bottom:6px;">Ready</div><div>Loading workspace...</div>`;
+    return d;
+  }
+  if (!ap.is_agent) {
+    d.innerHTML = `<div style="font-size:16px;color:var(--text);font-weight:600;margin-bottom:6px;">Ready in chat</div><div>${esc(model)} · pure conversation · <code>/</code> for commands</div>`;
+    return d;
+  }
+  const userFiles = (ap.files || []).filter((f) => !f.startsWith(".rs/")).length;
+  const sub = ap.task_md
+    ? `TASK.md loaded · ${esc(ap.hud_summary)} · <code>/task</code> to run`
+    : userFiles > 0
+      ? `${userFiles} file(s) · ${esc(ap.profile_name)} · ${esc(ap.hud_summary)}`
+      : `${esc(ap.profile_name)} · ${esc(ap.hud_summary)} · <code>/</code> for commands`;
+  d.innerHTML = `<div style="font-size:16px;color:var(--text);font-weight:600;margin-bottom:6px;">What should we build in ${esc(ap.name)}?</div><div>${sub}</div>`;
   return d;
 }
 
@@ -810,7 +906,7 @@ function buildToolCard(t) {
       const sign = ln.kind === "add" ? "+" : ln.kind === "del" ? "-" : " ";
       const r = document.createElement("div");
       r.className = `diff-line ${ln.kind}`;
-      r.innerHTML = `<span class="diff-num">${ln.num || ""} ${sign}</span><span>${esc(ln.text)}</span>`;
+      r.innerHTML = `<span class="diff-num">${ln.num || ""} ${sign}</span><span>${highlightCode(ln.text)}</span>`;
       db.appendChild(r);
     }
     card.appendChild(db);
@@ -841,6 +937,7 @@ async function runLocalSlash(text) {
     const arg = text.split(/\s+/)[1]?.toLowerCase() || "";
     const active = STATE?.active_project?.active_skills || [];
     if (arg === "clear" || arg === "none" || arg === "reset") {
+      const m = loadPinnedMap(); delete m[STATE.active_project.name]; savePinnedMap(m);
       for (const s of [...active]) await api("/api/settings/profile", { skill_toggle: s });
       await loadState();
     } else if ((STATE?.skills || []).includes(arg)) {
@@ -853,6 +950,11 @@ async function runLocalSlash(text) {
 
 let pendingImages = [];
 
+function updateSendReady() {
+  const ready = ($("msg-input")?.value.trim().length > 0) || pendingImages.length > 0;
+  $("btn-send")?.classList.toggle("ready", ready);
+}
+
 function renderImgStrip() {
   const strip = $("img-strip");
   strip.innerHTML = "";
@@ -864,6 +966,7 @@ function renderImgStrip() {
     box.querySelector("button").onclick = () => { pendingImages.splice(i, 1); renderImgStrip(); };
     strip.appendChild(box);
   });
+  updateSendReady();
 }
 
 function addImageFiles(files) {
@@ -887,6 +990,7 @@ async function sendMessage(overrideText, overrideImgs) {
   if (!text && !imgs.length) return;
   if (overrideText === undefined) {
     $("msg-input").value = "";
+    resizeInput();
     pendingImages = [];
     renderImgStrip();
   }
@@ -905,32 +1009,53 @@ async function sendMessage(overrideText, overrideImgs) {
 
   wrap.appendChild(buildUserEl(text, imgs));
 
-  let curThink = "";
-  let curAns = "";
+  let curThink = "", curAns = "";
   let liveAsst = document.createElement("div");
   liveAsst.className = "msg-assistant";
   wrap.appendChild(liveAsst);
   stream.scrollTop = stream.scrollHeight;
 
-  const updateLive = () => {
-    liveAsst.innerHTML = "";
-    if (curThink) {
-      const det = document.createElement("details");
-      det.className = "think-box";
-      if (STATE?.ui_prefs?.show_thinking !== false) det.open = true;
-      det.innerHTML = `<summary><svg class="think-chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5L10.5 8 6 12.5"/></svg><span>Thinking · ${curThink.length} chars</span></summary><div class="think-body">${esc(curThink)}</div>`;
-      liveAsst.appendChild(det);
+  let thinkDet = null, thinkCount = null, thinkBody = null;
+  let ansRow = null, ansBody = null;
+  const resetLiveNodes = () => {
+    curThink = ""; curAns = "";
+    thinkDet = thinkCount = thinkBody = ansRow = ansBody = null;
+    liveAsst = document.createElement("div");
+    liveAsst.className = "msg-assistant";
+    wrap.appendChild(liveAsst);
+  };
+  const scrollNearBottom = () => {
+    if (stream.scrollHeight - stream.scrollTop - stream.clientHeight < 96) {
+      stream.scrollTop = stream.scrollHeight;
     }
-    if (curAns) {
-      const row = document.createElement("div");
-      row.className = "ans-row";
-      row.innerHTML = `<span class="bullet">●</span><div class="ans-body">${renderMarkdown(curAns)}</div>`;
-      liveAsst.appendChild(row);
+  };
+  const updateLive = (isThink) => {
+    if (isThink) {
+      if (!thinkDet) {
+        thinkDet = document.createElement("details");
+        thinkDet.className = "think-box";
+        if (STATE?.ui_prefs?.show_thinking !== false) thinkDet.open = true;
+        thinkDet.innerHTML = `<summary><svg class="think-chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5L10.5 8 6 12.5"/></svg><span></span></summary><div class="think-body"></div>`;
+        thinkCount = thinkDet.querySelector("span");
+        thinkBody = thinkDet.querySelector(".think-body");
+        liveAsst.prepend(thinkDet);
+      }
+      thinkCount.textContent = `Thinking · ${curThink.length} chars`;
+      thinkBody.textContent = curThink;
+    } else {
+      if (!ansRow) {
+        ansRow = document.createElement("div");
+        ansRow.className = "ans-row";
+        ansRow.innerHTML = `<span class="bullet">●</span><div class="ans-body"></div>`;
+        ansBody = ansRow.querySelector(".ans-body");
+        liveAsst.appendChild(ansRow);
+      }
+      ansBody.innerHTML = renderMarkdown(curAns);
     }
-    stream.scrollTop = stream.scrollHeight;
+    scrollNearBottom();
   };
 
-  let chatErr = null;
+  let chatErr = null, errRolledBack = false;
   try {
     const resp = await fetch("/api/chat", {
       method: "POST",
@@ -956,15 +1081,12 @@ async function sendMessage(overrideText, overrideImgs) {
         }
         if (!evData) continue;
         const d = JSON.parse(evData);
-        if (evName === "thinking") { curThink += d.text; updateLive(); }
-        else if (evName === "chunk") { curAns += d.text; updateLive(); }
+        if (evName === "thinking" && d.text) { curThink += d.text; updateLive(true); }
+        else if (evName === "chunk" && d.text) { curAns += d.text; updateLive(false); }
         else if (evName === "tool_result") {
           wrap.appendChild(buildToolCard(d));
-          curThink = ""; curAns = "";
-          liveAsst = document.createElement("div");
-          liveAsst.className = "msg-assistant";
-          wrap.appendChild(liveAsst);
-          stream.scrollTop = stream.scrollHeight;
+          resetLiveNodes();
+          scrollNearBottom();
         } else if (evName === "permission") {
           const gc = document.createElement("div");
           gc.className = "gate-card";
@@ -981,6 +1103,7 @@ async function sendMessage(overrideText, overrideImgs) {
           stream.scrollTop = stream.scrollHeight;
         } else if (evName === "error") {
           chatErr = d.message;
+          errRolledBack = !!d.rolled_back;
         }
       }
     }
@@ -992,6 +1115,12 @@ async function sendMessage(overrideText, overrideImgs) {
     $("btn-stop").style.display = "none";
     await loadState();
     if (chatErr) {
+      if (errRolledBack) {
+        if ($("empty-state")) stream.innerHTML = "";
+        let w = stream.querySelector(".turn-wrap");
+        if (!w) { w = document.createElement("div"); w.className = "turn-wrap"; stream.appendChild(w); }
+        w.appendChild(buildUserEl(text, imgs));
+      }
       const ec = document.createElement("div");
       ec.className = "err-card";
       ec.innerHTML = `<div class="err-msg">⚠ ${esc(chatErr)}</div><div class="err-acts"><button class="btn btn-sm">Try again</button></div>`;
@@ -1018,6 +1147,7 @@ function renderModalTab() {
       pane.appendChild(row);
     }
     const tokOpts = Array.from(new Set([4096,8192,16384,32768,65536,131072,1048576,STATE.provider.env_max_tokens])).filter(Boolean).sort((a,b)=>a-b);
+    const rndOpts = Array.from(new Set([5,10,15,20,25,30,STATE.provider.max_rounds])).filter(Boolean).sort((a,b)=>a-b);
     const gov = document.createElement("div");
     gov.className = "setting-row";
     gov.innerHTML = `
@@ -1025,18 +1155,19 @@ function renderModalTab() {
         <select id="gov-tok">${tokOpts.map(v => `<option value="${v}" ${STATE.provider.env_max_tokens===v?"selected":""}>${v}</option>`).join("")}</select>
       </div>
       <div class="field" style="flex:1"><label class="muted">Max Steps (AI_MAX_AGENT_ROUNDS)</label>
-        <select id="gov-rnd">${[5,10,15,20,25,30].map(v => `<option value="${v}" ${STATE.provider.max_rounds===v?"selected":""}>${v} steps</option>`).join("")}</select>
+        <select id="gov-rnd">${rndOpts.map(v => `<option value="${v}" ${STATE.provider.max_rounds===v?"selected":""}>${v} steps</option>`).join("")}</select>
       </div>`;
     pane.appendChild(gov);
     $("gov-tok").onchange = async (e) => { await api("/api/settings/provider", { max_tokens: +e.target.value }); await loadState(); };
     $("gov-rnd").onchange = async (e) => { await api("/api/settings/provider", { max_rounds: +e.target.value }); await loadState(); };
   } else if (ACTIVE_TAB === "profiles") {
-    pane.innerHTML = `<div style="font-weight:600">Workspace Profile</div><div class="muted">Select which profile in <code>profiles/*.md</code> drives the active project.</div>`;
+    const locked = !STATE.active_project.is_agent;
+    pane.innerHTML = `<div style="font-weight:600">Workspace Profile</div><div class="muted">${locked ? "Chat mode is locked to the <code>chat</code> profile. Switch to an agent project to change profiles." : "Select which profile in <code>profiles/*.md</code> drives the active project."}</div>`;
     for (const prof of STATE.profiles) {
       const cur = STATE.active_project.profile_name === prof;
       const row = document.createElement("div");
       row.className = "setting-row" + (cur ? " active-slot" : "");
-      row.innerHTML = `<div><strong>${esc(prof)}</strong></div><button class="btn btn-sm ${cur ? "btn-primary" : ""}">${cur ? "Active" : "Select"}</button>`;
+      row.innerHTML = `<div><strong>${esc(prof)}</strong></div><button class="btn btn-sm ${cur ? "btn-primary" : ""}" ${locked ? "disabled" : ""}>${cur ? "Active" : "Select"}</button>`;
       row.querySelector("button").onclick = async () => { await api("/api/settings/profile", { profile_name: prof }); await loadState(); };
       pane.appendChild(row);
     }
@@ -1116,7 +1247,7 @@ function renderModalTab() {
     for (const t of allThemes()) {
       const card = document.createElement("button");
       card.className = "theme-card" + (ap.theme === t.id ? " active" : "");
-      const tag = t.source === "live" ? "desktop" : (t.source === "custom" ? "custom" : (t.semantic_diffs ? "cli" : t.mode));
+      const tag = t.source === "live" ? "desktop" : (t.source === "custom" ? "custom" : t.mode);
       card.innerHTML = `<span class="theme-swatch" style="background:linear-gradient(135deg, ${esc(t.bg)} 50%, ${esc(t.accent)} 50%)"></span><span class="theme-meta"><span class="theme-name">${esc(t.name)}</span><span class="theme-tag">${esc(tag)}</span></span>`;
       card.onclick = () => { applyAppearance({ theme: t.id }); renderModalTab(); };
       grid.appendChild(card);
@@ -1155,6 +1286,7 @@ function renderModalTab() {
     ligRow.innerHTML = `<div><strong>Code Ligatures</strong><div class="muted">Render <code>=&gt;</code>, <code>!=</code>, <code>::</code> ligatures in monospace</div></div><button class="btn btn-sm">${ap.ligatures ? "On" : "Off"}</button>`;
     ligRow.querySelector("button").onclick = () => { applyAppearance({ ligatures: !getAppearance().ligatures }); renderModalTab(); };
     pane.appendChild(ligRow);
+
 
     const r = document.createElement("div");
     r.className = "setting-row";
@@ -1231,6 +1363,28 @@ $("msg-input").addEventListener("paste", (e) => {
 });
 $("btn-send").onclick = () => sendMessage();
 $("btn-stop").onclick = () => api("/api/stop", {});
+function disarmReset() {
+  const b = $("btn-reset");
+  if (!b) return;
+  clearTimeout(b._t);
+  delete b.dataset.arm;
+  b.classList.remove("btn-danger");
+  b.textContent = "Reset";
+}
+$("btn-reset").onclick = async () => {
+  const b = $("btn-reset");
+  if (!b.dataset.arm) {
+    b.dataset.arm = "1";
+    b.classList.add("btn-danger");
+    b.textContent = "sure?";
+    b._t = setTimeout(disarmReset, 2200);
+    return;
+  }
+  disarmReset();
+  if (STREAMING) await api("/api/stop", {});
+  await api("/api/reset", {});
+  await loadState();
+};
 $("btn-toggle-task").onclick = async () => {
   const hidden = $("sidebar-right").classList.toggle("hidden");
   await api("/api/settings/ui", { show_right_panel: !hidden });
@@ -1245,12 +1399,20 @@ $("rs-tab-mem").onclick = () => {
   $("rs-pane-mem").classList.add("open"); $("rs-pane-task").classList.remove("open");
   $("btn-save-mem").style.display = "inline-flex"; $("btn-run-task").style.display = "none";
 };
+function resizeInput() {
+  const el = $("msg-input");
+  el.style.height = "auto";
+  el.style.height = el.value ? `${Math.min(Math.max(el.scrollHeight, 36), 180)}px` : "";
+}
+
 $("btn-run-task").onclick = () => {
   const ap = STATE?.active_project;
   if (!ap?.is_agent) return;
   if (!ap.task_md) {
     const inp = $("msg-input");
     if (!inp.value.startsWith("/task")) inp.value = "/task " + inp.value;
+    resizeInput();
+    updateSendReady();
     inp.focus();
     inp.setSelectionRange(inp.value.length, inp.value.length);
     return;
@@ -1279,7 +1441,7 @@ document.querySelectorAll(".nav-btn").forEach(b => b.onclick = () => {
 });
 
 $("sel-reasoning").onchange = async (e) => { await api("/api/settings/profile", { reasoning: e.target.value }); await loadState(); };
-$("msg-input").addEventListener("input", () => { acHl = 0; updateAutocomplete(); });
+$("msg-input").addEventListener("input", () => { acHl = 0; resizeInput(); updateSendReady(); updateAutocomplete(); });
 $("msg-input").addEventListener("click", () => updateAutocomplete());
 document.addEventListener("click", (e) => { if (!e.target.closest(".composer")) closeAc(); });
 $("msg-input").addEventListener("keydown", (e) => {
@@ -1297,7 +1459,9 @@ $("btn-new-proj").onclick = () => {
   const sel = $("np-prof");
   sel.innerHTML = (STATE?.profiles || ["chat"]).map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join("");
   $("modal-new-proj").classList.add("open");
+  $("np-name").focus();
 };
+$("np-name").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); $("btn-create-np").click(); } };
 $("btn-close-new-proj").onclick = $("btn-cancel-np").onclick = () => $("modal-new-proj").classList.remove("open");
 $("btn-create-np").onclick = async () => {
   const name = $("np-name").value.trim(), profile = $("np-prof").value;
@@ -1313,6 +1477,8 @@ $("btn-create-np").onclick = async () => {
 };
 
 const params = new URLSearchParams(location.search);
+const liveEs = new EventSource("/api/live");
+window.addEventListener("pagehide", () => liveEs.close());
 loadState(params.get("project") || "");
 
 let lastThemeSig = "", lastThemeSync = 0;
