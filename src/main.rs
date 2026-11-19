@@ -508,18 +508,19 @@ async fn execute_task_loop(
     spinner: &mut InlineSpinner,
 ) -> anyhow::Result<bool> {
     let max_rounds = rs_agent::config::get_max_rounds();
+    let max_lbl = if max_rounds == usize::MAX { "∞".to_string() } else { max_rounds.to_string() };
     let display_goal: String = goal.chars().take(80).collect();
     let ellipsis = if goal.chars().count() > 80 { "..." } else { "" };
 
     println!("  \x1b[1;36m✦ [Task Loop]\x1b[0m Starting autonomous run in \x1b[1;37m{}\x1b[0m", target_dir.display());
-    println!("  \x1b[2mGoal: {}{} (Max steps: {})\x1b[0m\n", display_goal, ellipsis, max_rounds);
+    println!("  \x1b[2mGoal: {}{} (Max steps: {})\x1b[0m\n", display_goal, ellipsis, max_lbl);
 
     history.push(ChatMessage::user(goal.to_string()));
 
     let mut total_tools_run = 0;
 
     for turn in 0..max_rounds {
-        println!("  \x1b[1;34m─── Step {}/{} ───\x1b[0m", turn + 1, max_rounds);
+        println!("  \x1b[1;34m─── Step {}/{} ───\x1b[0m", turn + 1, max_lbl);
 
         let mut renderer = StreamRenderer::new(state::get_pad());
         spinner.start("Executing autonomous step...");

@@ -125,13 +125,22 @@ pub fn get_max_tokens() -> usize {
     std::env::var("AI_MAX_TOKENS").ok().and_then(|v| v.parse().ok()).unwrap_or(8192)
 }
 
+fn parse_max_rounds(raw: &str) -> Option<usize> {
+    let t = raw.trim();
+    if t == "0" || t.eq_ignore_ascii_case("unlimited") || t.eq_ignore_ascii_case("inf") {
+        Some(usize::MAX)
+    } else {
+        t.parse::<usize>().ok().filter(|&n| n > 0)
+    }
+}
+
 pub fn get_max_rounds() -> usize {
     if let Ok(content) = fs::read_to_string(get_env_path()) {
-        if let Some(n) = get_env_val(&content, "AI_MAX_AGENT_ROUNDS").and_then(|v| v.parse::<usize>().ok()) {
+        if let Some(n) = get_env_val(&content, "AI_MAX_AGENT_ROUNDS").and_then(|v| parse_max_rounds(&v)) {
             return n;
         }
     }
-    std::env::var("AI_MAX_AGENT_ROUNDS").ok().and_then(|v| v.parse().ok()).unwrap_or(15)
+    std::env::var("AI_MAX_AGENT_ROUNDS").ok().and_then(|v| parse_max_rounds(&v)).unwrap_or(15)
 }
 
 pub fn get_context_ceilings() -> ContextCeilings {
@@ -315,4 +324,11 @@ mod tests {
         assert_eq!(fallbacks, vec!["Qwen3.8-27B", "Gemma-4-31B-IT"]);
     }
 
+    #[test]
+    fn test_parse_max_rounds_supports_unlimited() {
+        assert_eq!(parse_max_rounds("0"), Some(usize::MAX));
+        assert_eq!(parse_max_rounds("unlimited"), Some(usize::MAX));
+        assert_eq!(parse_max_rounds("20"), Some(20));
+        assert_eq!(parse_max_rounds(""), None);
+    }
 }

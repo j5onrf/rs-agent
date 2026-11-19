@@ -662,7 +662,7 @@ fn load_themes(themes_dir: &Path) -> Vec<Value> {
             "bg": bg, "panel": panel, "card": card, "border": border,
             "text": text, "muted": muted, "accent": accent, "cyan": cyan
         });
-        for extra in ["active_bg", "active_border"] {
+        for extra in ["active_bg", "active_border", "user_bg", "user_border"] {
             if let Some(s) = v.get(extra).and_then(|x| x.as_str()) {
                 obj[extra] = Value::String(s.to_string());
             }
@@ -1181,6 +1181,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             .map(|(name, cfg)| json!({ "name": name, "command": cfg.command, "args": cfg.args }))
             .collect();
         mcp_list.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+        let max_rounds = match get_max_rounds() { usize::MAX => 0, r => r };
 
         return write_http_json(
             &mut stream,
@@ -1197,7 +1198,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     "is_local": is_local_endpoint(&provider.base_url),
                     "max_tokens": get_max_tokens(),
                     "env_max_tokens": env_tok,
-                    "max_rounds": get_max_rounds()
+                    "max_rounds": max_rounds
                 },
                 "themes": load_themes(&app.root.join("plugins/rs-rail/themes")),
                 "mcp_servers": mcp_list,
@@ -1231,6 +1232,15 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             sess.cancel_flag.store(true, Ordering::SeqCst);
         }
         return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
+    }
+
+    if method == "POST" && path == "/api/shutdown" {
+        let _ = write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
+        tokio::spawn(async {
+            tokio::time::sleep(std::time::Duration::from_millis(80)).await;
+            std::process::exit(0);
+        });
+        return Ok(());
     }
 
     if method == "POST" && path == "/api/reset" {
@@ -1581,6 +1591,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 }
                 let tx_chunk = tx.clone();
                 let llm_t0 = Instant::now();
+                let think_ms = Arc::new(AtomicU64::new(0));
+                let think_ms_c = Arc::clone(&think_ms);
                 let res = client
                     .stream_chat_raw_with_reasoning(
                         &history,
@@ -1588,6 +1600,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                         Some(cancel_flag.clone()),
                         Some(reasoning.clone()),
                         move |slice, is_t| {
+                            if is_t {
+                                think_ms_c.store(llm_t0.elapsed().as_millis() as u64, Ordering::Relaxed);
+                            }
                             let ev = if is_t { "thinking" } else { "chunk" };
                             let _ = tx_chunk.send(format!("event: {ev}\ndata: {}\n\n", json!({ "text": slice })));
                         },
@@ -1635,10 +1650,13 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 });
 
                 if !reply.is_empty() || opt_reasoning.is_some() {
+                    let ms = think_ms.load(Ordering::Relaxed);
+                    let think_s = opt_reasoning.as_ref().map(|_| if ms > 0 { (ms as f64 / 1000.0).max(0.1) } else { llm_elapsed });
                     new_ui_items.push(UiTurnItem {
                         role: "assistant".into(),
                         content: if reply.is_empty() { None } else { Some(reply.clone()) },
                         reasoning: opt_reasoning.clone(),
+                        elapsed_s: think_s,
                         ..Default::default()
                     });
                 }
