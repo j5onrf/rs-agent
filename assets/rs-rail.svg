@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="rs-rail logo">
+  <defs>
+    <linearGradient id="sq_bg_rail" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="55%" stop-color="#f6f8fa"/>
+      <stop offset="100%" stop-color="#eaecef"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#sq_bg_rail)"/>
+  <path
+    fill="none"
+    stroke="#0d1117"
+    stroke-width="14"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    d="M 64 40 L 88 64 L 64 88 L 40 88"
+  />
+</svg>

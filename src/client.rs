@@ -335,11 +335,15 @@ fn accumulate_tool_calls(delta: &Value, tool_calls_map: &mut BTreeMap<usize, (St
             });
 
             if let Some(id) = tc.get("id").and_then(|v| v.as_str()) {
-                entry.0 = id.to_string();
+                if !id.is_empty() {
+                    entry.0 = id.to_string();
+                }
             }
             if let Some(fn_obj) = tc.get("function") {
                 if let Some(name) = fn_obj.get("name").and_then(|v| v.as_str()) {
-                    entry.1 = name.to_string();
+                    if !name.is_empty() {
+                        entry.1 = name.to_string();
+                    }
                 }
                 if let Some(args) = fn_obj.get("arguments").and_then(|v| v.as_str()) {
                     entry.2.push_str(args);
@@ -1121,5 +1125,22 @@ mod tests {
         let b2 = client.build_request_body(&[ChatMessage::user("hi")], None);
         assert_eq!(b2["reasoning"]["effort"], "medium");
         assert!(b2.get("reasoning_effort").is_none());
+    }
+
+    #[test]
+    fn test_accumulate_tool_calls_ignores_empty_id_and_name_deltas() {
+        let mut map = BTreeMap::new();
+        accumulate_tool_calls(
+            &serde_json::json!({"tool_calls": [{"index": 0, "id": "call_1", "function": {"name": "read_file", "arguments": r#"{"path":"#}}]}),
+            &mut map,
+        );
+        accumulate_tool_calls(
+            &serde_json::json!({"tool_calls": [{"index": 0, "id": "", "function": {"name": "", "arguments": r#""a.rs"}"#}}]}),
+            &mut map,
+        );
+        let entry = map.get(&0).unwrap();
+        assert_eq!(entry.0, "call_1");
+        assert_eq!(entry.1, "read_file");
+        assert_eq!(entry.2, r#"{"path":"a.rs"}"#);
     }
 }

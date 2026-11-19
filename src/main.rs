@@ -105,19 +105,19 @@ fn is_rs_agent_process(pid: i32) -> bool {
 fn resolve_instance_number(profile: &str) -> (usize, InstanceLockGuard) {
     let shm_dir = instance_lock_dir();
     let _ = fs::create_dir_all(&shm_dir);
+    let lock_prof = profile.replace('/', "_");
 
     let mut active_count = 0;
     if let Ok(entries) = fs::read_dir(&shm_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
             if let Some(fname) = path.file_name().and_then(|n| n.to_str()) {
-                let parts: Vec<&str> = fname.split('.').collect();
-                if parts.len() == 2 {
-                    if let Ok(pid) = parts[0].parse::<i32>() {
+                if let Some((pid_str, prof_str)) = fname.split_once('.') {
+                    if let Ok(pid) = pid_str.parse::<i32>() {
                         let is_active = is_rs_agent_process(pid);
                         if !is_active {
                             let _ = fs::remove_file(&path);
-                        } else if parts[1] == profile {
+                        } else if prof_str == lock_prof {
                             active_count += 1;
                         }
                     }
@@ -128,7 +128,7 @@ fn resolve_instance_number(profile: &str) -> (usize, InstanceLockGuard) {
 
     let instance_num = active_count + 1;
     let my_pid = std::process::id();
-    let lock_file = shm_dir.join(format!("{}.{}", my_pid, profile));
+    let lock_file = shm_dir.join(format!("{}.{}", my_pid, lock_prof));
     let _ = fs::write(&lock_file, instance_num.to_string());
     if let Ok(mut g) = CURRENT_LOCK_FILE.lock() {
         *g = Some(lock_file.clone());
@@ -1132,7 +1132,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
             let _ = crossterm::terminal::disable_raw_mode();
-            print!("\x1b[?25h\r\n");
+            print!("\x1b[?2004l\x1b[?25h\r\n");
             let _ = io::stdout().flush();
             std::process::exit(0);
         }

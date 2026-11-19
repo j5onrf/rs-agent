@@ -85,7 +85,10 @@ impl WorkspaceConfig {
         let dir = workspace.as_ref().join(".rs");
         fs::create_dir_all(&dir)?;
         let content = serde_json::to_string_pretty(self)?;
-        fs::write(dir.join("config.json"), content)?;
+        let final_path = dir.join("config.json");
+        let tmp_path = dir.join(format!("config.json.tmp.{}", std::process::id()));
+        fs::write(&tmp_path, content)?;
+        fs::rename(&tmp_path, &final_path)?;
         Ok(())
     }
 }

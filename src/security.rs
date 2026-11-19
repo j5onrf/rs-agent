@@ -165,16 +165,29 @@ impl SecurityBoundary {
         }
 
         let mut curr = path.to_path_buf();
+        let mut tail: Vec<Option<std::ffi::OsString>> = Vec::new();
 
         // Walk ancestors until an entry with metadata is found (symlink_metadata does NOT follow symlinks)
         while fs::symlink_metadata(&curr).is_err() {
-            if let Some(parent) = curr.parent() {
-                if parent == curr {
-                    break;
+            match curr.components().next_back() {
+                Some(std::path::Component::ParentDir) => {
+                    tail.push(None);
+                    if !curr.pop() {
+                        break;
+                    }
                 }
-                curr = parent.to_path_buf();
-            } else {
-                break;
+                Some(std::path::Component::Normal(s)) => {
+                    tail.push(Some(s.to_os_string()));
+                    if !curr.pop() {
+                        break;
+                    }
+                }
+                Some(std::path::Component::CurDir) => {
+                    if !curr.pop() {
+                        break;
+                    }
+                }
+                _ => break,
             }
         }
 
@@ -222,7 +235,22 @@ impl SecurityBoundary {
                     return false;
                 }
             }
-            !canon.starts_with(&self.root)
+            if !canon.starts_with(&self.root) {
+                return true;
+            }
+            // Replay uncreated components so non-existent `..` cannot escape root before create_dir_all
+            let mut probe = canon;
+            for part in tail.into_iter().rev() {
+                match part {
+                    None => {
+                        if !probe.pop() || !probe.starts_with(&self.root) {
+                            return true;
+                        }
+                    }
+                    Some(seg) => probe.push(seg),
+                }
+            }
+            !probe.starts_with(&self.root)
         } else {
             true
         }
@@ -342,5 +370,18 @@ mod tests {
         assert!(b.check_command("PATH=/usr/bin:/bin ls").is_some());
         assert!(b.check_command("echo ok;rm -rf .").is_some());
         assert!(!b.authorize("test"));
+    }
+
+    #[test]
+    fn test_is_outside_blocks_nonexistent_parent_traversal() {
+        let tmp = std::env::temp_dir().join(format!("rs_sec_traversal_test_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let b = SecurityBoundary::new_headless(&tmp);
+
+        assert!(b.is_outside(&b.resolve_path("nonexistent/../../outside_dir/file.txt")));
+        assert!(!b.is_outside(&b.resolve_path("nonexistent/../inside_dir/file.txt")));
+
+        let _ = fs::remove_dir_all(&tmp);
     }
 }

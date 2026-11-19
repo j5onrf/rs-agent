@@ -1,7 +1,7 @@
 <h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
 
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.6.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.7.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=secondary&logo=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT.svg?variant=secondary" alt="License"></a>
@@ -38,6 +38,7 @@
 | Invocation | Mode | Description |
 | :--- | :--- | :--- |
 | `[shortcut]` | **Shell Teleport** | Sub-`0.2ms` router via `rs-context.md` (`lfm`, `ling`, etc.) |
+| `rr` · `rail` | **rs-rail App** | Native Rust desktop app surface on `http://127.0.0.1:24243` |
 | <img alt="" src="assets/prompt2.svg" width="14" height="14" /> `ai` | **Interactive Chat** | Pure conversational REPL (`~180t` profile, thinking gutters, `/pad`) |
 | <img alt="" src="assets/prompt2.svg" width="14" height="14" /> `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security sandbox |
 
@@ -55,6 +56,18 @@
 | **Handover** | `/t3` · `/t3 web` | Launches desktop or browser (`projects/chat` in chat mode, workspace root for agents) |
 | **Diff Review** | `session/request_permission` | Split/unified diff gates (*Supervised*, *Auto-accept*, *Auto*, *Full access*) |
 | **Live Controls** | `$skills` · `/commands` · `thought_level` | `$` skill pills, reasoning tier/budget selector, vision input |
+
+---
+
+## <img alt="rs-rail" src="assets/rs-rail.svg" width="26" height="26" /> RS Rail (Desktop & Web)
+
+**rs-rail** is a native Rust web and frameless desktop surface running on `http://127.0.0.1:24243`, built directly on the in-process `rs-agent` engine.
+
+| Feature | Mechanism | Behavior |
+| :--- | :--- | :--- |
+| **Frameless App** | `rail` · `rr` | Dedicated standalone desktop app window (`--app=http://127.0.0.1:24243`) |
+| **Browser Tab** | `rail web` · `rr web` | Standard browser tab via `xdg-open` |
+| **Themes & Fonts** | Settings & Appearance | 10 monochrome themes (Dark/Light × 5 colors), live Omarchy & Noctalia desktop sync, custom `themes/*.json`, JetBrains Mono |
 
 ---
 
@@ -97,14 +110,14 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
-╭─── rs-agent v0.7.6 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.7.7 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ purebash · t256 · adp · mcp:photocraft(7)   │
 │   │ Li │  artcraft/photocraft-l            │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · clean                │ ─────────────────────────────────────────── │
 │   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · 15 steps · local                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 
-╭─── rs-agent v0.7.6 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.7.7 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  nvidia/nemotron-3.5-lightning:fr…│ core4 · medium                              │
 │   │ nv │  nemo                             │ ─────────────────────────────────────────── │
 │   ╰────╯  git: main · 9 modified           │ ctx 65.5k · 10 steps · openrouter           │

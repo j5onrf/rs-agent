@@ -1,0 +1,1543 @@
+use anyhow::Result;
+use serde::Serialize;
+use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::Instant;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::{mpsc, oneshot, Mutex};
+
+use rs_agent::adapter;
+use rs_agent::client::{is_local_endpoint, ChatMessage, LlmClient};
+use rs_agent::config::{
+    get_env_path, get_max_rounds, get_max_tokens, set_profile_max_tokens, strip_inline_comment, ProviderConfig,
+    ToolTier, WorkspaceConfig,
+};
+use rs_agent::mcp::{self, McpServerConfig};
+use rs_agent::profile::{build_system_prompt, Profile, ReasoningSetting};
+use rs_agent::security::SecurityBoundary;
+use rs_agent::skill::Skill;
+use rs_agent::state;
+use rs_agent::stream::UsageStats;
+use rs_agent::tools;
+use rs_agent::ui::format_endpoint;
+
+const UI_HTML: &str = include_str!("ui.html");
+
+#[derive(Clone, Serialize)]
+struct DiffLine {
+    kind: &'static str,
+    num: usize,
+    text: String,
+}
+
+#[derive(Clone, Serialize)]
+struct DiffPayload {
+    adds: usize,
+    rems: usize,
+    lines: Vec<DiffLine>,
+}
+
+#[derive(Clone, Serialize)]
+struct UiTurnItem {
+    role: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    images: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    reasoning: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    brief: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ok: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    elapsed_s: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    diff: Option<DiffPayload>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    raw: Option<String>,
+}
+
+struct SessionState {
+    project_name: String,
+    workspace: PathBuf,
+    profile_name: String,
+    is_agent: bool,
+    adapters: bool,
+    delegate: bool,
+    tier: ToolTier,
+    mcp_servers: Vec<String>,
+    mcp_tools: Vec<String>,
+    ctx_override: Option<usize>,
+    hud_summary: String,
+    reasoning: Option<ReasoningSetting>,
+    active_skills: Vec<String>,
+    llm_history: Vec<ChatMessage>,
+    ui_history: Vec<UiTurnItem>,
+    last_stats: Option<UsageStats>,
+    cancel_flag: Arc<AtomicBool>,
+    generation: u64,
+}
+
+struct AppRuntime {
+    root: PathBuf,
+    sessions: Mutex<HashMap<String, SessionState>>,
+    active_project: Mutex<String>,
+    pending_perms: Mutex<HashMap<u64, oneshot::Sender<bool>>>,
+    next_perm_id: AtomicU64,
+}
+
+impl AppRuntime {
+    fn new() -> Self {
+        let root = dirs::home_dir()
+            .map(|h| h.join(".config/rs-agent"))
+            .unwrap_or_else(|| PathBuf::from("."));
+        Self {
+            root,
+            sessions: Mutex::new(HashMap::new()),
+            active_project: Mutex::new("chat".into()),
+            pending_perms: Mutex::new(HashMap::new()),
+            next_perm_id: AtomicU64::new(1),
+        }
+    }
+
+    fn load_or_init_session(&self, project: &str) -> SessionState {
+        let proj_dir = self.root.join("projects").join(project);
+        let _ = fs::create_dir_all(&proj_dir);
+        let is_agent = project != "chat";
+        let mut cfg = WorkspaceConfig::load_or_default(&proj_dir);
+        if !is_agent {
+            cfg.is_agent = false;
+            cfg.profile_name = "chat".into();
+        } else {
+            cfg.is_agent = true;
+            if cfg.profile_name == "chat" || Profile::load(&cfg.profile_name).is_none() {
+                if Profile::load(project).is_some() {
+                    cfg.profile_name = project.into();
+                } else {
+                    let avail = Profile::list_available();
+                    let cand = Profile::find_workspace_candidates(project, &avail);
+                    if let Some(first) = cand.first() {
+                        cfg.profile_name = first.clone();
+                    }
+                }
+            }
+        }
+
+        let prof = Profile::load(&cfg.profile_name).unwrap_or_else(|| Profile::parse("ROLE: Assistant."));
+        let hud_summary = prof.hud_summary(cfg.is_agent);
+        set_profile_max_tokens(prof.ctx);
+        let sys = build_system_prompt(&prof, &proj_dir, cfg.is_agent, &[]);
+
+        SessionState {
+            project_name: project.into(),
+            workspace: proj_dir,
+            profile_name: cfg.profile_name,
+            is_agent: cfg.is_agent,
+            adapters: prof.adapters,
+            delegate: prof.delegate,
+            tier: prof.tier,
+            mcp_servers: prof.mcp_servers,
+            mcp_tools: prof.mcp_tools,
+            ctx_override: prof.ctx,
+            hud_summary,
+            reasoning: prof.reasoning_budget,
+            active_skills: Vec::new(),
+            llm_history: vec![ChatMessage::system(sys)],
+            ui_history: Vec::new(),
+            last_stats: None,
+            cancel_flag: Arc::new(AtomicBool::new(false)),
+            generation: 0,
+        }
+    }
+}
+
+fn is_valid_slug(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 48
+        && name != "."
+        && name != ".."
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+fn git_status_brief(dir: &Path) -> (String, bool) {
+    let mut cur = Some(dir);
+    let mut in_git = false;
+    while let Some(d) = cur {
+        if d.join(".git").exists() {
+            in_git = true;
+            break;
+        }
+        cur = d.parent();
+    }
+    if !in_git {
+        return ("git: [none]".into(), false);
+    }
+    let Ok(out) = std::process::Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(["--no-optional-locks", "status", "--porcelain", "-b", "--no-renames"])
+        .output()
+    else {
+        return ("git: [none]".into(), false);
+    };
+    let text = String::from_utf8_lossy(&out.stdout);
+    let mut lines = text.lines();
+    let head = lines.next().unwrap_or("").trim_start_matches("##").trim();
+    let branch = head.split("...").next().unwrap_or(head).split_whitespace().next().unwrap_or("detached");
+    let dirty = lines.filter(|l| !l.trim().is_empty()).count();
+    let label = if dirty == 0 {
+        format!("git: {branch} · clean")
+    } else {
+        format!("git: {branch} · {dirty} modified")
+    };
+    (label, dirty > 0)
+}
+
+fn compute_diff(old_text: &str, new_text: &str) -> DiffPayload {
+    let old_lines: Vec<&str> = old_text.lines().collect();
+    let new_lines: Vec<&str> = new_text.lines().collect();
+    let min_len = old_lines.len().min(new_lines.len());
+    let mut prefix = 0;
+    while prefix < min_len && old_lines[prefix] == new_lines[prefix] {
+        prefix += 1;
+    }
+    let mut suffix = 0;
+    while suffix < (min_len - prefix)
+        && old_lines[old_lines.len() - 1 - suffix] == new_lines[new_lines.len() - 1 - suffix]
+    {
+        suffix += 1;
+    }
+    let removed = &old_lines[prefix..old_lines.len() - suffix];
+    let added = &new_lines[prefix..new_lines.len() - suffix];
+    let mut lines = Vec::new();
+    if prefix > 0 {
+        lines.push(DiffLine { kind: "ctx", num: prefix, text: old_lines[prefix - 1].to_string() });
+    }
+    for (i, l) in removed.iter().take(12).enumerate() {
+        lines.push(DiffLine { kind: "del", num: prefix + i + 1, text: (*l).to_string() });
+    }
+    for (i, l) in added.iter().take(12).enumerate() {
+        lines.push(DiffLine { kind: "add", num: prefix + i + 1, text: (*l).to_string() });
+    }
+    if suffix > 0 {
+        let idx = old_lines.len() - suffix;
+        lines.push(DiffLine { kind: "ctx", num: idx + 1, text: old_lines[idx].to_string() });
+    }
+    DiffPayload { adds: added.len(), rems: removed.len(), lines }
+}
+
+fn extract_quoted_val(line: &str) -> &str {
+    if let Some(pos) = line.find('=') {
+        let rest = line[pos + 1..].trim();
+        if let Some(s) = rest.strip_prefix('"') {
+            if let Some(end) = s.find('"') {
+                return &s[..end];
+            }
+        } else if let Some(s) = rest.strip_prefix('\'') {
+            if let Some(end) = s.find('\'') {
+                return &s[..end];
+            }
+        } else {
+            return strip_inline_comment(rest);
+        }
+    }
+    ""
+}
+
+#[derive(Serialize)]
+struct EnvSlotView {
+    id: String,
+    name: String,
+    model: String,
+    is_active: bool,
+}
+
+#[inline]
+fn is_env_key(line: &str, key: &str) -> bool {
+    line.strip_prefix(key).is_some_and(|r| r.trim_start().starts_with('='))
+}
+
+#[inline]
+fn is_valid_slot_val(val: &str) -> bool {
+    !val.is_empty() && !val.contains("your-key-here") && !val.contains("your_key_here")
+}
+
+fn read_env_slots(env_path: &Path) -> (Vec<EnvSlotView>, usize, usize) {
+    let raw = fs::read_to_string(env_path).unwrap_or_default();
+    let lines: Vec<&str> = raw.lines().collect();
+    let mut slots = Vec::new();
+
+    for &(pfx, name, def_m) in &[
+        ("GEMINI", "Google Gemini", "gemini-3.5-flash-lite"),
+        ("GOOGLE", "Google AI", "gemini-3.5-flash-lite"),
+        ("OPENROUTER", "OpenRouter", "openrouter/free"),
+        ("OPENAI", "OpenAI", "gpt-4o"),
+        ("ANTHROPIC", "Anthropic", "claude-3-5-sonnet-20241022"),
+        ("DEEPSEEK", "DeepSeek", "deepseek-chat"),
+        ("GROQ", "Groq", "llama-3.3-70b-versatile"),
+    ] {
+        let kv = format!("{pfx}_API_KEY");
+        let mv = format!("{pfx}_MODEL");
+        let mut found = false;
+        let mut active = false;
+        for l in &lines {
+            let t = l.trim();
+            let u = t.trim_start_matches('#').trim();
+            if is_env_key(u, &kv) && is_valid_slot_val(extract_quoted_val(u)) {
+                found = true;
+                active = !t.starts_with('#');
+                break;
+            }
+        }
+        if found {
+            let model = lines
+                .iter()
+                .find_map(|l| {
+                    let t = l.trim();
+                    if !t.starts_with('#') && is_env_key(t, &mv) {
+                        Some(extract_quoted_val(t).to_string())
+                    } else {
+                        None
+                    }
+                })
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| def_m.into());
+            slots.push(EnvSlotView { id: pfx.into(), name: name.into(), model, is_active: active });
+        }
+    }
+
+    for i in 1..=9 {
+        let kv = format!("CUSTOM{i}_API_KEY");
+        let nv = format!("CUSTOM{i}_NAME");
+        let mv = format!("CUSTOM{i}_MODEL");
+        let mut found = false;
+        let mut active = false;
+        let mut name = format!("Custom {i}");
+        let mut model = "default".to_string();
+        for l in &lines {
+            let t = l.trim();
+            let u = t.trim_start_matches('#').trim();
+            if is_env_key(u, &kv) && is_valid_slot_val(extract_quoted_val(u)) {
+                found = true;
+                active = !t.starts_with('#');
+            } else if is_env_key(u, &nv) {
+                let v = extract_quoted_val(u);
+                if !v.is_empty() {
+                    name = v.into();
+                }
+            } else if !t.starts_with('#') && is_env_key(t, &mv) {
+                let v = extract_quoted_val(t);
+                if !v.is_empty() {
+                    model = v.into();
+                }
+            }
+        }
+        if found {
+            slots.push(EnvSlotView { id: format!("CUSTOM{i}"), name, model, is_active: active });
+        }
+    }
+
+    let mut env_tok = 8192;
+    let mut env_rnd = 15;
+    for l in &lines {
+        let t = l.trim();
+        if !t.starts_with('#') && is_env_key(t, "AI_MAX_TOKENS") {
+            if let Ok(v) = extract_quoted_val(t).parse() {
+                env_tok = v;
+            }
+        } else if !t.starts_with('#') && is_env_key(t, "AI_MAX_AGENT_ROUNDS") {
+            if let Ok(v) = extract_quoted_val(t).parse() {
+                env_rnd = v;
+            }
+        }
+    }
+    (slots, env_tok, env_rnd)
+}
+
+fn update_env_file(
+    env_path: &Path,
+    toggle_slot: Option<&str>,
+    max_tokens: Option<usize>,
+    max_rounds: Option<usize>,
+) -> Result<()> {
+    if let Some(parent) = env_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
+    let raw = fs::read_to_string(env_path).unwrap_or_default();
+    let mut lines: Vec<String> = raw.lines().map(ToString::to_string).collect();
+
+    if let Some(target) = toggle_slot {
+        let target_key = format!("{target}_API_KEY");
+        let was_active = lines.iter().any(|l| {
+            let t = l.trim();
+            !t.starts_with('#') && is_env_key(t, &target_key)
+        });
+        let activate = !was_active;
+
+        let prefixes: Vec<String> = ["GEMINI", "GOOGLE", "OPENROUTER", "OPENAI", "ANTHROPIC", "DEEPSEEK", "GROQ"]
+            .into_iter()
+            .map(String::from)
+            .chain((1..=9).map(|i| format!("CUSTOM{i}")))
+            .collect();
+
+        for line in &mut lines {
+            let trimmed = line.trim();
+            let uncommented = trimmed.trim_start_matches('#').trim_start();
+            for pfx in &prefixes {
+                let kv = format!("{pfx}_API_KEY");
+                if is_env_key(uncommented, &kv) {
+                    if activate && pfx == target {
+                        *line = uncommented.to_string();
+                    } else {
+                        *line = format!("#{uncommented}");
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    if let Some(tok) = max_tokens {
+        let mut found = false;
+        for l in &mut lines {
+            if is_env_key(l.trim().trim_start_matches('#').trim(), "AI_MAX_TOKENS") {
+                *l = format!("AI_MAX_TOKENS=\"{tok}\"");
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            lines.push(format!("AI_MAX_TOKENS=\"{tok}\""));
+        }
+    }
+
+    if let Some(rnd) = max_rounds {
+        let mut found = false;
+        for l in &mut lines {
+            if is_env_key(l.trim().trim_start_matches('#').trim(), "AI_MAX_AGENT_ROUNDS") {
+                *l = format!("AI_MAX_AGENT_ROUNDS=\"{rnd}\"");
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            lines.push(format!("AI_MAX_AGENT_ROUNDS=\"{rnd}\""));
+        }
+    }
+
+    let mut out = lines.join("\n");
+    if !out.ends_with('\n') {
+        out.push('\n');
+    }
+    let tmp = env_path.with_extension(format!("env.tmp.{}", std::process::id()));
+    fs::write(&tmp, &out)?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = fs::set_permissions(&tmp, fs::Permissions::from_mode(0o600));
+    }
+    fs::rename(&tmp, env_path)?;
+    Ok(())
+}
+
+fn is_light_hex(hex: &str) -> bool {
+    let h = hex.trim().trim_start_matches('#');
+    if !h.is_ascii() || h.len() < 6 {
+        return false;
+    }
+    let r = u8::from_str_radix(&h[0..2], 16).unwrap_or(0) as u32;
+    let g = u8::from_str_radix(&h[2..4], 16).unwrap_or(0) as u32;
+    let b = u8::from_str_radix(&h[4..6], 16).unwrap_or(0) as u32;
+    (r * 299 + g * 587 + b * 114) / 1000 > 140
+}
+
+fn parse_omarchy_toml(dir: &Path) -> Option<Value> {
+    let raw = fs::read_to_string(dir.join("colors.toml")).ok()?;
+    let mut map: HashMap<String, String> = HashMap::new();
+    for line in raw.lines() {
+        let t = line.trim();
+        if t.is_empty() || t.starts_with('#') {
+            continue;
+        }
+        if let Some((k, v)) = t.split_once('=') {
+            let val = strip_inline_comment(v.trim()).trim_matches(['"', '\'']).trim();
+            if !val.is_empty() {
+                map.insert(k.trim().to_string(), val.to_string());
+            }
+        }
+    }
+    let panel = map.get("background").or_else(|| map.get("dark_background"))?.clone();
+    let bg = map.get("darker_background").or_else(|| map.get("dark_background")).unwrap_or(&panel).clone();
+    let card = map.get("lighter_background").unwrap_or(&panel).clone();
+    let border = map.get("selection").or_else(|| map.get("muted")).cloned().unwrap_or_else(|| "#333842".into());
+    let text = map.get("foreground").or_else(|| map.get("bright_foreground")).cloned().unwrap_or_else(|| "#e5e7eb".into());
+    let muted = map.get("dark_foreground").or_else(|| map.get("muted")).cloned().unwrap_or_else(|| "#8b92a0".into());
+    let accent = map.get("accent").or_else(|| map.get("green")).or_else(|| map.get("blue")).cloned().unwrap_or_else(|| "#22c55e".into());
+    let cyan = map.get("cyan").or_else(|| map.get("blue")).unwrap_or(&accent).clone();
+    let is_light = dir.join("light.mode").is_file()
+        || map.get("mode").is_some_and(|m| m.eq_ignore_ascii_case("light"))
+        || is_light_hex(&bg);
+    Some(json!({
+        "id": "omarchy", "name": "Omarchy", "source": "live",
+        "mode": if is_light { "light" } else { "dark" },
+        "bg": bg, "panel": panel, "card": card, "border": border,
+        "text": text, "muted": muted, "accent": accent, "cyan": cyan
+    }))
+}
+
+fn parse_noctalia_json(path: &Path) -> Option<Value> {
+    let raw = fs::read_to_string(path).ok()?;
+    let v: Value = serde_json::from_str(&raw).ok()?;
+    let bg = v.get("mSurface").and_then(|x| x.as_str())?;
+    let panel = v.get("mSurfaceVariant").and_then(|x| x.as_str()).unwrap_or(bg);
+    let card = v.get("mSurfaceContainer").and_then(|x| x.as_str()).unwrap_or(panel);
+    let border = v.get("mOutline").and_then(|x| x.as_str()).unwrap_or("#333842");
+    let text = v.get("mOnSurface").and_then(|x| x.as_str()).unwrap_or("#e5e7eb");
+    let muted = v.get("mOnSurfaceVariant").and_then(|x| x.as_str()).unwrap_or("#8b92a0");
+    let accent = v.get("mPrimary").and_then(|x| x.as_str()).unwrap_or("#22c55e");
+    let cyan = v.get("mSecondary").and_then(|x| x.as_str()).unwrap_or(accent);
+    let mode = if is_light_hex(bg) { "light" } else { "dark" };
+    Some(json!({
+        "id": "noctalia", "name": "Noctalia", "source": "live", "mode": mode,
+        "bg": bg, "panel": panel, "card": card, "border": border,
+        "text": text, "muted": muted, "accent": accent, "cyan": cyan
+    }))
+}
+
+fn load_themes(themes_dir: &Path) -> Vec<Value> {
+    let mut out = Vec::new();
+    if let Some(home) = dirs::home_dir() {
+        if let Some(t) = parse_omarchy_toml(&home.join(".config/omarchy/current/theme")) {
+            out.push(t);
+        }
+        if let Some(t) = parse_noctalia_json(&home.join(".config/noctalia/colors.json")) {
+            out.push(t);
+        }
+    }
+    let mut files = Vec::new();
+    if let Ok(rd) = fs::read_dir(themes_dir) {
+        for ent in rd.flatten() {
+            let p = ent.path();
+            if p.extension().and_then(|e| e.to_str()) == Some("json") {
+                files.push(p);
+            }
+        }
+    }
+    files.sort();
+    for path in files {
+        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else { continue };
+        let Ok(raw) = fs::read_to_string(&path) else { continue };
+        let Ok(v) = serde_json::from_str::<Value>(&raw) else { continue };
+        let Some(bg) = v.get("bg").and_then(|x| x.as_str()) else { continue };
+        let Some(accent) = v.get("accent").and_then(|x| x.as_str()) else { continue };
+        let panel = v.get("panel").and_then(|x| x.as_str()).unwrap_or(bg);
+        let card = v.get("card").and_then(|x| x.as_str()).unwrap_or(panel);
+        let border = v.get("border").and_then(|x| x.as_str()).unwrap_or("#2c303a");
+        let text = v.get("text").and_then(|x| x.as_str()).unwrap_or("#e5e7eb");
+        let muted = v.get("muted").and_then(|x| x.as_str()).unwrap_or("#8b92a0");
+        let cyan = v.get("cyan").and_then(|x| x.as_str()).unwrap_or(accent);
+        let name = v.get("name").and_then(|x| x.as_str()).unwrap_or(stem);
+        let mode = v.get("mode").and_then(|x| x.as_str()).unwrap_or(if is_light_hex(bg) { "light" } else { "dark" });
+        let mut obj = json!({
+            "id": format!("custom:{stem}"), "name": name, "source": "custom", "mode": mode,
+            "bg": bg, "panel": panel, "card": card, "border": border,
+            "text": text, "muted": muted, "accent": accent, "cyan": cyan
+        });
+        if let Some(ab) = v.get("active_bg").and_then(|x| x.as_str()) {
+            obj["active_bg"] = Value::String(ab.to_string());
+        }
+        if let Some(abo) = v.get("active_border").and_then(|x| x.as_str()) {
+            obj["active_border"] = Value::String(abo.to_string());
+        }
+        out.push(obj);
+    }
+    out
+}
+
+fn dirty_project_set(root: &Path) -> std::collections::HashSet<String> {
+    let mut set = std::collections::HashSet::new();
+    if let Ok(out) = std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["--no-optional-locks", "status", "--porcelain", "-uall", "--", "projects/"])
+        .output()
+    {
+        for line in String::from_utf8_lossy(&out.stdout).lines() {
+            if line.len() < 4 {
+                continue;
+            }
+            let p = line[3..].trim().trim_matches('"');
+            let p = p.rsplit(" -> ").next().unwrap_or(p);
+            if let Some(rest) = p.strip_prefix("projects/") {
+                if let Some(proj) = rest.split('/').next() {
+                    set.insert(proj.to_string());
+                }
+            }
+        }
+    }
+    set
+}
+
+fn count_workspace_files(dir: &Path) -> usize {
+    let mut count = 0;
+    if let Ok(rd) = fs::read_dir(dir) {
+        for ent in rd.flatten() {
+            let name = ent.file_name();
+            let s = name.to_string_lossy();
+            if s.starts_with('.') {
+                continue;
+            }
+            let p = ent.path();
+            if p.is_dir() {
+                count += count_workspace_files(&p).max(1);
+            } else {
+                count += 1;
+            }
+        }
+    }
+    count
+}
+
+fn clean_project_dir(proj_dir: &Path) -> Result<usize> {
+    let mut removed = 0;
+    if let Ok(rd) = fs::read_dir(proj_dir) {
+        for ent in rd.flatten() {
+            let name = ent.file_name();
+            let s = name.to_string_lossy();
+            if s == ".rs" || s == ".git" {
+                continue;
+            }
+            let p = ent.path();
+            let meta = fs::symlink_metadata(&p)?;
+            if meta.is_dir() && !meta.file_type().is_symlink() {
+                fs::remove_dir_all(&p)?;
+            } else {
+                fs::remove_file(&p)?;
+            }
+            removed += 1;
+        }
+    }
+    Ok(removed)
+}
+
+fn build_user_chat_message(text: &str, images: &[String]) -> ChatMessage {
+    if images.is_empty() {
+        return ChatMessage::user(text);
+    }
+    let mut parts = Vec::with_capacity(images.len() + 1);
+    if !text.is_empty() {
+        parts.push(json!({ "type": "text", "text": text }));
+    }
+    for url in images {
+        parts.push(json!({ "type": "image_url", "image_url": { "url": url } }));
+    }
+    ChatMessage {
+        role: "user".into(),
+        content: Value::Array(parts),
+        reasoning_content: None,
+        tool_calls: None,
+        tool_call_id: None,
+    }
+}
+
+async fn write_http_json(stream: &mut TcpStream, status: u16, body: &Value) -> Result<()> {
+    let txt = serde_json::to_string(body)?;
+    let hdr = format!(
+        "HTTP/1.1 {status} OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        txt.len()
+    );
+    stream.write_all(hdr.as_bytes()).await?;
+    stream.write_all(txt.as_bytes()).await?;
+    Ok(())
+}
+
+async fn write_http_err(stream: &mut TcpStream, status: u16, msg: &str) -> Result<()> {
+    let hdr = format!(
+        "HTTP/1.1 {status} Error\r\nContent-Type: text/plain\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+        msg.len()
+    );
+    stream.write_all(hdr.as_bytes()).await?;
+    stream.write_all(msg.as_bytes()).await?;
+    Ok(())
+}
+
+async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()> {
+    let mut buf = Vec::with_capacity(4096);
+    let mut tmp = [0u8; 2048];
+    let hdr_end;
+
+    loop {
+        let n = stream.read(&mut tmp).await?;
+        if n == 0 {
+            return Ok(());
+        }
+        buf.extend_from_slice(&tmp[..n]);
+        if let Some(pos) = buf.windows(4).position(|w| w == b"\r\n\r\n") {
+            hdr_end = pos + 4;
+            break;
+        }
+        if buf.len() > 65536 {
+            return Ok(());
+        }
+    }
+
+    let hdr_str = String::from_utf8_lossy(&buf[..hdr_end]);
+    let mut lines = hdr_str.lines();
+    let req_line = lines.next().unwrap_or("");
+    let mut parts = req_line.split_whitespace();
+    let method = parts.next().unwrap_or("");
+    let raw_target = parts.next().unwrap_or("/");
+    let (path, query) = raw_target.split_once('?').unwrap_or((raw_target, ""));
+
+    let mut content_len = 0usize;
+    let mut host_ok = true;
+    let mut origin_ok = true;
+    let mut fetch_site_ok = true;
+    let mut is_json_ct = false;
+    for l in lines {
+        let low = l.to_ascii_lowercase();
+        if let Some(v) = low.strip_prefix("content-length:") {
+            content_len = v.trim().parse().unwrap_or(0);
+        } else if let Some(v) = low.strip_prefix("host:") {
+            let h = v.trim();
+            host_ok = h.starts_with("127.0.0.1") || h.starts_with("localhost") || h.starts_with("[::1]");
+        } else if let Some(v) = low.strip_prefix("origin:") {
+            let o = v.trim();
+            origin_ok = o.starts_with("http://127.0.0.1:")
+                || o.starts_with("http://localhost:")
+                || o == "http://127.0.0.1"
+                || o == "http://localhost";
+        } else if let Some(v) = low.strip_prefix("sec-fetch-site:") {
+            let s = v.trim();
+            fetch_site_ok = s == "same-origin" || s == "none";
+        } else if let Some(v) = low.strip_prefix("content-type:") {
+            is_json_ct = v.trim().starts_with("application/json");
+        }
+    }
+    if !host_ok || !origin_ok || !fetch_site_ok {
+        return write_http_err(&mut stream, 403, "Forbidden origin/host").await;
+    }
+    if content_len > 16 * 1024 * 1024 {
+        return write_http_err(&mut stream, 413, "Payload too large").await;
+    }
+
+    let mut body = buf[hdr_end..].to_vec();
+    while body.len() < content_len {
+        let need = (content_len - body.len()).min(tmp.len());
+        let n = stream.read(&mut tmp[..need]).await?;
+        if n == 0 {
+            break;
+        }
+        body.extend_from_slice(&tmp[..n]);
+    }
+
+    if method == "GET" && path == "/" {
+        let hdr = format!(
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+            UI_HTML.len()
+        );
+        stream.write_all(hdr.as_bytes()).await?;
+        stream.write_all(UI_HTML.as_bytes()).await?;
+        return Ok(());
+    }
+
+    if method == "GET" && path == "/api/health" {
+        return write_http_json(&mut stream, 200, &json!({ "status": "ok" })).await;
+    }
+
+    if method == "GET" && path == "/api/state" {
+        if let Some(sel) = query.split('&').find_map(|p| p.strip_prefix("project=")).filter(|s| !s.is_empty()) {
+            let clean = sel.replace("%20", " ");
+            if is_valid_slug(&clean) && app.root.join("projects").join(&clean).is_dir() {
+                *app.active_project.lock().await = clean;
+            }
+        }
+
+        let active_name = app.active_project.lock().await.clone();
+        let dirty_set = dirty_project_set(&app.root);
+        let mut proj_entries = Vec::new();
+        if let Ok(rd) = fs::read_dir(app.root.join("projects")) {
+            for ent in rd.flatten() {
+                let p = ent.path();
+                if !p.is_dir() {
+                    continue;
+                }
+                let Some(name) = p.file_name().and_then(|n| n.to_str()).map(ToString::to_string) else {
+                    continue;
+                };
+                if name.starts_with('.') {
+                    continue;
+                }
+                let cfg = WorkspaceConfig::load_or_default(&p);
+                let prof = if name == "chat" { "chat".into() } else { cfg.profile_name };
+                let dirty = if p.join(".git").exists() {
+                    git_status_brief(&p).1
+                } else {
+                    dirty_set.contains(&name)
+                };
+                let file_count = count_workspace_files(&p);
+                proj_entries.push(json!({
+                    "name": name,
+                    "profile_name": prof,
+                    "dirty": dirty,
+                    "file_count": file_count
+                }));
+            }
+        }
+        proj_entries.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+
+        let sess_val = {
+            let mut lock = app.sessions.lock().await;
+            let sess = lock.entry(active_name.clone()).or_insert_with(|| app.load_or_init_session(&active_name));
+            set_profile_max_tokens(sess.ctx_override);
+            let (git, _) = git_status_brief(&sess.workspace);
+            let task_md = tools::read_task_spec(&sess.workspace);
+            let r_str = match &sess.reasoning {
+                Some(ReasoningSetting::Tokens(n)) => n.to_string(),
+                Some(ReasoningSetting::Tier(t)) => t.clone(),
+                None => String::new(),
+            };
+            json!({
+                "name": sess.project_name,
+                "path": sess.workspace.display().to_string(),
+                "profile_name": sess.profile_name,
+                "is_agent": sess.is_agent,
+                "hud_summary": sess.hud_summary,
+                "git": git,
+                "task_md": task_md,
+                "reasoning": r_str,
+                "active_skills": sess.active_skills,
+                "history": sess.ui_history,
+                "last_stats": sess.last_stats.as_ref().map(|s| json!({
+                    "prompt_tokens": s.prompt_tokens,
+                    "completion_tokens": s.completion_tokens,
+                    "reasoning_tokens": s.reasoning_tokens,
+                    "cached_tokens": s.cached_tokens
+                }))
+            })
+        };
+
+        let provider = ProviderConfig::load().await;
+        let (slots, env_tok, _env_rnd) = read_env_slots(&get_env_path());
+        let mcp_map = mcp::load_servers_config();
+        let mut mcp_list: Vec<Value> = mcp_map
+            .into_iter()
+            .map(|(name, cfg)| json!({ "name": name, "command": cfg.command, "args": cfg.args }))
+            .collect();
+        mcp_list.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+
+        return write_http_json(
+            &mut stream,
+            200,
+            &json!({
+                "projects": proj_entries,
+                "active_project": sess_val,
+                "profiles": Profile::list_available(),
+                "skills": Skill::list_available(),
+                "providers": slots,
+                "provider": {
+                    "model": provider.model,
+                    "endpoint": format_endpoint(&provider.base_url),
+                    "is_local": is_local_endpoint(&provider.base_url),
+                    "max_tokens": get_max_tokens(),
+                    "env_max_tokens": env_tok,
+                    "max_rounds": get_max_rounds()
+                },
+                "themes": load_themes(&app.root.join("plugins/rs-rail/themes")),
+                "mcp_servers": mcp_list,
+                "ui_prefs": {
+                    "pad": state::get_pad(),
+                    "show_thinking": state::get_show_thinking_summaries()
+                }
+            }),
+        )
+        .await;
+    }
+
+    if method == "POST" && !body.is_empty() && !is_json_ct {
+        return write_http_err(&mut stream, 415, "Content-Type must be application/json").await;
+    }
+    let payload: Value = serde_json::from_slice(&body).unwrap_or_else(|_| json!({}));
+
+    if method == "POST" && path == "/api/authorize" {
+        let req_id = payload.get("req_id").and_then(|v| v.as_u64()).unwrap_or(0);
+        let allow = payload.get("allow").and_then(|v| v.as_bool()).unwrap_or(false);
+        if let Some(tx) = app.pending_perms.lock().await.remove(&req_id) {
+            let _ = tx.send(allow);
+        }
+        return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
+    }
+
+    if method == "POST" && path == "/api/stop" {
+        let active = app.active_project.lock().await.clone();
+        if let Some(sess) = app.sessions.lock().await.get(&active) {
+            sess.cancel_flag.store(true, Ordering::SeqCst);
+        }
+        return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
+    }
+
+    if method == "POST" && path == "/api/reset" {
+        let active = app.active_project.lock().await.clone();
+        let mut lock = app.sessions.lock().await;
+        let next_gen = lock
+            .get(&active)
+            .map(|s| {
+                s.cancel_flag.store(true, Ordering::SeqCst);
+                s.generation + 1
+            })
+            .unwrap_or(1);
+        let mut fresh = app.load_or_init_session(&active);
+        fresh.generation = next_gen;
+        lock.insert(active, fresh);
+        return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
+    }
+
+    if method == "POST" && path == "/api/project/create" {
+        let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_ascii_lowercase();
+        let prof_name = payload.get("profile").and_then(|v| v.as_str()).unwrap_or("lfm3").trim();
+        if !is_valid_slug(&name) {
+            return write_http_err(&mut stream, 400, "Invalid project slug").await;
+        }
+        let proj_dir = app.root.join("projects").join(&name);
+        let prof = Profile::load(prof_name).unwrap_or_else(|| Profile::parse("ROLE: Assistant."));
+        let cfg = WorkspaceConfig {
+            profile_name: prof_name.to_string(),
+            is_agent: true,
+            tier: prof.tier,
+            adapters: prof.adapters,
+            delegate: prof.delegate,
+        };
+        cfg.save(&proj_dir)?;
+        *app.active_project.lock().await = name.clone();
+        return write_http_json(&mut stream, 200, &json!({ "name": name })).await;
+    }
+
+    if method == "POST" && path == "/api/project/clean" {
+        let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("").trim();
+        if !is_valid_slug(name) {
+            return write_http_err(&mut stream, 400, "Invalid project slug").await;
+        }
+        let projects_root = app.root.join("projects").canonicalize()?;
+        let proj_dir = projects_root.join(name);
+        if !proj_dir.is_dir() || !proj_dir.canonicalize().is_ok_and(|c| c.starts_with(&projects_root)) {
+            return write_http_err(&mut stream, 404, "Project not found").await;
+        }
+        let removed = clean_project_dir(&proj_dir)?;
+        return write_http_json(&mut stream, 200, &json!({ "ok": true, "removed": removed })).await;
+    }
+
+    if method == "POST" && path == "/api/settings/provider" {
+        let toggle = payload.get("toggle_slot").and_then(|v| v.as_str());
+        let max_tok = payload.get("max_tokens").and_then(|v| v.as_u64()).map(|n| n as usize);
+        let max_rnd = payload.get("max_rounds").and_then(|v| v.as_u64()).map(|n| n as usize);
+        update_env_file(&get_env_path(), toggle, max_tok, max_rnd)?;
+        return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
+    }
+
+    if method == "POST" && path == "/api/settings/profile" {
+        let active = app.active_project.lock().await.clone();
+        let mut lock = app.sessions.lock().await;
+        let sess = lock.entry(active.clone()).or_insert_with(|| app.load_or_init_session(&active));
+
+        if let Some(new_prof) = payload.get("profile_name").and_then(|v| v.as_str()) {
+            if sess.is_agent {
+                if let Some(loaded) = Profile::load(new_prof) {
+                    sess.profile_name = new_prof.to_string();
+                    sess.tier = loaded.tier.clone();
+                    sess.adapters = loaded.adapters;
+                    sess.delegate = loaded.delegate;
+                    sess.mcp_servers = loaded.mcp_servers.clone();
+                    sess.mcp_tools = loaded.mcp_tools.clone();
+                    sess.ctx_override = loaded.ctx;
+                    sess.reasoning = loaded.reasoning_budget.clone();
+                    sess.hud_summary = loaded.hud_summary(true);
+                    set_profile_max_tokens(loaded.ctx);
+                    let cfg = WorkspaceConfig {
+                        profile_name: sess.profile_name.clone(),
+                        is_agent: true,
+                        tier: sess.tier.clone(),
+                        adapters: sess.adapters,
+                        delegate: sess.delegate,
+                    };
+                    let _ = cfg.save(&sess.workspace);
+                    let sys = build_system_prompt(&loaded, &sess.workspace, true, &sess.active_skills);
+                    if let Some(first) = sess.llm_history.first_mut() {
+                        first.content = Value::String(sys);
+                    }
+                }
+            }
+        }
+
+        if let Some(sk) = payload.get("skill_toggle").and_then(|v| v.as_str()) {
+            if let Some(pos) = sess.active_skills.iter().position(|x| x == sk) {
+                sess.active_skills.remove(pos);
+            } else if sess.active_skills.len() < 3 && Skill::load(sk).is_some() {
+                sess.active_skills.push(sk.to_string());
+            }
+            if let Some(loaded) = Profile::load(&sess.profile_name) {
+                let sys = build_system_prompt(&loaded, &sess.workspace, sess.is_agent, &sess.active_skills);
+                if let Some(first) = sess.llm_history.first_mut() {
+                    first.content = Value::String(sys);
+                }
+            }
+        }
+
+        if let Some(r_raw) = payload.get("reasoning").and_then(|v| v.as_str()) {
+            sess.reasoning = if r_raw.is_empty() { None } else { ReasoningSetting::parse(r_raw) };
+        }
+        return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
+    }
+
+    if method == "POST" && path == "/api/settings/ui" {
+        if let Some(show) = payload.get("show_thinking").and_then(|v| v.as_bool()) {
+            state::set_show_thinking_summaries(Some(show));
+        }
+        return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
+    }
+
+    if method == "POST" && path == "/api/settings/mcp" {
+        if let Some(srv) = payload.get("inspect").and_then(|v| v.as_str()) {
+            match mcp::get_server_tools_schema(srv).await {
+                Ok(tools) => return write_http_json(&mut stream, 200, &json!({ "tools": tools })).await,
+                Err(e) => return write_http_err(&mut stream, 500, &e).await,
+            }
+        }
+        if let Some(add_obj) = payload.get("add") {
+            let name = add_obj.get("name").and_then(|v| v.as_str()).unwrap_or("").trim();
+            let command = add_obj.get("command").and_then(|v| v.as_str()).unwrap_or("").trim();
+            let args: Vec<String> = add_obj
+                .get("args")
+                .and_then(|v| v.as_array())
+                .map(|a| a.iter().filter_map(|x| x.as_str().map(ToString::to_string)).collect())
+                .unwrap_or_default();
+            if name.is_empty() || command.is_empty() {
+                return write_http_err(&mut stream, 400, "Missing server name or command").await;
+            }
+            let mcp_path = app.root.join("plugins/mcp/servers.json");
+            let mut servers = mcp::load_servers_config();
+            servers.insert(name.to_string(), McpServerConfig { command: command.into(), args, env: HashMap::new() });
+            let file_val = json!({ "servers": servers });
+            if let Some(parent) = mcp_path.parent() {
+                let _ = fs::create_dir_all(parent);
+            }
+            let tmp = mcp_path.with_extension("json.tmp");
+            fs::write(&tmp, serde_json::to_string_pretty(&file_val)?)?;
+            fs::rename(&tmp, &mcp_path)?;
+            return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
+        }
+        return write_http_err(&mut stream, 400, "Unknown MCP request").await;
+    }
+
+    if method == "POST" && path == "/api/chat" {
+        let raw_msg = payload.get("message").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+        let images: Vec<String> = payload
+            .get("images")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|x| x.as_str())
+                    .filter(|s| s.starts_with("data:image/"))
+                    .take(4)
+                    .map(ToString::to_string)
+                    .collect()
+            })
+            .unwrap_or_default();
+        if raw_msg.is_empty() && images.is_empty() {
+            return write_http_err(&mut stream, 400, "Empty message").await;
+        }
+
+        let head = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream; charset=utf-8\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n";
+        stream.write_all(head.as_bytes()).await?;
+
+        let (tx, mut rx) = mpsc::unbounded_channel::<String>();
+        let emit = move |ev: &str, data: Value| -> String { format!("event: {ev}\ndata: {data}\n\n") };
+        let active = app.active_project.lock().await.clone();
+        let req_cancel = {
+            let mut lock = app.sessions.lock().await;
+            let sess = lock.entry(active.clone()).or_insert_with(|| app.load_or_init_session(&active));
+            sess.cancel_flag.store(false, Ordering::SeqCst);
+            sess.cancel_flag.clone()
+        };
+
+        let app_clone = Arc::clone(&app);
+        tokio::spawn(async move {
+            let (
+                workspace,
+                is_agent,
+                adapters,
+                delegate,
+                tier,
+                mcp_servers,
+                mcp_tools,
+                ctx_override,
+                reasoning,
+                mut history,
+                cancel_flag,
+                start_gen,
+            ) = {
+                let mut lock = app_clone.sessions.lock().await;
+                let sess = lock.entry(active.clone()).or_insert_with(|| app_clone.load_or_init_session(&active));
+                sess.ui_history.push(UiTurnItem {
+                    role: "user".into(),
+                    images: if images.is_empty() { None } else { Some(images.clone()) },
+                    content: if raw_msg.is_empty() { None } else { Some(raw_msg.clone()) },
+                    reasoning: None,
+                    name: None,
+                    brief: None,
+                    ok: None,
+                    summary: None,
+                    elapsed_s: None,
+                    diff: None,
+                    raw: None,
+                });
+                (
+                    sess.workspace.clone(),
+                    sess.is_agent,
+                    sess.adapters,
+                    sess.delegate,
+                    sess.tier.clone(),
+                    sess.mcp_servers.clone(),
+                    sess.mcp_tools.clone(),
+                    sess.ctx_override,
+                    sess.reasoning.clone(),
+                    sess.llm_history.clone(),
+                    sess.cancel_flag.clone(),
+                    sess.generation,
+                )
+            };
+
+            set_profile_max_tokens(ctx_override);
+            let is_task = raw_msg == "/task" || raw_msg.starts_with("/task ");
+            let effective_prompt = if is_task {
+                let arg = raw_msg.strip_prefix("/task").unwrap_or("").trim();
+                if !arg.is_empty() {
+                    arg.to_string()
+                } else if let Some(spec) = tools::read_task_spec(&workspace) {
+                    spec
+                } else {
+                    let _ = tx.send(emit("error", json!({ "message": "No goal given and no TASK.md found." })));
+                    let _ = tx.send(emit("done", json!({})));
+                    return;
+                }
+            } else {
+                raw_msg
+            };
+
+            let provider = ProviderConfig::load().await;
+            if !images.is_empty() && is_local_endpoint(&provider.base_url) {
+                let _ = tx.send(emit("error", json!({ "message": "Switch to a cloud model to send images." })));
+                let _ = tx.send(emit("done", json!({})));
+                return;
+            }
+            history.push(build_user_chat_message(&effective_prompt, &images));
+            let client = LlmClient::new(provider);
+            let boundary = SecurityBoundary::new_headless(&workspace);
+            let active_tools = if is_agent {
+                Some(tools::get_tools_schema_with_mcp(&tier, delegate, &mcp_servers, &mcp_tools).await)
+            } else {
+                None
+            };
+            let max_rounds = if is_agent { get_max_rounds() } else { 1 };
+
+            let mut new_ui_items = Vec::new();
+            let mut last_stats = None;
+
+            for _round in 0..max_rounds {
+                if cancel_flag.load(Ordering::SeqCst) {
+                    break;
+                }
+                let tx_chunk = tx.clone();
+                let res = client
+                    .stream_chat_raw_with_reasoning(
+                        &history,
+                        active_tools.clone(),
+                        Some(cancel_flag.clone()),
+                        Some(reasoning.clone()),
+                        move |slice, is_t| {
+                            let ev = if is_t { "thinking" } else { "chunk" };
+                            let _ = tx_chunk.send(format!("event: {ev}\ndata: {}\n\n", json!({ "text": slice })));
+                        },
+                    )
+                    .await;
+
+                let (reply, opt_reasoning, tool_calls, stats) = match res {
+                    Ok(v) => v,
+                    Err(e) => {
+                        let _ = tx.send(emit("error", json!({ "message": e.to_string() })));
+                        break;
+                    }
+                };
+                last_stats = Some(stats);
+
+                if !reply.is_empty() || opt_reasoning.is_some() {
+                    new_ui_items.push(UiTurnItem {
+                        role: "assistant".into(),
+                        images: None,
+                        content: if reply.is_empty() { None } else { Some(reply.clone()) },
+                        reasoning: opt_reasoning.clone(),
+                        name: None,
+                        brief: None,
+                        ok: None,
+                        summary: None,
+                        elapsed_s: None,
+                        diff: None,
+                        raw: None,
+                    });
+                }
+
+                let Some(calls) = tool_calls.filter(|c| !c.is_empty() && is_agent) else {
+                    history.push(ChatMessage::assistant_with_reasoning(reply.clone(), opt_reasoning));
+                    if cancel_flag.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    if is_task && !tools::is_task_complete(&reply) {
+                        history.push(ChatMessage::user("Continue with the next action."));
+                        continue;
+                    }
+                    break;
+                };
+
+                let mut assistant_msg = ChatMessage::assistant_with_reasoning(reply, opt_reasoning);
+                assistant_msg.tool_calls = Some(Value::Array(calls.clone()));
+                history.push(assistant_msg);
+
+                let mut idx = 0;
+                while idx < calls.len() {
+                    if cancel_flag.load(Ordering::SeqCst) {
+                        for rem in &calls[idx..] {
+                            history.push(ChatMessage::tool_response(
+                                rem["id"].as_str().unwrap_or("call_0").into(),
+                                "[Cancelled]".into(),
+                            ));
+                        }
+                        break;
+                    }
+
+                    let fn_name = calls[idx]["function"]["name"].as_str().unwrap_or("tool");
+                    if tools::is_read_only_tool(fn_name) {
+                        let mut batch_end = idx + 1;
+                        while batch_end < calls.len()
+                            && tools::is_read_only_tool(calls[batch_end]["function"]["name"].as_str().unwrap_or("tool"))
+                        {
+                            batch_end += 1;
+                        }
+                        let mut futs = Vec::new();
+                        for c in &calls[idx..batch_end] {
+                            let c_id = c["id"].as_str().unwrap_or("call_0").to_string();
+                            let c_name = c["function"]["name"].as_str().unwrap_or("tool").to_string();
+                            let raw_a = c["function"]["arguments"].as_str().unwrap_or("{}");
+                            let args = if adapters { adapter::repair_tool_args(&c_name, raw_a) } else { raw_a.into() };
+                            let brief = serde_json::from_str::<Value>(&args)
+                                .ok()
+                                .and_then(|v| {
+                                    v.get("path")
+                                        .or_else(|| v.get("pattern"))
+                                        .and_then(|x| x.as_str())
+                                        .map(ToString::to_string)
+                                })
+                                .unwrap_or_default();
+                            let ws = workspace.clone();
+                            let bnd = SecurityBoundary::new_headless(&ws);
+                            futs.push(async move {
+                                let t0 = Instant::now();
+                                let out = tools::execute_tool_with_auth(&c_name, &args, &ws, &bnd, false).await;
+                                (c_id, c_name, brief, out, t0.elapsed().as_secs_f64())
+                            });
+                        }
+                        for (c_id, c_name, brief, res, elapsed) in futures_util::future::join_all(futs).await {
+                            let (ok, summary, raw_txt, resp_txt) = match res {
+                                Ok(o) => {
+                                    let sum = format!("{} line(s)", o.lines().count());
+                                    (true, sum, Some(o.clone()), o)
+                                }
+                                Err(e) => (false, e.clone(), None, format!("[tool error] {e}")),
+                            };
+                            let item = UiTurnItem {
+                                role: "tool_card".into(),
+                                images: None,
+                                content: None,
+                                reasoning: None,
+                                name: Some(c_name),
+                                brief: Some(brief),
+                                ok: Some(ok),
+                                summary: Some(summary),
+                                elapsed_s: Some(elapsed),
+                                diff: None,
+                                raw: raw_txt,
+                            };
+                            let _ = tx.send(emit("tool_result", serde_json::to_value(&item).unwrap_or(json!({}))));
+                            new_ui_items.push(item);
+                            history.push(ChatMessage::tool_response(c_id, resp_txt));
+                        }
+                        idx = batch_end;
+                        continue;
+                    }
+
+                    let call = &calls[idx];
+                    let call_id = call["id"].as_str().unwrap_or("call_0").to_string();
+                    let raw_args = call["function"]["arguments"].as_str().unwrap_or("{}");
+                    let final_args = if adapters { adapter::repair_tool_args(fn_name, raw_args) } else { raw_args.into() };
+                    let parsed_args: Value = serde_json::from_str(&final_args).unwrap_or_else(|_| json!({}));
+                    let brief = parsed_args
+                        .get("path")
+                        .or_else(|| parsed_args.get("command"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+
+                    // Security Gate pause when SecurityBoundary flags a mutating/system command
+                    let mut preauthorized = false;
+                    if fn_name == "run_command" {
+                        if let Some(cmd_str) = parsed_args.get("command").and_then(|v| v.as_str()) {
+                            if let Some(reason) = boundary.check_command(cmd_str) {
+                                let req_id = app_clone.next_perm_id.fetch_add(1, Ordering::SeqCst);
+                                let (ptx, prx) = oneshot::channel();
+                                app_clone.pending_perms.lock().await.insert(req_id, ptx);
+                                let _ = tx.send(emit(
+                                    "permission",
+                                    json!({ "req_id": req_id, "tool": fn_name, "title": reason, "detail": cmd_str }),
+                                ));
+                                let approved = tokio::select! {
+                                    _ = async {
+                                        while !cancel_flag.load(Ordering::Relaxed) {
+                                            tokio::time::sleep(std::time::Duration::from_millis(80)).await;
+                                        }
+                                    } => false,
+                                    r = prx => r.unwrap_or(false),
+                                };
+                                app_clone.pending_perms.lock().await.remove(&req_id);
+                                if !approved {
+                                    let msg = format!("Denied by user ({reason})");
+                                    let item = UiTurnItem {
+                                        role: "tool_card".into(),
+                                        images: None,
+                                        content: None,
+                                        reasoning: None,
+                                        name: Some(fn_name.into()),
+                                        brief: Some(brief),
+                                        ok: Some(false),
+                                        summary: Some(msg.clone()),
+                                        elapsed_s: Some(0.0),
+                                        diff: None,
+                                        raw: None,
+                                    };
+                                    let _ = tx.send(emit("tool_result", serde_json::to_value(&item).unwrap_or(json!({}))));
+                                    new_ui_items.push(item);
+                                    history.push(ChatMessage::tool_response(call_id, format!("[denied] {msg}")));
+                                    idx += 1;
+                                    continue;
+                                }
+                                preauthorized = true;
+                            }
+                        }
+                    }
+
+                    let pre_txt = if (fn_name == "edit_file" || fn_name == "write_file") && !brief.is_empty() {
+                        let p = boundary.resolve_path(&brief);
+                        if !boundary.is_outside(&p) { fs::read_to_string(&p).ok() } else { None }
+                    } else {
+                        None
+                    };
+
+                    let t0 = Instant::now();
+                    let res = tools::execute_tool_with_auth(fn_name, &final_args, &workspace, &boundary, preauthorized).await;
+                    let elapsed = t0.elapsed().as_secs_f64();
+
+                    let (ok, summary, diff, raw_txt, resp_txt) = match res {
+                        Ok(o) => {
+                            if fn_name == "edit_file" || fn_name == "write_file" {
+                                let p = boundary.resolve_path(&brief);
+                                let new_txt = if !boundary.is_outside(&p) { fs::read_to_string(&p).ok() } else { None };
+                                if let Some(nt) = new_txt {
+                                    let d = compute_diff(pre_txt.as_deref().unwrap_or(""), &nt);
+                                    let sum = format!("Updated {} (+{} -{})", brief, d.adds, d.rems);
+                                    (true, sum, Some(d), None, o)
+                                } else {
+                                    (true, format!("Updated {brief}"), None, None, o)
+                                }
+                            } else {
+                                let first = o.lines().next().unwrap_or("(no output)").trim().to_string();
+                                (true, first, None, Some(o.clone()), o)
+                            }
+                        }
+                        Err(e) => (false, e.clone(), None, None, format!("[tool error] {e}")),
+                    };
+
+                    let item = UiTurnItem {
+                        role: "tool_card".into(),
+                        images: None,
+                        content: None,
+                        reasoning: None,
+                        name: Some(fn_name.into()),
+                        brief: Some(brief),
+                        ok: Some(ok),
+                        summary: Some(summary),
+                        elapsed_s: Some(elapsed),
+                        diff,
+                        raw: raw_txt,
+                    };
+                    let _ = tx.send(emit("tool_result", serde_json::to_value(&item).unwrap_or(json!({}))));
+                    new_ui_items.push(item);
+                    history.push(ChatMessage::tool_response(call_id, resp_txt));
+                    idx += 1;
+                }
+            }
+
+            {
+                let mut lock = app_clone.sessions.lock().await;
+                if let Some(sess) = lock.get_mut(&active) {
+                    if sess.generation == start_gen {
+                        sess.llm_history = history;
+                        sess.ui_history.extend(new_ui_items);
+                        if last_stats.is_some() {
+                            sess.last_stats = last_stats;
+                        }
+                    }
+                }
+            }
+            let _ = tx.send(emit("done", json!({})));
+        });
+
+        while let Some(chunk) = rx.recv().await {
+            if stream.write_all(chunk.as_bytes()).await.is_err() {
+                req_cancel.store(true, Ordering::SeqCst);
+                break;
+            }
+            let _ = stream.flush().await;
+        }
+        let _ = stream.shutdown().await;
+        return Ok(());
+    }
+
+    write_http_err(&mut stream, 404, "Not found").await
+}
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let port = std::env::var("RS_RAIL_PORT").unwrap_or_else(|_| "24243".into());
+    let addr = format!("127.0.0.1:{port}");
+    let listener = TcpListener::bind(&addr).await?;
+    println!("● rs-rail listening on http://{addr}");
+
+    let app = Arc::new(AppRuntime::new());
+    loop {
+        let (socket, _) = match listener.accept().await {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+        let app_ref = Arc::clone(&app);
+        tokio::spawn(async move {
+            let _ = handle_client(socket, app_ref).await;
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_slug_rejects_traversal() {
+        assert!(is_valid_slug("nemo"));
+        assert!(is_valid_slug("qwen38-c"));
+        assert!(!is_valid_slug(""));
+        assert!(!is_valid_slug(".."));
+        assert!(!is_valid_slug("../etc"));
+        assert!(!is_valid_slug("a/b"));
+    }
+
+    #[test]
+    fn test_compute_diff_counts_and_lines() {
+        let d = compute_diff("a\nb\nc\n", "a\nx\ny\nc\n");
+        assert_eq!(d.adds, 2);
+        assert_eq!(d.rems, 1);
+    }
+
+    #[test]
+    fn test_env_toggle_preserves_keys_and_updates_governors() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_env_{}.env", std::process::id()));
+        fs::write(
+            &tmp,
+            "#GEMINI_API_KEY=\"AIzaTest123\"\nOPENROUTER_API_KEY=\"sk-or-test\"\nAI_MAX_TOKENS=\"8192\"\nAI_MAX_AGENT_ROUNDS=\"10\"\n",
+        )
+        .unwrap();
+
+        update_env_file(&tmp, Some("GEMINI"), Some(65536), Some(20)).unwrap();
+        let (slots, tok, rnd) = read_env_slots(&tmp);
+        let _ = fs::remove_file(&tmp);
+
+        assert!(slots.iter().find(|s| s.id == "GEMINI").unwrap().is_active);
+        assert!(!slots.iter().find(|s| s.id == "OPENROUTER").unwrap().is_active);
+        assert_eq!(tok, 65536);
+        assert_eq!(rnd, 20);
+    }
+
+    #[test]
+    fn test_is_env_key_prevents_prefix_collision_and_filters_placeholders() {
+        assert!(is_env_key("GEMINI_API_KEY=abc", "GEMINI_API_KEY"));
+        assert!(!is_env_key("GEMINI_API_KEY_ALT=abc", "GEMINI_API_KEY"));
+        assert!(!is_valid_slot_val("your-key-here"));
+        assert!(is_valid_slot_val("sk-real-key"));
+    }
+
+    #[test]
+    fn test_load_themes_parses_omarchy_noctalia_and_custom_folder() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_themes_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("themes")).unwrap();
+        fs::write(tmp.join("themes/claude.json"), r##"{"name":"Claude","bg":"#141413","accent":"#d97757"}"##).unwrap();
+        fs::write(tmp.join("colors.toml"), "background = \"#0a1220\"\naccent = \"#78dce8\" # hex comment\n").unwrap();
+        fs::write(tmp.join("colors.json"), r##"{"mSurface":"#f8fafc","mOnSurface":"#0f172a","mPrimary":"#2563eb"}"##).unwrap();
+
+        let om = parse_omarchy_toml(&tmp).unwrap();
+        assert_eq!(om["accent"], "#78dce8");
+        assert_eq!(om["mode"], "dark");
+
+        let noc = parse_noctalia_json(&tmp.join("colors.json")).unwrap();
+        assert_eq!(noc["mode"], "light");
+        assert_eq!(noc["accent"], "#2563eb");
+
+        let custom = load_themes(&tmp.join("themes"));
+        assert!(custom.iter().any(|t| t["id"] == "custom:claude" && t["accent"] == "#d97757"));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_clean_project_dir_preserves_rs_and_removes_files() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_clean_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join(".rs")).unwrap();
+        fs::create_dir_all(tmp.join("sub")).unwrap();
+        fs::write(tmp.join(".rs/config.json"), "{}").unwrap();
+        fs::write(tmp.join("test_calc.py"), "print(1)").unwrap();
+        fs::write(tmp.join("sub/a.txt"), "hi").unwrap();
+
+        let removed = clean_project_dir(&tmp).unwrap();
+        assert_eq!(removed, 2);
+        assert!(tmp.join(".rs/config.json").is_file());
+        assert!(!tmp.join("test_calc.py").exists());
+        assert!(!tmp.join("sub").exists());
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_build_user_chat_message_supports_multimodal_images() {
+        let text_only = build_user_chat_message("hello", &[]);
+        assert_eq!(text_only.content, Value::String("hello".into()));
+
+        let mm = build_user_chat_message("look", &["data:image/png;base64,AAAA".into()]);
+        let arr = mm.content.as_array().unwrap();
+        assert_eq!(arr.len(), 2);
+        assert_eq!(arr[1]["image_url"]["url"], "data:image/png;base64,AAAA");
+    }
+}

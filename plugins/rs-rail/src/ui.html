@@ -1,0 +1,1138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>rs-rail</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+<style>
+  :root {
+    --bg: #0b0c0e;
+    --panel: #111317;
+    --card: #171a20;
+    --hover: #1e222a;
+    --border: #252932;
+    --nav-bg: #0e1014;
+    --code-bg: #0f1115;
+    --text: #e5e7eb;
+    --muted: #8b92a0;
+    --dim: #5c6370;
+    --accent: #22c55e;
+    --accent-fg: #05140a;
+    --accent-bg: rgba(34, 197, 94, 0.12);
+    --user-bg: #163022;
+    --user-border: #244f36;
+    --user-text: #ecfdf5;
+    --cyan: #38bdf8;
+    --warn: #f59e0b;
+    --red: #ef4444;
+    --err-text: #fca5a5;
+    --del-bg: rgba(239, 68, 68, 0.14);
+    --del-text: #fca5a5;
+    --add-bg: rgba(34, 197, 94, 0.14);
+    --add-text: #86efac;
+    --mono: "JetBrains Mono", "JetBrainsMono Nerd Font", "JetBrainsMono NF", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --sans: "JetBrains Mono", "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --code-size: 12px;
+    --ligatures: none;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; overflow: hidden; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button:disabled { opacity: 0.42; cursor: not-allowed; filter: none; }
+  .app { display: flex; flex-direction: column; height: 100vh; }
+
+  /* Topbar */
+  .topbar { height: 42px; min-height: 42px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; gap: 12px; }
+  .tb-left, .tb-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .brand { font-weight: 700; letter-spacing: .3px; display: flex; align-items: center; gap: 6px; color: var(--text); white-space: nowrap; }
+  .pill { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-size: 12px; color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .ctx-bar { width: 56px; height: 5px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .ctx-fill { display: block; height: 100%; background: var(--accent); width: 0%; transition: width .2s; }
+  .btn { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; color: var(--text); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .btn:hover { background: var(--hover); }
+  .btn-primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-danger { background: var(--del-bg); color: var(--err-text); border-color: rgba(239,68,68,.4); }
+  .btn-sm { padding: 2px 8px; font-size: 11px; }
+  .btn-icon { padding: 4px 6px; }
+
+  /* Main 3-pane body */
+  .main { flex: 1; display: flex; min-height: 0; }
+  .sidebar-left { width: 235px; min-width: 200px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  .sidebar-right { width: 270px; min-width: 220px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .sidebar-left.hidden, .sidebar-right.hidden { display: none; }
+  .sec-head { padding: 10px 12px 8px; font-size: 12px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .sidebar-right .sec-head { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--dim); border-bottom: none; padding-bottom: 6px; }
+  .proj-list { flex: 1; overflow-y: auto; padding: 6px 6px 12px; }
+  .proj-item { padding: 6px 8px; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; border: 1px solid transparent; }
+  .proj-item:hover { background: var(--hover); }
+  .proj-item.active { background: var(--active-bg, var(--user-bg)); border-color: var(--active-border, var(--user-border)); }
+  .proj-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+  .proj-badge { width: 20px; height: 20px; border-radius: 5px; background: var(--card); border: 1px solid var(--border); color: var(--muted); font-size: 10px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase; }
+  .proj-item.active .proj-badge { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+  .proj-name { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .proj-acts { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .proj-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); opacity: 0; transition: opacity .12s; }
+  .proj-dot.dirty { background: var(--accent); opacity: 0.9; }
+  .proj-item:hover .proj-dot { opacity: 0.75; }
+  .proj-item:hover .proj-dot.dirty { opacity: 1; }
+  .proj-del { background: transparent; border: none; padding: 2px; border-radius: 4px; color: var(--muted); cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 0; }
+  .proj-item:hover .proj-del { display: inline-flex; }
+  .proj-del:hover { color: var(--err-text); background: var(--del-bg); }
+  .proj-hover { position: fixed; z-index: 60; pointer-events: none; background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; min-width: 210px; max-width: 260px; box-shadow: 0 12px 30px rgba(0,0,0,.5); display: none; flex-direction: column; gap: 5px; font-size: 11.5px; }
+  .proj-hover.open { display: flex; }
+  .ph-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 600; color: var(--text); }
+  .ph-kbd { font-size: 10px; color: var(--dim); border: 1px solid var(--border); background: var(--card); border-radius: 4px; padding: 1px 5px; }
+  .ph-row { color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
+
+  /* Center Chat */
+  .center { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .stream { flex: 1; overflow-y: auto; padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .turn-wrap { max-width: 880px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+  .msg-user { align-self: flex-end; background: var(--user-bg); border: 1px solid var(--user-border); color: var(--user-text); padding: 8px 13px; border-radius: 10px; max-width: 78%; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+  .msg-assistant { display: flex; flex-direction: column; gap: 8px; }
+  .think-box { color: var(--dim); font-size: 12px; }
+  .think-box summary { cursor: pointer; user-select: none; color: var(--dim); font-style: italic; list-style: none; display: inline-flex; align-items: center; gap: 6px; padding: 2px 0; }
+  .think-box summary::-webkit-details-marker { display: none; }
+  .think-chev { transition: transform .15s; flex-shrink: 0; opacity: 0.55; }
+  .think-box summary:hover .think-chev { opacity: 1; }
+  .think-box[open] .think-chev { transform: rotate(90deg); }
+  .think-box summary:hover { color: var(--muted); }
+  .think-body { white-space: pre-wrap; margin: 2px 0 4px 0; padding-left: 18px; color: var(--muted); opacity: 0.78; font-style: italic; font-family: var(--mono); font-size: var(--code-size); line-height: 1.45; font-variant-ligatures: var(--ligatures); }
+  .ans-row { display: flex; align-items: flex-start; gap: 9px; line-height: 1.55; }
+  .bullet { color: var(--cyan); font-size: 12px; margin-top: 2px; flex-shrink: 0; }
+  .ans-body { flex: 1; min-width: 0; word-break: break-word; }
+  .ans-body p { margin: 0 0 8px; }
+  .ans-body p:last-child { margin-bottom: 0; }
+  .ans-body code { font-family: var(--mono); font-size: var(--code-size); background: var(--card); padding: 1px 5px; border-radius: 4px; border: 1px solid var(--border); font-variant-ligatures: var(--ligatures); }
+  .code-wrap { position: relative; margin: 8px 0; border: 1px solid var(--border); border-radius: 8px; background: var(--code-bg); overflow: hidden; }
+  .code-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 10px; background: var(--panel); border-bottom: 1px solid var(--border); font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .code-wrap pre { margin: 0; padding: 10px 12px; overflow-x: auto; font-family: var(--mono); font-size: var(--code-size); line-height: 1.45; font-variant-ligatures: var(--ligatures); }
+
+  /* Tool Cards */
+  .tool-card { border: 1px solid var(--border); background: var(--panel); border-radius: 8px; overflow: hidden; }
+  .tool-head { padding: 7px 11px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: var(--mono); font-size: 12px; cursor: pointer; }
+  .tool-title { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tool-brief { color: var(--muted); }
+  .tool-summary { color: var(--dim); font-size: 11.5px; padding: 0 11px 7px 26px; font-family: var(--mono); }
+  .tool-err { color: var(--err-text); }
+  .diff-box { border-top: 1px solid var(--border); background: var(--code-bg); font-family: var(--mono); font-size: var(--code-size); overflow-x: auto; padding: 4px 0; font-variant-ligatures: var(--ligatures); }
+  .diff-line { padding: 1px 10px; white-space: pre; display: flex; gap: 10px; }
+  .diff-line.del { background: var(--del-bg); color: var(--del-text); }
+  .diff-line.add { background: var(--add-bg); color: var(--add-text); }
+  .diff-line.ctx { color: var(--dim); }
+  .diff-num { width: 32px; text-align: right; color: var(--dim); user-select: none; flex-shrink: 0; }
+  .tool-raw { border-top: 1px solid var(--border); padding: 8px 11px; margin: 0; font-family: var(--mono); font-size: var(--code-size); color: var(--muted); white-space: pre-wrap; max-height: 240px; overflow-y: auto; display: none; font-variant-ligatures: var(--ligatures); }
+  .tool-card.open .tool-raw { display: block; }
+
+  /* Security Gate Card */
+  .gate-card { border: 1px solid rgba(245,158,11,.45); background: rgba(245,158,11,.08); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .gate-title { color: #fcd34d; font-weight: 600; font-size: 12px; }
+  .gate-cmd { font-family: var(--mono); font-size: 12px; background: var(--bg); padding: 6px 8px; border-radius: 5px; border: 1px solid var(--border); overflow-x: auto; }
+  .gate-actions { display: flex; gap: 8px; }
+
+  /* Composer */
+  .composer-wrap { padding: 10px 24px 14px; border-top: 1px solid var(--border); background: var(--bg); }
+  .composer { position: relative; max-width: 880px; margin: 0 auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+  .img-strip { display: none; gap: 6px; flex-wrap: wrap; }
+  .img-strip.open { display: flex; }
+  .img-thumb { position: relative; width: 44px; height: 44px; border-radius: 6px; border: 1px solid var(--border); overflow: hidden; background: var(--bg); }
+  .img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .img-rm { position: absolute; top: 2px; right: 2px; width: 14px; height: 14px; border-radius: 50%; border: none; background: rgba(0,0,0,.75); color: #fff; font-size: 9px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .msg-imgs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
+  .msg-img { max-width: 180px; max-height: 140px; border-radius: 6px; border: 1px solid var(--border); object-fit: cover; display: block; }
+  .composer textarea { width: 100%; background: transparent; border: none; outline: none; resize: none; min-height: 36px; max-height: 180px; line-height: 1.45; color: var(--text); }
+  .comp-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .comp-left, .comp-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .comp-select { background: var(--card); border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; font-size: 11.5px; color: var(--muted); }
+  .skill-chip { font-size: 11px; padding: 2px 7px; border-radius: 99px; border: 1px solid var(--cyan); color: var(--cyan); background: rgba(56,189,248,.12); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .chip-x { opacity: .65; font-size: 10px; line-height: 1; padding: 0 1px; }
+  .chip-x:hover { opacity: 1; color: var(--err-text); }
+
+  /* Inline / Command Autocomplete */
+  .ac-pop { position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; max-height: min(220px, 40vh); overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 5px; display: none; flex-direction: column; gap: 2px; box-shadow: 0 14px 32px rgba(0,0,0,.5); z-index: 30; }
+  .ac-pop.open { display: flex; }
+  .ac-item { background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 6px 10px; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
+  .ac-item.hl, .ac-item:hover { background: var(--hover); color: var(--text); }
+  .ac-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .ac-key { font-family: var(--mono); color: var(--text); font-weight: 600; white-space: nowrap; }
+  .ac-desc { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Right sidebar (TASK.md) */
+  .task-body { flex: 1; overflow-y: auto; padding: 10px 12px; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: pre-wrap; line-height: 1.5; }
+  .task-foot { padding: 10px 12px 14px; border-top: 1px solid var(--border); display: flex; gap: 6px; flex-shrink: 0; }
+
+  /* Settings Modal */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.68); display: none; align-items: center; justify-content: center; z-index: 50; }
+  .modal-backdrop.open { display: flex; }
+  .modal { width: 760px; max-width: 94vw; height: 540px; max-height: 88vh; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px rgba(0,0,0,.6); }
+  .modal-head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
+  .modal-body { flex: 1; display: flex; min-height: 0; }
+  .modal-nav { width: 190px; border-right: 1px solid var(--border); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; background: var(--nav-bg); }
+  .nav-group { font-size: 10.5px; color: var(--dim); padding: 8px 10px 4px; font-weight: 600; letter-spacing: .06em; }
+  .nav-btn { text-align: left; background: transparent; border: 1px solid transparent; padding: 7px 10px; border-radius: 6px; cursor: pointer; color: var(--muted); }
+  .nav-btn:hover { background: var(--hover); color: var(--text); }
+  .nav-btn.active { background: var(--accent-bg); border-color: rgba(34,197,94,.45); color: var(--accent); font-weight: 500; }
+  .modal-pane { flex: 1; padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
+  .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; gap: 12px; }
+  .setting-row.active-slot { border-color: rgba(34,197,94,.5); background: rgba(34,197,94,.06); }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field input, .field select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; color: var(--text); }
+  .switch { width: 32px; height: 18px; border-radius: 99px; border: 1px solid var(--border); background: var(--bg); position: relative; cursor: pointer; flex-shrink: 0; transition: background .15s; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 50%; background: var(--muted); transition: transform .15s, background .15s; }
+  .switch.on { background: var(--accent); border-color: var(--accent); }
+  .switch.on::after { transform: translateX(14px); background: var(--accent-fg); }
+  .skills-filter { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; outline: none; font-size: 12px; }
+  .skills-filter:focus { border-color: var(--cyan); }
+  .theme-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .theme-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 9px 10px; cursor: pointer; display: flex; align-items: center; gap: 9px; text-align: left; min-width: 0; }
+  .theme-card:hover { background: var(--hover); }
+  .theme-card.active { border-color: var(--accent); background: var(--accent-bg); }
+  .theme-swatch { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--border); flex-shrink: 0; }
+  .theme-meta { min-width: 0; display: flex; flex-direction: column; }
+  .theme-name { font-size: 12px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .theme-tag { font-size: 10px; color: var(--dim); }
+  .muted { color: var(--muted); font-size: 12px; }
+  .empty-state { margin: auto; text-align: center; color: var(--dim); max-width: 420px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="tb-left">
+      <div class="brand" title="rs-agent"><svg width="18" height="18" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M49 24 L72 47 L50 69 L24 69"/></svg><span>rs-rail</span></div>
+      <button class="btn btn-sm btn-icon" id="btn-toggle-proj" title="Toggle Projects Sidebar (Ctrl+B)" aria-label="Toggle sidebar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg></button>
+      <span class="pill" id="tb-profile">—</span>
+      <span class="pill" id="tb-git">git: —</span>
+    </div>
+    <div class="tb-right">
+      <span class="pill" id="tb-ctx">
+        <span id="tb-usage">ctx 8.2k</span>
+        <span class="ctx-bar"><span class="ctx-fill" id="tb-ctx-fill"></span></span>
+      </span>
+      <button class="btn btn-sm btn-icon" id="btn-toggle-task" title="Toggle TASK.md / TODO" aria-label="Toggle task panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5.5 8l1.7 1.7 3.3-3.4"/></svg></button>
+      <button class="btn btn-sm btn-icon" id="btn-settings" title="Settings" aria-label="Settings"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="5.5" cy="4.5" r="1.5" fill="var(--card)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10.5" cy="8" r="1.5" fill="var(--card)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="6.5" cy="11.5" r="1.5" fill="var(--card)"/></svg></button>
+    </div>
+  </header>
+
+  <div class="main">
+    <aside class="sidebar-left" id="sidebar-left">
+      <div class="sec-head">
+        <span>Projects</span>
+        <button class="btn btn-sm btn-icon" id="btn-new-proj" title="New Workspace" aria-label="New Workspace"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3.5" x2="8" y2="12.5"/><line x1="3.5" y1="8" x2="12.5" y2="8"/></svg></button>
+      </div>
+      <div class="proj-list" id="proj-list"></div>
+    </aside>
+
+    <section class="center">
+      <div class="stream" id="stream">
+        <div class="empty-state" id="empty-state">
+          <div style="font-size:15px;color:var(--text);font-weight:600;margin-bottom:6px;">rs-agent Native Surface</div>
+          <div>Direct in-process <code>rs-agent</code> runtime — parallel tools, 3-stage resilient edits, and <code>SecurityBoundary</code> gating.</div>
+        </div>
+      </div>
+
+      <div class="composer-wrap">
+        <div class="composer">
+          <div class="ac-pop" id="ac-pop"></div>
+          <input type="file" id="img-file" accept="image/*" multiple hidden />
+          <div class="img-strip" id="img-strip"></div>
+          <textarea id="msg-input" placeholder="Message... (/ commands, Enter to send)"></textarea>
+          <div class="comp-bar">
+            <div class="comp-left">
+              <button class="btn btn-sm" id="btn-model-pill" title="Open Providers">—</button>
+              <select class="comp-select" id="sel-reasoning" title="Reasoning setting">
+                <option value="">Default reasoning</option>
+                <option value="0">Off (0)</option>
+                <option value="250">t250</option>
+                <option value="500">t500</option>
+                <option value="1000">t1000</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+                <option value="xhigh">xhigh</option>
+              </select>
+              <button class="btn btn-sm btn-icon" id="btn-img" title="Attach image (or paste)" aria-label="Attach image" style="display:none;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="5.7" cy="6" r="1"/><path d="M2.5 11.5l3.2-3.2 2.4 2.4 2.1-2.1 3.3 2.9"/></svg></button>
+              <div id="skills-bar" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+            </div>
+            <div class="comp-right">
+              <button class="btn btn-sm btn-primary" id="btn-send">Send ↵</button>
+              <button class="btn btn-sm btn-danger" id="btn-stop" style="display:none;">Stop ■</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar-right hidden" id="sidebar-right">
+      <div class="sec-head"><span>TASK.md / TODO</span></div>
+      <div class="task-body" id="task-body">No TASK.md found in workspace.</div>
+      <div class="task-foot">
+        <button class="btn btn-sm btn-primary" id="btn-run-task" style="width:100%;justify-content:center;">Run /task Loop</button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-backdrop" id="modal-settings">
+  <div class="modal">
+    <div class="modal-head">
+      <span>Settings</span>
+      <button class="btn btn-sm" id="btn-close-settings">✕</button>
+    </div>
+    <div class="modal-body">
+      <nav class="modal-nav">
+        <div class="nav-group">AGENT</div>
+        <button class="nav-btn active" data-tab="providers">Providers & Models</button>
+        <button class="nav-btn" data-tab="profiles">Profiles</button>
+        <button class="nav-btn" data-tab="skills">Skills</button>
+        <button class="nav-btn" data-tab="mcp">MCP / Plugins</button>
+        <div class="nav-group">INTERFACE</div>
+        <button class="nav-btn" data-tab="commands">Commands</button>
+        <button class="nav-btn" data-tab="appearance">Appearance</button>
+      </nav>
+      <div class="modal-pane" id="modal-pane"></div>
+    </div>
+  </div>
+</div>
+
+<!-- New Project Modal -->
+<div class="modal-backdrop" id="modal-new-proj">
+  <div class="modal" style="width:420px;height:auto;">
+    <div class="modal-head">
+      <span>New Workspace</span>
+      <button class="btn btn-sm" id="btn-close-new-proj">✕</button>
+    </div>
+    <div class="modal-pane">
+      <div class="field">
+        <label class="muted">Project Name (lowercase slug)</label>
+        <input id="np-name" placeholder="e.g. rust-cli" />
+      </div>
+      <div class="field">
+        <label class="muted">Profile</label>
+        <select id="np-prof"></select>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px;">
+        <button class="btn" id="btn-cancel-np">Cancel</button>
+        <button class="btn btn-primary" id="btn-create-np">Create</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let STATE = null;
+let ACTIVE_TAB = "providers";
+let STREAMING = false;
+let skillFilter = "";
+
+const BUILTIN_THEMES = [
+  { id:"dark-green",   name:"Dark Green",   mode:"dark",  bg:"#0b0c0e", panel:"#111317", card:"#171a20", border:"#252932", text:"#e5e7eb", muted:"#8b92a0", accent:"#22c55e", cyan:"#38bdf8" },
+  { id:"dark-red",     name:"Dark Red",     mode:"dark",  bg:"#0b0c0e", panel:"#111317", card:"#171a20", border:"#252932", text:"#e5e7eb", muted:"#8b92a0", accent:"#ef4444", cyan:"#f87171" },
+  { id:"dark-blue",    name:"Dark Blue",    mode:"dark",  bg:"#0b0c0e", panel:"#111317", card:"#171a20", border:"#252932", text:"#e5e7eb", muted:"#8b92a0", accent:"#3b82f6", cyan:"#60a5fa" },
+  { id:"dark-purple",  name:"Dark Purple",  mode:"dark",  bg:"#0b0c0e", panel:"#111317", card:"#171a20", border:"#252932", text:"#e5e7eb", muted:"#8b92a0", accent:"#a855f7", cyan:"#c084fc" },
+  { id:"dark-orange",  name:"Dark Orange",  mode:"dark",  bg:"#0b0c0e", panel:"#111317", card:"#171a20", border:"#252932", text:"#e5e7eb", muted:"#8b92a0", accent:"#f97316", cyan:"#fb923c" },
+  { id:"light-green",  name:"Light Green",  mode:"light", bg:"#f6f7f9", panel:"#ffffff", card:"#f0f2f5", border:"#d8dee6", text:"#111827", muted:"#4b5563", accent:"#16a34a", cyan:"#16a34a" },
+  { id:"light-red",    name:"Light Red",    mode:"light", bg:"#f6f7f9", panel:"#ffffff", card:"#f0f2f5", border:"#d8dee6", text:"#111827", muted:"#4b5563", accent:"#dc2626", cyan:"#dc2626" },
+  { id:"light-blue",   name:"Light Blue",   mode:"light", bg:"#f6f7f9", panel:"#ffffff", card:"#f0f2f5", border:"#d8dee6", text:"#111827", muted:"#4b5563", accent:"#2563eb", cyan:"#2563eb" },
+  { id:"light-purple", name:"Light Purple", mode:"light", bg:"#f6f7f9", panel:"#ffffff", card:"#f0f2f5", border:"#d8dee6", text:"#111827", muted:"#4b5563", accent:"#9333ea", cyan:"#9333ea" },
+  { id:"light-orange", name:"Light Orange", mode:"light", bg:"#f6f7f9", panel:"#ffffff", card:"#f0f2f5", border:"#d8dee6", text:"#111827", muted:"#4b5563", accent:"#ea580c", cyan:"#ea580c" }
+];
+
+const DEFAULT_APPEARANCE = {
+  theme: "dark-green",
+  uiFont: "JetBrains Mono",
+  codeFont: "JetBrains Mono",
+  codeSize: 12,
+  ligatures: false
+};
+
+function hexLum(hex) {
+  const h = String(hex || "").replace("#", "");
+  if (h.length < 6) return 0;
+  return (parseInt(h.slice(0,2), 16) * 299 + parseInt(h.slice(2,4), 16) * 587 + parseInt(h.slice(4,6), 16) * 114) / 1000;
+}
+
+function getAppearance() {
+  try { return { ...DEFAULT_APPEARANCE, ...JSON.parse(localStorage.getItem("rs_rail_appearance") || "{}") }; }
+  catch { return { ...DEFAULT_APPEARANCE }; }
+}
+
+function allThemes() {
+  return [...BUILTIN_THEMES, ...(STATE?.themes || [])];
+}
+
+function applyAppearance(next) {
+  const cfg = next ? { ...getAppearance(), ...next } : getAppearance();
+  localStorage.setItem("rs_rail_appearance", JSON.stringify(cfg));
+  let t = allThemes().find((x) => x.id === cfg.theme);
+  if (t) {
+    localStorage.setItem("rs_rail_theme_cache", JSON.stringify(t));
+  } else {
+    try {
+      const cached = JSON.parse(localStorage.getItem("rs_rail_theme_cache") || "null");
+      if (cached && cached.id === cfg.theme) t = cached;
+    } catch {}
+  }
+  if (!t) t = BUILTIN_THEMES[0];
+
+  const isLight = t.mode === "light";
+  const accentFg = hexLum(t.accent) > 130 ? "#05140a" : "#ffffff";
+  const vars = {
+    "--bg": t.bg, "--panel": t.panel, "--card": t.card, "--border": t.border,
+    "--text": t.text, "--muted": t.muted,
+    "--dim": `color-mix(in srgb, ${t.muted} 70%, ${t.bg})`,
+    "--hover": `color-mix(in srgb, ${t.text} 6%, ${t.card})`,
+    "--nav-bg": `color-mix(in srgb, ${t.bg} 55%, ${t.panel})`,
+    "--code-bg": `color-mix(in srgb, ${t.bg} 75%, ${t.panel})`,
+    "--accent": t.accent, "--accent-fg": accentFg,
+    "--accent-bg": `color-mix(in srgb, ${t.accent} 14%, transparent)`,
+    "--user-bg": `color-mix(in srgb, ${t.accent} 16%, ${t.panel})`,
+    "--user-border": `color-mix(in srgb, ${t.accent} 42%, ${t.border})`,
+    "--user-text": t.text,
+    "--active-bg": t.active_bg || `color-mix(in srgb, ${t.accent} 16%, ${t.panel})`,
+    "--active-border": t.active_border || `color-mix(in srgb, ${t.accent} 48%, ${t.border})`,
+    "--cyan": t.cyan || t.accent,
+    "--err-text": isLight ? "#dc2626" : "#fca5a5",
+    "--del-bg": isLight ? "rgba(220,38,38,0.10)" : "rgba(239,68,68,0.14)",
+    "--del-text": isLight ? "#b91c1c" : "#fca5a5",
+    "--add-bg": isLight ? "rgba(22,163,74,0.12)" : "rgba(34,197,94,0.14)",
+    "--add-text": isLight ? "#15803d" : "#86efac",
+  };
+  const root = document.documentElement.style;
+  for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
+  const uiMap = {
+    "JetBrains Mono": '"JetBrains Mono", "JetBrainsMono Nerd Font", "JetBrainsMono NF", ui-monospace, monospace',
+    "Geist": '"Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    "System": '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+  };
+  const codeMap = {
+    "JetBrains Mono": '"JetBrains Mono", "JetBrainsMono Nerd Font", "JetBrainsMono NF", ui-monospace, SFMono-Regular, Menlo, monospace',
+    "Fira Code": '"Fira Code", "JetBrains Mono", ui-monospace, monospace',
+    "System": 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+  };
+  root.setProperty("--sans", uiMap[cfg.uiFont] || uiMap["JetBrains Mono"]);
+  root.setProperty("--mono", codeMap[cfg.codeFont] || codeMap["JetBrains Mono"]);
+  root.setProperty("--code-size", `${cfg.codeSize}px`);
+  root.setProperty("--ligatures", cfg.ligatures ? "normal" : "none");
+}
+applyAppearance();
+
+const SLASH_CMDS = [
+  { cmd: "/task", desc: "Run autonomous goal loop" },
+  { cmd: "/r", desc: "Reset active session" },
+  { cmd: "/s", desc: "Attach or detach skills (max 3)" },
+  { cmd: "/p", desc: "Select agent profile" },
+  { cmd: "/ms", desc: "Providers & models" },
+  { cmd: "/tk", desc: "Toggle auto-expand thinking" },
+];
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function renderMarkdown(text) {
+  const parts = String(text || "").split(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g);
+  let html = "";
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 3 === 0) {
+      let seg = esc(parts[i]).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+      const paras = seg.split(/\n{2,}/).filter(Boolean).map(p => `<p>${p.replace(/\n/g, "<br>")}</p>`).join("");
+      html += paras;
+    } else if (i % 3 === 1) {
+      const lang = esc(parts[i] || "text");
+      const code = esc(parts[i + 1] || "");
+      html += `<div class="code-wrap"><div class="code-head"><span>${lang}</span><button class="btn btn-sm" onclick="navigator.clipboard.writeText(this.closest('.code-wrap').querySelector('pre').innerText)">Copy</button></div><pre>${code}</pre></div>`;
+      i++;
+    }
+  }
+  return html || "<p></p>";
+}
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(await res.text() || res.statusText);
+  return res.json();
+}
+
+async function loadState(project) {
+  const q = project ? `?project=${encodeURIComponent(project)}` : "";
+  STATE = await api(`/api/state${q}`);
+  renderAll();
+}
+
+function openSettings(tab) {
+  if (tab) ACTIVE_TAB = tab;
+  $("modal-settings").classList.add("open");
+  renderModalTab();
+}
+
+function renderAll() {
+  if (!STATE) return;
+  const ap = STATE.active_project;
+  const headLabel = ap.profile_name && ap.profile_name !== ap.name
+    ? `${ap.name} · ${ap.profile_name}`
+    : ap.name;
+  $("tb-profile").textContent = `${headLabel} · ${ap.hud_summary}`;
+  $("tb-git").textContent = ap.git || "git: [none]";
+  $("btn-model-pill").textContent = `${STATE.provider.model} · ${STATE.provider.endpoint}`;
+  $("btn-img").style.display = STATE.provider.is_local ? "none" : "inline-flex";
+
+  const ctxMax = STATE.provider.max_tokens || 8192;
+  const ctxLbl = ctxMax >= 1000 ? `${(ctxMax/1000).toFixed(1)}k` : ctxMax;
+  if (ap.last_stats) {
+    const used = (ap.last_stats.prompt_tokens || 0) + (ap.last_stats.completion_tokens || 0);
+    const pct = Math.min(100, (used / Math.max(1, ctxMax)) * 100);
+    $("tb-usage").textContent = `${pct.toFixed(1)}% / ${ctxLbl}`;
+    $("tb-ctx-fill").style.width = `${pct}%`;
+  } else {
+    $("tb-usage").textContent = `ctx ${ctxLbl}`;
+    $("tb-ctx-fill").style.width = "0%";
+  }
+
+  // Projects list (T3-style badge, scoped git dot, hover clean + hover card)
+  const plist = $("proj-list");
+  plist.innerHTML = "";
+  const hc = $("proj-hover");
+  STATE.projects.forEach((p, idx) => {
+    const el = document.createElement("div");
+    el.className = "proj-item" + (p.name === ap.name ? " active" : "");
+    const abbr = p.name.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || p.name.slice(0, 2);
+    const delBtn = p.file_count > 0
+      ? `<button class="proj-del" title="Delete ${p.file_count} file(s)"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11"/><path d="M6 2.5h4"/><path d="M4.5 4.5l.7 9h5.6l.7-9"/></svg></button>`
+      : "";
+    el.innerHTML = `<div class="proj-left"><span class="proj-badge">${esc(abbr)}</span><span class="proj-name">${esc(p.name)}</span></div><div class="proj-acts">${delBtn}<span class="proj-dot ${p.dirty ? "dirty" : ""}"></span></div>`;
+    el.onclick = () => { hc.classList.remove("open"); loadState(p.name); };
+    const db = el.querySelector(".proj-del");
+    if (db) {
+      db.onclick = async (e) => {
+        e.stopPropagation();
+        if (!confirm(`Delete ${p.file_count} file(s) in ${p.name}?`)) return;
+        await api("/api/project/clean", { name: p.name });
+        hc.classList.remove("open");
+        await loadState();
+      };
+    }
+    el.onmouseenter = () => {
+      const r = el.getBoundingClientRect();
+      const kbd = idx < 9 ? `<span class="ph-kbd">Ctrl+${idx + 1}</span>` : "";
+      const filesTxt = p.file_count ? `${p.file_count} file(s)` : "empty";
+      const gitTxt = p.dirty ? "modified" : "clean";
+      hc.innerHTML = `<div class="ph-top"><span>${esc(p.name)}</span>${kbd}</div><div class="ph-row"><span>Profile</span><span>${esc(p.profile_name)}</span></div><div class="ph-row"><span>Workspace</span><span>${filesTxt}</span></div><div class="ph-row"><span>Git</span><span>${gitTxt}</span></div>`;
+      hc.style.left = `${r.right + 8}px`;
+      hc.style.top = `${Math.min(r.top, window.innerHeight - 110)}px`;
+      hc.classList.add("open");
+    };
+    el.onmouseleave = () => hc.classList.remove("open");
+    plist.appendChild(el);
+  });
+
+  $("sel-reasoning").value = ap.reasoning || "";
+
+  // Active skill chips only (0..3)
+  const sbar = $("skills-bar");
+  sbar.innerHTML = "";
+  for (const sk of ap.active_skills) {
+    const chip = document.createElement("button");
+    chip.className = "skill-chip";
+    chip.title = "Active for next turn (click to remove)";
+    chip.innerHTML = `<span>${esc(sk)}</span><span class="chip-x">✕</span>`;
+    chip.onclick = async () => { await api("/api/settings/profile", { skill_toggle: sk }); await loadState(); };
+    sbar.appendChild(chip);
+  }
+
+  // Task panel
+  $("task-body").textContent = ap.task_md || (ap.is_agent ? "No TASK.md found. Click below to type /task <goal>." : "Chat mode (no tools). Switch to an agent project to run /task.");
+  const rt = $("btn-run-task");
+  rt.disabled = !ap.is_agent;
+  rt.textContent = !ap.is_agent ? "Agent Projects Only" : (ap.task_md ? "Run /task Loop" : "Type /task <goal>");
+
+  applyAppearance();
+  renderHistory();
+  if ($("modal-settings").classList.contains("open")) renderModalTab();
+}
+
+function renderHistory() {
+  const stream = $("stream");
+  const msgs = STATE.active_project.history || [];
+  if (!msgs.length) {
+    stream.innerHTML = "";
+    stream.appendChild($("empty-state") || createEmpty());
+    return;
+  }
+  stream.innerHTML = "";
+  const wrap = document.createElement("div");
+  wrap.className = "turn-wrap";
+  for (const m of msgs) {
+    if (m.role === "user") {
+      wrap.appendChild(buildUserEl(m.content || "", m.images || []));
+    } else if (m.role === "assistant") {
+      wrap.appendChild(buildAssistantEl(m.reasoning || "", m.content || ""));
+    } else if (m.role === "tool_card") {
+      wrap.appendChild(buildToolCard(m));
+    }
+  }
+  stream.appendChild(wrap);
+  stream.scrollTop = stream.scrollHeight;
+}
+
+function buildUserEl(text, images) {
+  const u = document.createElement("div");
+  u.className = "msg-user";
+  if (images && images.length) {
+    const row = document.createElement("div");
+    row.className = "msg-imgs";
+    for (const src of images) {
+      const im = document.createElement("img");
+      im.className = "msg-img";
+      im.src = src;
+      row.appendChild(im);
+    }
+    u.appendChild(row);
+  }
+  if (text) {
+    const t = document.createElement("div");
+    t.textContent = text;
+    u.appendChild(t);
+  }
+  return u;
+}
+
+function createEmpty() {
+  const d = document.createElement("div");
+  d.id = "empty-state";
+  d.className = "empty-state";
+  d.innerHTML = `<div style="font-size:15px;color:var(--text);font-weight:600;margin-bottom:6px;">rs-agent Native Surface</div><div>Direct in-process <code>rs-agent</code> runtime — parallel tools, 3-stage resilient edits, and <code>SecurityBoundary</code> gating.</div>`;
+  return d;
+}
+
+function buildAssistantEl(reasoning, content) {
+  const box = document.createElement("div");
+  box.className = "msg-assistant";
+  if (reasoning) {
+    const det = document.createElement("details");
+    det.className = "think-box";
+    if (STATE?.ui_prefs?.show_thinking !== false) det.open = true;
+    det.innerHTML = `<summary><svg class="think-chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5L10.5 8 6 12.5"/></svg><span>Thinking · ${reasoning.length} chars</span></summary><div class="think-body">${esc(reasoning)}</div>`;
+    box.appendChild(det);
+  }
+  if (content) {
+    const row = document.createElement("div");
+    row.className = "ans-row";
+    row.innerHTML = `<span class="bullet">●</span><div class="ans-body">${renderMarkdown(content)}</div>`;
+    box.appendChild(row);
+  }
+  return box;
+}
+
+function buildToolCard(t) {
+  const card = document.createElement("div");
+  card.className = "tool-card";
+  const label = ({ read_file:"Read", edit_file:"Edit", write_file:"Write", list_dir:"List", search_code:"Search", run_command:"Bash" }[t.name] || t.name);
+  card.innerHTML = `
+    <div class="tool-head">
+      <div class="tool-title"><span class="bullet">●</span><strong>${esc(label)}</strong><span class="tool-brief">(${esc(t.brief || "")})</span></div>
+      <span class="muted">${t.elapsed_s !== undefined ? t.elapsed_s.toFixed(1)+"s" : ""}</span>
+    </div>
+    <div class="tool-summary ${t.ok ? "" : "tool-err"}">⎿ ${esc(t.summary || "")}</div>
+  `;
+  if (t.diff && t.diff.lines && t.diff.lines.length) {
+    const db = document.createElement("div");
+    db.className = "diff-box";
+    for (const ln of t.diff.lines) {
+      const sign = ln.kind === "add" ? "+" : ln.kind === "del" ? "-" : " ";
+      const r = document.createElement("div");
+      r.className = `diff-line ${ln.kind}`;
+      r.innerHTML = `<span class="diff-num">${ln.num || ""} ${sign}</span><span>${esc(ln.text)}</span>`;
+      db.appendChild(r);
+    }
+    card.appendChild(db);
+  } else if (t.raw) {
+    const pre = document.createElement("pre");
+    pre.className = "tool-raw";
+    pre.textContent = t.raw;
+    card.appendChild(pre);
+    card.querySelector(".tool-head").onclick = () => card.classList.toggle("open");
+  }
+  return card;
+}
+
+async function runLocalSlash(text) {
+  const low = text.toLowerCase();
+  if (low === "/r" || low === "/reset") {
+    await api("/api/reset", {}); await loadState(); return true;
+  }
+  if (low === "/p" || low === "/profile") {
+    openSettings("profiles"); return true;
+  }
+  if (low === "/ms" || low === "/model") {
+    openSettings("providers"); return true;
+  }
+  if (low === "/tk" || low === "/think") {
+    await api("/api/settings/ui", { show_thinking: STATE?.ui_prefs?.show_thinking === false }); await loadState(); return true;
+  }
+  if (low === "/s" || low === "/skill") {
+    openSettings("skills"); return true;
+  }
+  if (low.startsWith("/s ") || low.startsWith("/skill ")) {
+    const arg = text.split(/\s+/)[1]?.toLowerCase() || "";
+    const active = STATE?.active_project?.active_skills || [];
+    if (arg === "clear" || arg === "none" || arg === "reset") {
+      for (const s of [...active]) await api("/api/settings/profile", { skill_toggle: s });
+      await loadState();
+    } else if ((STATE?.skills || []).includes(arg)) {
+      await api("/api/settings/profile", { skill_toggle: arg }); await loadState();
+    }
+    return true;
+  }
+  return false;
+}
+
+let pendingImages = [];
+
+function renderImgStrip() {
+  const strip = $("img-strip");
+  strip.innerHTML = "";
+  strip.classList.toggle("open", pendingImages.length > 0);
+  pendingImages.forEach((src, i) => {
+    const box = document.createElement("div");
+    box.className = "img-thumb";
+    box.innerHTML = `<img src="${src}" /><button class="img-rm" title="Remove">✕</button>`;
+    box.querySelector("button").onclick = () => { pendingImages.splice(i, 1); renderImgStrip(); };
+    strip.appendChild(box);
+  });
+}
+
+function addImageFiles(files) {
+  for (const f of Array.from(files || [])) {
+    if (!f.type.startsWith("image/") || pendingImages.length >= 4) continue;
+    const rd = new FileReader();
+    rd.onload = () => {
+      if (typeof rd.result === "string" && pendingImages.length < 4) {
+        pendingImages.push(rd.result);
+        renderImgStrip();
+      }
+    };
+    rd.readAsDataURL(f);
+  }
+}
+
+async function sendMessage(overrideText) {
+  if (STREAMING) return;
+  const text = overrideText !== undefined ? overrideText : $("msg-input").value.trim();
+  const imgs = overrideText !== undefined ? [] : [...pendingImages];
+  if (!text && !imgs.length) return;
+  if (overrideText === undefined) {
+    $("msg-input").value = "";
+    pendingImages = [];
+    renderImgStrip();
+  }
+  closeAc();
+  if (!imgs.length && text.startsWith("/") && await runLocalSlash(text)) return;
+
+  STREAMING = true;
+  $("btn-send").style.display = "none";
+  $("btn-stop").style.display = "inline-flex";
+
+  const stream = $("stream");
+  if ($("empty-state")) stream.innerHTML = "";
+  let wrap = stream.querySelector(".turn-wrap");
+  if (!wrap) { wrap = document.createElement("div"); wrap.className = "turn-wrap"; stream.appendChild(wrap); }
+
+  wrap.appendChild(buildUserEl(text, imgs));
+
+  let curThink = "";
+  let curAns = "";
+  let liveAsst = document.createElement("div");
+  liveAsst.className = "msg-assistant";
+  wrap.appendChild(liveAsst);
+  stream.scrollTop = stream.scrollHeight;
+
+  const updateLive = () => {
+    liveAsst.innerHTML = "";
+    if (curThink) {
+      const det = document.createElement("details");
+      det.className = "think-box";
+      if (STATE?.ui_prefs?.show_thinking !== false) det.open = true;
+      det.innerHTML = `<summary><svg class="think-chev" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5L10.5 8 6 12.5"/></svg><span>Thinking · ${curThink.length} chars</span></summary><div class="think-body">${esc(curThink)}</div>`;
+      liveAsst.appendChild(det);
+    }
+    if (curAns) {
+      const row = document.createElement("div");
+      row.className = "ans-row";
+      row.innerHTML = `<span class="bullet">●</span><div class="ans-body">${renderMarkdown(curAns)}</div>`;
+      liveAsst.appendChild(row);
+    }
+    stream.scrollTop = stream.scrollHeight;
+  };
+
+  let chatErr = null;
+  try {
+    const resp = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, images: imgs }),
+    });
+    if (!resp.ok) throw new Error(await resp.text() || resp.statusText);
+    const reader = resp.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let idx;
+      while ((idx = buf.indexOf("\n\n")) !== -1) {
+        const rawEv = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        let evName = "message", evData = "";
+        for (const line of rawEv.split("\n")) {
+          if (line.startsWith("event:")) evName = line.slice(6).trim();
+          else if (line.startsWith("data:")) evData += line.slice(5).trim();
+        }
+        if (!evData) continue;
+        const d = JSON.parse(evData);
+        if (evName === "thinking") { curThink += d.text; updateLive(); }
+        else if (evName === "chunk") { curAns += d.text; updateLive(); }
+        else if (evName === "tool_result") {
+          wrap.appendChild(buildToolCard(d));
+          curThink = ""; curAns = "";
+          liveAsst = document.createElement("div");
+          liveAsst.className = "msg-assistant";
+          wrap.appendChild(liveAsst);
+          stream.scrollTop = stream.scrollHeight;
+        } else if (evName === "permission") {
+          const gc = document.createElement("div");
+          gc.className = "gate-card";
+          gc.innerHTML = `<div class="gate-title">⚠ Security Gate: ${esc(d.title)}</div><div class="gate-cmd">${esc(d.detail)}</div><div class="gate-actions"><button class="btn btn-sm btn-primary">Allow once</button><button class="btn btn-sm btn-danger">Deny</button></div>`;
+          const [allowBtn, denyBtn] = gc.querySelectorAll("button");
+          const resolvePerm = async (allow) => {
+            allowBtn.disabled = denyBtn.disabled = true;
+            await api("/api/authorize", { req_id: d.req_id, allow });
+            gc.innerHTML = `<div class="muted">${allow ? "✓ Authorized once" : "✗ Denied"}: ${esc(d.title)}</div>`;
+          };
+          allowBtn.onclick = () => resolvePerm(true);
+          denyBtn.onclick = () => resolvePerm(false);
+          wrap.appendChild(gc);
+          stream.scrollTop = stream.scrollHeight;
+        } else if (evName === "error") {
+          chatErr = d.message;
+        }
+      }
+    }
+  } catch (err) {
+    chatErr = err.message;
+  } finally {
+    STREAMING = false;
+    $("btn-send").style.display = "inline-flex";
+    $("btn-stop").style.display = "none";
+    await loadState();
+    if (chatErr) {
+      const er = document.createElement("div");
+      er.className = "tool-err";
+      er.style.cssText = "max-width:880px;width:100%;margin:0 auto;";
+      er.textContent = `✗ ${chatErr}`;
+      stream.appendChild(er);
+      stream.scrollTop = stream.scrollHeight;
+    }
+  }
+}
+
+function renderModalTab() {
+  document.querySelectorAll(".nav-btn").forEach(x => x.classList.toggle("active", x.dataset.tab === ACTIVE_TAB));
+  const pane = $("modal-pane");
+  pane.innerHTML = "";
+  if (ACTIVE_TAB === "providers") {
+    pane.innerHTML = `<div style="font-weight:600">Providers & Runtime Governors</div><div class="muted">Click a configured .env slot to activate, or disable all to use Local :8080. API keys stay strictly server-side.</div>`;
+    for (const s of STATE.providers) {
+      const row = document.createElement("div");
+      row.className = "setting-row" + (s.is_active ? " active-slot" : "");
+      row.innerHTML = `<div><strong>${esc(s.name)}</strong><div class="muted">${esc(s.model)}</div></div><button class="btn btn-sm ${s.is_active ? "btn-primary" : ""}">${s.is_active ? "Active (Disable)" : "Activate"}</button>`;
+      row.querySelector("button").onclick = async () => { await api("/api/settings/provider", { toggle_slot: s.id }); await loadState(); };
+      pane.appendChild(row);
+    }
+    const tokOpts = Array.from(new Set([4096,8192,16384,32768,65536,131072,1048576,STATE.provider.env_max_tokens])).filter(Boolean).sort((a,b)=>a-b);
+    const gov = document.createElement("div");
+    gov.className = "setting-row";
+    gov.innerHTML = `
+      <div class="field" style="flex:1"><label class="muted">Context Budget (AI_MAX_TOKENS)</label>
+        <select id="gov-tok">${tokOpts.map(v => `<option value="${v}" ${STATE.provider.env_max_tokens===v?"selected":""}>${v}</option>`).join("")}</select>
+      </div>
+      <div class="field" style="flex:1"><label class="muted">Max Steps (AI_MAX_AGENT_ROUNDS)</label>
+        <select id="gov-rnd">${[5,10,15,20,25,30].map(v => `<option value="${v}" ${STATE.provider.max_rounds===v?"selected":""}>${v} steps</option>`).join("")}</select>
+      </div>`;
+    pane.appendChild(gov);
+    $("gov-tok").onchange = async (e) => { await api("/api/settings/provider", { max_tokens: +e.target.value }); await loadState(); };
+    $("gov-rnd").onchange = async (e) => { await api("/api/settings/provider", { max_rounds: +e.target.value }); await loadState(); };
+  } else if (ACTIVE_TAB === "profiles") {
+    pane.innerHTML = `<div style="font-weight:600">Workspace Profile</div><div class="muted">Select which profile in <code>profiles/*.md</code> drives the active project.</div>`;
+    for (const prof of STATE.profiles) {
+      const cur = STATE.active_project.profile_name === prof;
+      const row = document.createElement("div");
+      row.className = "setting-row" + (cur ? " active-slot" : "");
+      row.innerHTML = `<div><strong>${esc(prof)}</strong></div><button class="btn btn-sm ${cur ? "btn-primary" : ""}">${cur ? "Active" : "Select"}</button>`;
+      row.querySelector("button").onclick = async () => { await api("/api/settings/profile", { profile_name: prof }); await loadState(); };
+      pane.appendChild(row);
+    }
+  } else if (ACTIVE_TAB === "skills") {
+    const active = STATE.active_project.active_skills || [];
+    pane.innerHTML = `<div><div style="font-weight:600">Skills (${active.length}/3 active)</div><div class="muted">Attached skills are injected into the system prompt for the next turn.</div></div><input class="skills-filter" id="modal-skills-filter" placeholder="Filter skills..." value="${esc(skillFilter)}" /><div id="modal-skills-list" style="display:flex;flex-direction:column;gap:8px;"></div>`;
+    const drawSkillsList = () => {
+      const list = $("modal-skills-list");
+      const q = skillFilter.trim().toLowerCase();
+      const filtered = (STATE.skills || []).filter((s) => !q || s.toLowerCase().includes(q));
+      list.innerHTML = "";
+      if (!filtered.length) {
+        list.innerHTML = `<div class="muted">No matching skills in ~/.config/rs-agent/skills/</div>`;
+        return;
+      }
+      for (const sk of filtered) {
+        const on = active.includes(sk);
+        const full = !on && active.length >= 3;
+        const row = document.createElement("div");
+        row.className = "setting-row" + (on ? " active-slot" : "");
+        row.innerHTML = `<div><strong>${esc(sk)}</strong><div class="muted">~/.config/rs-agent/skills/${esc(sk)}.md</div></div><button class="switch ${on ? "on" : ""}" ${full ? "disabled" : ""} title="${full ? "Max 3 skills active" : "Toggle skill"}"></button>`;
+        row.querySelector("button").onclick = async () => {
+          await api("/api/settings/profile", { skill_toggle: sk });
+          await loadState();
+        };
+        list.appendChild(row);
+      }
+    };
+    drawSkillsList();
+    $("modal-skills-filter").oninput = (e) => { skillFilter = e.target.value; drawSkillsList(); };
+  } else if (ACTIVE_TAB === "commands") {
+    pane.innerHTML = `<div style="font-weight:600">Slash Commands</div><div class="muted">Type <code>/</code> in the composer or run an action below.</div>`;
+    for (const c of SLASH_CMDS) {
+      const row = document.createElement("div");
+      row.className = "setting-row";
+      row.innerHTML = `<div><strong style="font-family:var(--mono)">${esc(c.cmd)}</strong><div class="muted">${esc(c.desc)}</div></div><button class="btn btn-sm">Run</button>`;
+      row.querySelector("button").onclick = async () => {
+        $("modal-settings").classList.remove("open");
+        if (c.cmd === "/task") $("btn-run-task").click();
+        else await runLocalSlash(c.cmd);
+      };
+      pane.appendChild(row);
+    }
+  } else if (ACTIVE_TAB === "mcp") {
+    pane.innerHTML = `<div style="font-weight:600">MCP Servers (plugins/mcp/servers.json)</div><div class="muted">Servers spawned over stdio by <code>src/mcp.rs</code> when attached to a profile.</div>`;
+    for (const m of STATE.mcp_servers) {
+      const row = document.createElement("div");
+      row.className = "setting-row";
+      row.innerHTML = `<div style="min-width:0"><strong>${esc(m.name)}</strong><div class="muted" style="font-family:var(--mono);overflow:hidden;text-overflow:ellipsis">${esc(m.command)} ${esc((m.args||[]).join(" "))}</div></div><button class="btn btn-sm">Inspect Tools</button>`;
+      row.querySelector("button").onclick = async (e) => {
+        e.target.textContent = "Probing...";
+        try {
+          const res = await api("/api/settings/mcp", { inspect: m.name });
+          alert(`${m.name} (${res.tools.length} tools):\n` + res.tools.map(t => "• " + t.function.name).join("\n"));
+        } catch (err) { alert("Error: " + err.message); }
+        e.target.textContent = "Inspect Tools";
+      };
+      pane.appendChild(row);
+    }
+    const addBox = document.createElement("div");
+    addBox.className = "setting-row";
+    addBox.style.flexDirection = "column";
+    addBox.style.alignItems = "stretch";
+    addBox.innerHTML = `
+      <strong>+ Add MCP Server</strong>
+      <div style="display:flex;gap:8px;"><input id="mcp-name" placeholder="name (e.g. context7)" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px;" /><input id="mcp-cmd" placeholder="command (e.g. npx)" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px;" /></div>
+      <div style="display:flex;gap:8px;"><input id="mcp-args" placeholder="args (space-separated)" style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px;" /><button class="btn btn-primary btn-sm" id="btn-add-mcp">Add</button></div>`;
+    pane.appendChild(addBox);
+    $("btn-add-mcp").onclick = async () => {
+      const name = $("mcp-name").value.trim(), command = $("mcp-cmd").value.trim(), args = $("mcp-args").value.trim().split(/\s+/).filter(Boolean);
+      if (!name || !command) return;
+      await api("/api/settings/mcp", { add: { name, command, args } });
+      await loadState();
+    };
+  } else if (ACTIVE_TAB === "appearance") {
+    const ap = getAppearance();
+    pane.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;"><div><div style="font-weight:600">Themes</div><div class="muted">Custom themes: <code>plugins/rs-rail/themes/*.json</code></div></div><button class="btn btn-sm" id="btn-reload-themes">Reload</button></div><div class="theme-grid" id="theme-grid"></div>`;
+    $("btn-reload-themes").onclick = () => loadState();
+
+    const grid = $("theme-grid");
+    for (const t of allThemes()) {
+      const card = document.createElement("button");
+      card.className = "theme-card" + (ap.theme === t.id ? " active" : "");
+      const tag = t.source === "live" ? "desktop" : (t.source === "custom" ? "custom" : t.mode);
+      card.innerHTML = `<span class="theme-swatch" style="background:linear-gradient(135deg, ${esc(t.bg)} 50%, ${esc(t.accent)} 50%)"></span><span class="theme-meta"><span class="theme-name">${esc(t.name)}</span><span class="theme-tag">${esc(tag)}</span></span>`;
+      card.onclick = () => { applyAppearance({ theme: t.id }); renderModalTab(); };
+      grid.appendChild(card);
+    }
+
+    const uiRow = document.createElement("div");
+    uiRow.className = "setting-row";
+    uiRow.innerHTML = `<div><strong>Interface Font</strong><div class="muted">Labels, headings, and chat prose</div></div>
+      <select id="ap-ui-font" class="comp-select">
+        <option value="JetBrains Mono" ${ap.uiFont==="JetBrains Mono"?"selected":""}>JetBrains Mono</option>
+        <option value="Geist" ${ap.uiFont==="Geist"?"selected":""}>Geist</option>
+        <option value="System" ${ap.uiFont==="System"?"selected":""}>System Sans</option>
+      </select>`;
+    pane.appendChild(uiRow);
+    $("ap-ui-font").onchange = (e) => applyAppearance({ uiFont: e.target.value });
+
+    const codeRow = document.createElement("div");
+    codeRow.className = "setting-row";
+    codeRow.innerHTML = `<div><strong>Code Font &amp; Size</strong><div class="muted">Code blocks, diffs, thinking, and tools (12px = 9pt)</div></div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <select id="ap-code-font" class="comp-select">
+          <option value="JetBrains Mono" ${ap.codeFont==="JetBrains Mono"?"selected":""}>JetBrains Mono</option>
+          <option value="Fira Code" ${ap.codeFont==="Fira Code"?"selected":""}>Fira Code</option>
+          <option value="System" ${ap.codeFont==="System"?"selected":""}>System Mono</option>
+        </select>
+        <select id="ap-code-size" class="comp-select">
+          ${[11,12,13,14,15,16].map(n => `<option value="${n}" ${ap.codeSize===n?"selected":""}>${n}px</option>`).join("")}
+        </select>
+      </div>`;
+    pane.appendChild(codeRow);
+    $("ap-code-font").onchange = (e) => applyAppearance({ codeFont: e.target.value });
+    $("ap-code-size").onchange = (e) => applyAppearance({ codeSize: +e.target.value });
+
+    const ligRow = document.createElement("div");
+    ligRow.className = "setting-row";
+    ligRow.innerHTML = `<div><strong>Code Ligatures</strong><div class="muted">Render <code>=&gt;</code>, <code>!=</code>, <code>::</code> ligatures in monospace</div></div><button class="btn btn-sm">${ap.ligatures ? "On" : "Off"}</button>`;
+    ligRow.querySelector("button").onclick = () => { applyAppearance({ ligatures: !getAppearance().ligatures }); renderModalTab(); };
+    pane.appendChild(ligRow);
+
+    const r = document.createElement("div");
+    r.className = "setting-row";
+    r.innerHTML = `<div><strong>Auto-Expand Thinking</strong><div class="muted">Synced with CLI <code>/tk</code> via state.json</div></div><button class="btn btn-sm">${STATE.ui_prefs.show_thinking !== false ? "On" : "Collapsed"}</button>`;
+    r.querySelector("button").onclick = async () => { await api("/api/settings/ui", { show_thinking: STATE.ui_prefs.show_thinking === false }); await loadState(); };
+    pane.appendChild(r);
+  }
+}
+
+let acItems = [];
+let acHl = 0;
+
+function closeAc() {
+  $("ac-pop").classList.remove("open");
+  acItems = [];
+}
+
+function updateAutocomplete() {
+  const val = $("msg-input").value;
+  if (!val.startsWith("/") || /\s/.test(val)) { closeAc(); return; }
+  const q = val.slice(1).toLowerCase();
+  acItems = SLASH_CMDS.filter((c) => c.cmd.slice(1).startsWith(q));
+  if (!acItems.length) { closeAc(); return; }
+  if (acHl >= acItems.length) acHl = 0;
+
+  const pop = $("ac-pop");
+  pop.innerHTML = "";
+  acItems.forEach((it, idx) => {
+    const btn = document.createElement("button");
+    btn.className = "ac-item" + (idx === acHl ? " hl" : "");
+    btn.innerHTML = `<div class="ac-left"><span class="ac-key">${esc(it.cmd)}</span><span class="ac-desc">${esc(it.desc)}</span></div>`;
+    btn.onmousedown = (e) => { e.preventDefault(); pickAcItem(idx); };
+    pop.appendChild(btn);
+  });
+  pop.classList.add("open");
+}
+
+async function pickAcItem(idx) {
+  const it = acItems[idx];
+  if (!it) return;
+  const inp = $("msg-input");
+  closeAc();
+  if (it.cmd === "/task") {
+    if (STATE?.active_project?.task_md) { inp.value = ""; await sendMessage("/task"); }
+    else { inp.value = "/task "; inp.focus(); }
+    return;
+  }
+  inp.value = "";
+  await runLocalSlash(it.cmd);
+}
+
+const toggleLeft = () => {
+  const hidden = $("sidebar-left").classList.toggle("hidden");
+  localStorage.setItem("rs_rail_left_hidden", hidden ? "1" : "0");
+};
+$("btn-toggle-proj").onclick = toggleLeft;
+if (localStorage.getItem("rs_rail_left_hidden") === "1") $("sidebar-left").classList.add("hidden");
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") { e.preventDefault(); toggleLeft(); }
+  if ((e.ctrlKey || e.metaKey) && /^[1-9]$/.test(e.key) && STATE?.projects?.[+e.key - 1]) { e.preventDefault(); loadState(STATE.projects[+e.key - 1].name); }
+});
+
+$("btn-img").onclick = () => $("img-file").click();
+$("img-file").onchange = (e) => { addImageFiles(e.target.files); e.target.value = ""; };
+$("msg-input").addEventListener("paste", (e) => {
+  if (STATE?.provider?.is_local) return;
+  const imgs = Array.from(e.clipboardData?.items || []).filter(i => i.type.startsWith("image/")).map(i => i.getAsFile()).filter(Boolean);
+  if (imgs.length) { e.preventDefault(); addImageFiles(imgs); }
+});
+$("btn-send").onclick = () => sendMessage();
+$("btn-stop").onclick = () => api("/api/stop", {});
+$("btn-toggle-task").onclick = () => $("sidebar-right").classList.toggle("hidden");
+$("btn-run-task").onclick = () => {
+  const ap = STATE?.active_project;
+  if (!ap?.is_agent) return;
+  if (!ap.task_md) {
+    const inp = $("msg-input");
+    if (!inp.value.startsWith("/task")) inp.value = "/task " + inp.value;
+    inp.focus();
+    inp.setSelectionRange(inp.value.length, inp.value.length);
+    return;
+  }
+  sendMessage("/task");
+};
+$("btn-settings").onclick = () => openSettings();
+$("btn-model-pill").onclick = () => openSettings("providers");
+$("btn-close-settings").onclick = () => $("modal-settings").classList.remove("open");
+document.querySelectorAll(".nav-btn").forEach(b => b.onclick = () => {
+  ACTIVE_TAB = b.dataset.tab; renderModalTab();
+});
+
+$("sel-reasoning").onchange = async (e) => { await api("/api/settings/profile", { reasoning: e.target.value }); await loadState(); };
+$("msg-input").addEventListener("input", () => { acHl = 0; updateAutocomplete(); });
+$("msg-input").addEventListener("click", () => updateAutocomplete());
+document.addEventListener("click", (e) => { if (!e.target.closest(".composer")) closeAc(); });
+$("msg-input").addEventListener("keydown", (e) => {
+  if ($("ac-pop").classList.contains("open") && acItems.length) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault(); acHl = (acHl + 1) % acItems.length; updateAutocomplete(); return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault(); acHl = (acHl + acItems.length - 1) % acItems.length; updateAutocomplete(); return;
+    }
+    if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+      e.preventDefault(); pickAcItem(acHl); return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault(); closeAc(); return;
+    }
+  }
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+$("btn-new-proj").onclick = () => {
+  const sel = $("np-prof");
+  sel.innerHTML = (STATE?.profiles || ["chat"]).map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join("");
+  $("modal-new-proj").classList.add("open");
+};
+$("btn-close-new-proj").onclick = $("btn-cancel-np").onclick = () => $("modal-new-proj").classList.remove("open");
+$("btn-create-np").onclick = async () => {
+  const name = $("np-name").value.trim(), profile = $("np-prof").value;
+  if (!name) return;
+  try {
+    const created = await api("/api/project/create", { name, profile });
+    $("np-name").value = "";
+    $("modal-new-proj").classList.remove("open");
+    await loadState(created.name);
+  } catch (err) {
+    alert("Error: " + err.message);
+  }
+};
+
+const params = new URLSearchParams(location.search);
+loadState(params.get("project") || "");
+</script>
+<div class="proj-hover" id="proj-hover"></div>
+</body>
+</html>

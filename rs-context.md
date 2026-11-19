@@ -16,7 +16,11 @@ ai init ~/.config/rs-agent/projects/gem35 ---> gem35
 ~/.config/rs-agent/tools/model-select/model-select ---> model select, ms
 ~/.config/rs-agent/tools/new-project/new-project ---> new project, newp
 ~/.config/rs-agent/tools/test-agent/test-agent ---> test agent, ta
-~/.config/rs-agent/tools/rs-index/rs-index ---> index, idx 
+~/.config/rs-agent/tools/rs-index/rs-index ---> index, idx
+
+# --- Plugins ---
+~/.config/rs-agent/plugins/rs-rail/launch.sh ---> rail, rr
+~/.config/rs-agent/plugins/rs-rail/launch.sh web ---> rail web, rr web
 
 # --- Custom Tools ---
 curl -s "wttr.in/?format=3" ---> get weather

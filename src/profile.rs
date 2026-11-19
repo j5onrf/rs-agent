@@ -188,8 +188,8 @@ impl Profile {
                         "ctx" | "context_size" => {
                             let s = val.trim_matches(['"', '\'']).trim();
                             let n = s.parse::<usize>().ok()
-                                .or_else(|| s.strip_suffix(['k', 'K']).and_then(|v| v.parse::<usize>().ok().map(|x| x * 1024)))
-                                .or_else(|| s.strip_suffix(['m', 'M']).and_then(|v| v.parse::<usize>().ok().map(|x| x * 1048576)));
+                                .or_else(|| s.strip_suffix(['k', 'K']).and_then(|v| v.parse::<usize>().ok().map(|x| x.saturating_mul(1024))))
+                                .or_else(|| s.strip_suffix(['m', 'M']).and_then(|v| v.parse::<usize>().ok().map(|x| x.saturating_mul(1048576))));
                             if let Some(x) = n.filter(|&x| x > 0) {
                                 ctx = Some(x);
                             }
@@ -1093,7 +1093,10 @@ pub fn ensure_workspace_in_root(
         if !inserted {
             out_lines.push(route_line);
         }
-        let _ = fs::write(&ctx_path, out_lines.join("\n") + "\n");
+        let tmp_ctx = root.join(format!("rs-context.md.tmp.{}", std::process::id()));
+        if fs::write(&tmp_ctx, out_lines.join("\n") + "\n").is_ok() {
+            let _ = fs::rename(&tmp_ctx, &ctx_path);
+        }
     }
 
     Some(slug)

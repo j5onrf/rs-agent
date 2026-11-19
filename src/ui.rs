@@ -1114,7 +1114,7 @@ pub fn read_ruled_input(
 
     loop {
         let term_w = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(96);
-        let w = term_w.clamp(40, 120);
+        let w = term_w.clamp(16, 120);
         let rule = "─".repeat(w);
         let text_avail = w.saturating_sub(3).max(10);
 

@@ -1,0 +1,12 @@
+{
+  "name": "Claude",
+  "mode": "dark",
+  "bg": "#141413",
+  "panel": "#1b1a18",
+  "card": "#23221f",
+  "border": "#36332e",
+  "text": "#f0efec",
+  "muted": "#b1ada1",
+  "accent": "#d97757",
+  "cyan": "#83a598"
+}
