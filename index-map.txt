@@ -21,12 +21,14 @@
 #   ├── plugins/mcp/servers.json         - "servers": {
 #   ├── plugins/rs-rail/Cargo.toml       - name = "rs-rail"
 #   ├── plugins/rs-rail/Readme.md        - Native Rust local HTTP+SSE web surface for `rs-agent` — zero `pi-agent`, zero No
+#   ├── plugins/rs-rail/config.json      - "show_right_panel": true,
 #   ├── plugins/rs-rail/launch.sh        - #!/usr/bin/env bash
 #   ├── plugins/rs-rail/rs-rail.desktop  - [Desktop Entry]
 #   ├── plugins/rs-rail/src/main.rs      - CLI Entrypoint & Runtime Loop
 #   ├── plugins/rs-rail/src/ui.html      - --bg: #0c0c0e;
 #   ├── plugins/rs-rail/themes/claude.json - "name": "Claude",
 #   ├── plugins/rs-rail/themes/noctalia.json - "name": "Noctalia",
+#   ├── plugins/rs-rail/themes/openbot.json - "name": "OpenBot",
 #   ├── plugins/t3code/Cargo.toml        - name = "t3code-bridge"
 #   ├── plugins/t3code/Readme.md         - A native Rust Agent Client Protocol (ACP) stdio bridge connecting the `rs-agent`
 #   ├── plugins/t3code/launch.sh         - #!/usr/bin/env bash
@@ -51,6 +53,8 @@
 #   ├── projects/gem35/math_demo.py      - def is_prime(n):
 #   ├── projects/groot/math_demo.py      - def is_prime(n):
 #   ├── projects/lfm3/math_demo.py       - def is_prime(n):
+#   ├── projects/ling-tiny/hello_test.py - print("hello world")
+#   ├── projects/ling-tiny/math_demo.py  - #!/usr/bin/env python3
 #   ├── projects/nemo/math_utils.py      - #!/usr/bin/env python3
 #   ├── projects/sage/test_calc.py       - def add(a, b):
 #   ├── projects/tokenlab/calc.py        - def add(a, b):
@@ -71,7 +75,7 @@
 #   ├── src/security.rs                  - types: SecurityBoundary
 #   ├── src/skill.rs                     - types: Skill, SkillAction
 #   ├── src/spinner.rs                   - types: InlineSpinner
-#   ├── src/state.rs                     - types: AppState
+#   ├── src/state.rs                     - types: AppState, WorkspaceSession
 #   ├── src/stream.rs                    - types: UsageStats, StreamRenderer
 #   ├── src/tools.rs                     - fn: is_read_only_tool, get_tools_schema, get_tools_schema_with_mcp
 #   ├── src/ui.rs                        - types: InputResult
@@ -95,11 +99,11 @@
 
 ### `plugins/rs-rail/src/main.rs`
 ```rust
-  L040: impl Default for RailConfig {
-    L041: fn default() -> Self;
+  L042: impl Default for RailConfig {
+    L043: fn default() -> Self;
   }
-  L1604: async fn main() -> Result<()>;
-  L1624: mod tests;
+  L1890: async fn main() -> Result<()>;
+  L1910: mod tests;
 ```
 
 ### `plugins/t3code/src/main.rs`
@@ -137,9 +141,9 @@
   L054: impl Drop for CursorHideGuard {
     L055: fn drop(&mut self);
   }
-  L139: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
-  L156: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff, Mcp { .. } }
-  L1124: async fn main() -> anyhow :: Result<()>;
+  L146: /* CLI */ struct Cli { command: Option<Commands>, bridge: bool }
+  L163: /* CLI */ enum Commands { Init { .. }, Match { .. }, New { .. }, Handoff, Mcp { .. } }
+  L1152: async fn main() -> anyhow :: Result<()>;
 ```
 
 ### `tools/model-select/src/lib.rs`
@@ -148,8 +152,8 @@
   L019: impl Drop for RawModeGuard {
     L020: fn drop(&mut self);
   }
-  L369: pub fn run_selector(alt_screen: bool) -> io :: Result<SelectOutcome>;
-  L545: mod tests;
+  L372: pub fn run_selector(alt_screen: bool) -> io :: Result<SelectOutcome>;
+  L551: mod tests;
 ```
 
 ### `tools/model-select/src/main.rs`
@@ -222,14 +226,14 @@
   L105: pub fn get_env_path() -> PathBuf;
   L111: pub fn set_profile_max_tokens(val: Option<usize>);
   L115: pub fn get_max_tokens() -> usize;
-  L128: pub fn get_max_rounds() -> usize;
-  L137: pub fn get_context_ceilings() -> ContextCeilings;
-  L150: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, ... (5 fields) }
-  L187: impl ProviderConfig {
-    L188: pub async fn load() -> Self;
+  L137: pub fn get_max_rounds() -> usize;
+  L146: pub fn get_context_ceilings() -> ContextCeilings;
+  L159: pub struct ProviderConfig { pub base_url: String, pub api_key: String, pub model: String, ... (5 fields) }
+  L196: impl ProviderConfig {
+    L197: pub async fn load() -> Self;
   }
-  L266: pub fn load_global_instructions() -> Option<String>;
-  L288: mod tests;
+  L275: pub fn load_global_instructions() -> Option<String>;
+  L297: mod tests;
 ```
 
 ### `src/matcher.rs`
@@ -344,17 +348,21 @@
 
 ### `src/state.rs`
 ```rust
-  L005: pub struct AppState { pub box_style: usize, pub pad: bool, pub show_thinking_summaries: Option<bool> }
-  L017: impl Default for AppState {
-    L018: fn default() -> Self;
+  L006: pub struct AppState { pub box_style: usize, pub pad: bool, pub show_thinking_summaries: Option<bool> }
+  L018: impl Default for AppState {
+    L019: fn default() -> Self;
   }
-  L046: pub fn get_box_style() -> usize;
-  L061: pub fn set_box_style(style: usize);
-  L067: pub fn get_pad() -> bool;
-  L071: pub fn set_pad(pad: bool);
-  L077: pub fn get_show_thinking_summaries() -> Option<bool>;
-  L081: pub fn set_show_thinking_summaries(val: Option<bool>);
-  L087: mod tests;
+  L047: pub fn get_box_style() -> usize;
+  L062: pub fn set_box_style(style: usize);
+  L068: pub fn get_pad() -> bool;
+  L072: pub fn set_pad(pad: bool);
+  L078: pub fn get_show_thinking_summaries() -> Option<bool>;
+  L082: pub fn set_show_thinking_summaries(val: Option<bool>);
+  L088: pub struct WorkspaceSession { pub messages: Vec<ChatMessage>, pub ui_history: Option<serde_json :: Value>, pub last_stats: Option<serde_json :: Value>, ... (5 fields) }
+  L102: pub fn load_workspace_session(workspace: &Path) -> WorkspaceSession;
+  L109: pub fn save_workspace_session(workspace: &Path, session: &WorkspaceSession);
+  L130: pub fn clear_workspace_session(workspace: &Path);
+  L134: mod tests;
 ```
 
 ### `src/stream.rs`

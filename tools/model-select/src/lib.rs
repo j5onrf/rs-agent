@@ -238,7 +238,9 @@ fn load_governors(lines: &[String]) -> (usize, Option<usize>, usize, Option<usiz
         } else if uncommented.starts_with("AI_MAX_AGENT_ROUNDS") {
             rounds_line_idx = Some(idx);
             let val = extract_quoted_val(uncommented);
-            if let Ok(v) = val.parse::<usize>() {
+            if val == "0" || val.eq_ignore_ascii_case("unlimited") {
+                max_rounds = 0;
+            } else if let Ok(v) = val.parse::<usize>() {
                 max_rounds = v;
             }
         }
@@ -348,9 +350,10 @@ fn render_tui(
     ));
 
     let rnd_ptr = if cursor == rnd_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
+    let rnd_str = if max_rounds == 0 { "unlimited".to_string() } else { format!("{} steps", max_rounds) };
     buf.push_str(&format!(
-        "   {} 🔄  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{} steps\x1b[0m\r\n\r\n",
-        rnd_ptr, "Task Loop Limit", max_rounds
+        "   {} 🔄  \x1b[1;37m{:<28}\x1b[0m \x1b[1;33m{}\x1b[0m\r\n\r\n",
+        rnd_ptr, "Task Loop Limit", rnd_str
     ));
 
     let exit_ptr = if cursor == exit_idx { "\x1b[1;36m❯\x1b[0m " } else { "  " };
@@ -488,7 +491,9 @@ pub fn run_selector(alt_screen: bool) -> io::Result<SelectOutcome> {
                             15 => 20,
                             20 => 25,
                             25 => 30,
-                            _ => 5,
+                            30 => 0,
+                            0 => 5,
+                            _ => 15,
                         };
                         let save_res = save_to_env(
                             &env_path,
@@ -502,9 +507,10 @@ pub fn run_selector(alt_screen: bool) -> io::Result<SelectOutcome> {
                         match save_res {
                             Ok(()) => {
                                 changed = true;
+                                let rnd_saved = if max_rounds == 0 { "unlimited".to_string() } else { format!("{} steps", max_rounds) };
                                 status_message = Some(format!(
-                                    "\x1b[1;32m✓\x1b[0m Task Loop Limit: \x1b[1;33m{} steps\x1b[0m \x1b[2m[saved]\x1b[0m",
-                                    max_rounds
+                                    "\x1b[1;32m✓\x1b[0m Task Loop Limit: \x1b[1;33m{}\x1b[0m \x1b[2m[saved]\x1b[0m",
+                                    rnd_saved
                                 ));
                             }
                             Err(e) => {
