@@ -209,12 +209,18 @@ impl AppRuntime {
             None => None,
         };
 
-        let prof = Profile::load(&cfg.profile_name).unwrap_or_else(|| Profile::parse("ROLE: Assistant."));
+        let loaded_prof = Profile::load(&cfg.profile_name);
+        let profile_missing = loaded_prof.is_none();
+        let prof = loaded_prof.unwrap_or_else(|| Profile::parse("ROLE: Assistant."));
         if is_agent && !proj_dir.join(".rs/config.json").is_file() {
             cfg.tier = prof.tier.clone();
             cfg.adapters = prof.adapters;
             cfg.delegate = prof.delegate;
             let _ = cfg.save(&proj_dir);
+        }
+        // Omit profile label in header only when its .md file is missing on disk.
+        if profile_missing {
+            cfg.profile_name.clear();
         }
         let hud_summary = prof.hud_summary(cfg.is_agent);
         set_profile_max_tokens(prof.ctx);
@@ -2432,6 +2438,18 @@ mod tests {
         let sess = app.load_or_init_session("demo");
         assert!(sess.is_agent);
         assert!(tmp.join("projects/demo/.rs/config.json").is_file());
+
+        fs::create_dir_all(tmp.join("projects/missingprof")).unwrap();
+        WorkspaceConfig {
+            profile_name: "no-such-profile-xyz".into(),
+            is_agent: true,
+            tier: ToolTier::Smol,
+            adapters: false,
+            delegate: false,
+        }
+        .save(tmp.join("projects/missingprof"))
+        .unwrap();
+        assert!(app.load_or_init_session("missingprof").profile_name.is_empty());
         let _ = fs::remove_dir_all(&tmp);
     }
 

@@ -137,10 +137,9 @@
   .turn-wrap { max-width: 880px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
   .msg-user { align-self: flex-end; background: var(--user-bg); border: 1px solid var(--user-border); color: var(--user-text); padding: 8px 13px; border-radius: 10px; max-width: 78%; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
   .msg-assistant { display: flex; flex-direction: column; gap: 8px; }
-  .stream.chat-mode .msg-assistant { align-self: flex-start; max-width: 78%; min-width: 0; background: var(--card); border: 1px solid var(--border); padding: 8px 13px; border-radius: 10px; }
+  .stream.chat-mode .msg-assistant { align-self: flex-start; max-width: 78%; min-width: 0; background: var(--panel); border: 1px solid var(--border); padding: 8px 13px; border-radius: 10px; }
   .stream.chat-mode .msg-assistant:empty { display: none; }
-  .stream.chat-mode .ans-row > .bullet { display: none; }
-  .stream.chat-mode .ans-body code { background: var(--panel); }
+  .stream.chat-mode .ans-body code { background: var(--card); }
   .stream.chat-mode .think-box summary { margin-left: -4px; }
   .stream.chat-mode .think-box summary:hover { background: var(--hover); }
   .think-box { color: var(--dim); font-size: 12px; }
@@ -504,7 +503,7 @@ function applyAppearance(next) {
     "--accent": t.accent, "--accent-fg": accentFg,
     "--accent-bg": `color-mix(in srgb, ${t.accent} 14%, transparent)`,
     "--topbar-bg": t.topbar_bg || t.panel,
-    "--user-bg": t.user_bg || `color-mix(in srgb, ${t.accent} ${isLight ? "11%" : "16%"}, ${t.panel})`,
+    "--user-bg": t.user_bg || `color-mix(in srgb, ${t.accent} ${isLight ? "20%" : "22%"}, ${t.panel})`,
     "--user-border": t.user_border || `color-mix(in srgb, ${t.accent} ${isLight ? "34%" : "42%"}, ${t.border})`,
     "--user-text": t.text,
     "--active-bg": t.active_bg || `color-mix(in srgb, ${t.accent} 16%, ${t.panel})`,
@@ -688,8 +687,12 @@ function setRsNote(msg) {
 function renderAll() {
   if (!STATE) return;
   const ap = STATE.active_project;
-  const headLabel = ap.profile_name && ap.profile_name !== ap.name ? `${ap.name} · ${ap.profile_name}` : ap.name;
+  const normId = (s) => String(s || "").split("/").pop().toLowerCase().replace(/[-_]/g, "");
+  const headLabel = !ap.profile_name
+    ? `${ap.name} · missing profile`
+    : (normId(ap.profile_name) !== normId(ap.name) ? `${ap.name} · ${ap.profile_name}` : ap.name);
   $("tb-profile").textContent = `${headLabel} · ${ap.hud_summary}`;
+  $("tb-profile").title = ap.profile_name ? `Project: ${ap.name}\nProfile: ${ap.profile_name}` : `Project: ${ap.name}\nProfile file missing`;
   $("tb-git").textContent = ap.git || "git: [none]";
   $("btn-model-pill").textContent = `${STATE.provider.model} · ${STATE.provider.endpoint}`;
   $("btn-img").style.display = STATE.provider.is_local ? "none" : "inline-flex";

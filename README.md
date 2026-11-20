@@ -1,7 +1,7 @@
 <h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
 
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.8.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.7.9.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=secondary&logo=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT.svg?variant=secondary" alt="License"></a>
@@ -61,13 +61,13 @@
 
 ## <img alt="rs-rail" src="assets/rs-rail.svg" width="26" height="26" /> RS Rail (Desktop & Web)
 
-**rs-rail** is a native Rust web and frameless desktop surface running on `http://127.0.0.1:24243`, built directly on the in-process `rs-agent` engine.
+**rs-rail** is a native web and desktop UI in a single Rust binary with `ui.html` compiled in, running on `http://127.0.0.1:24243` and built directly on `rs-agent`.
 
 | Feature | Mechanism | Behavior |
 | :--- | :--- | :--- |
 | **Frameless App** | `rail` · `rr` | Dedicated standalone desktop app window (`--app=http://127.0.0.1:24243`) |
 | **Browser Tab** | `rail web` · `rr web` | Standard browser tab via `xdg-open` |
-| **Themes & Fonts** | Settings & Appearance | 3 built-in themes (`Dark Default`, `Dark Green`, `Pure Light`), live Omarchy & Noctalia sync, custom `themes/*.json`, `JetBrains Mono` / `Geist` / `Fira Code`, optional syntax highlighting |
+| **Themes & Fonts** | Settings & Appearance | `Dark Default` fallback, live `Omarchy` & `Noctalia` desktop sync, `+ Noctalia` palette browser (Core & Community, `Dark`/`Light`), deletable `themes/*.json` (`Pure Light`, `Claude`, `DarkBot`), `JetBrains Mono` / `Geist` / `Fira Code`, syntax highlighting & ligatures |
 
 ---
 
@@ -110,14 +110,14 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
-╭─── rs-agent v0.7.8 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.7.9 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ purebash · t256 · adp · mcp:photocraft(7)   │
 │   │ Li │  artcraft/photocraft-l            │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · clean                │ ─────────────────────────────────────────── │
 │   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · 15 steps · local                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 
-╭─── rs-agent v0.7.8 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.7.9 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  nvidia/nemotron-3.5-lightning:fr…│ core4 · medium                              │
 │   │ nv │  nemo                             │ ─────────────────────────────────────────── │
 │   ╰────╯  git: main · 9 modified           │ ctx 65.5k · 10 steps · openrouter           │
