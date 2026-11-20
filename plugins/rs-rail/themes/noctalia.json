@@ -1,12 +1,12 @@
 {
   "name": "Noctalia",
   "mode": "dark",
-  "bg": "#32302f",
-  "panel": "#373432",
-  "card": "#3c3836",
-  "border": "#504945",
-  "text": "#ddc7a1",
-  "muted": "#d4be98",
-  "accent": "#a9b665",
-  "cyan": "#e78a4e"
+  "bg": "#242e0f",
+  "panel": "#1e260d",
+  "card": "#3c4c1a",
+  "border": "#6f7661",
+  "text": "#f2f3f2",
+  "muted": "#b4b6af",
+  "accent": "#bde467",
+  "cyan": "#72d65c"
 }

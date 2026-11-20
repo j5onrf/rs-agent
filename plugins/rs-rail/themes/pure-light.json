@@ -1,0 +1,14 @@
+{
+  "name": "Pure Light",
+  "mode": "light",
+  "bg": "#ffffff",
+  "panel": "#f8f9fa",
+  "card": "#f1f3f4",
+  "border": "#dadce0",
+  "text": "#1f1f1f",
+  "muted": "#5f6368",
+  "accent": "#1a73e8",
+  "cyan": "#1a73e8",
+  "active_bg": "#e8f0fe",
+  "active_border": "#a8c7fa"
+}

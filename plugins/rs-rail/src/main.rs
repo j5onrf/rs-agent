@@ -136,6 +136,9 @@ struct AppRuntime {
     next_perm_id: AtomicU64,
     active_clients: AtomicUsize,
     client_seq: AtomicU64,
+    http: reqwest::Client,
+    noctalia_catalog: Mutex<Option<Vec<Value>>>,
+    noctalia_registry: Mutex<HashMap<String, Value>>,
 }
 
 impl AppRuntime {
@@ -143,10 +146,19 @@ impl AppRuntime {
         let root = dirs::home_dir()
             .map(|h| h.join(".config/rs-agent"))
             .unwrap_or_else(|| PathBuf::from("."));
+        Self::new_in(root)
+    }
+
+    fn new_in(root: PathBuf) -> Self {
         let initial = RailConfig::load(&root.join("plugins/rs-rail/config.json"))
             .last_project
             .filter(|p| is_valid_slug(p) && root.join("projects").join(p).is_dir())
             .unwrap_or_else(|| "chat".into());
+        let http = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(12))
+            .user_agent("rs-rail")
+            .build()
+            .unwrap_or_default();
         Self {
             root,
             sessions: Mutex::new(HashMap::new()),
@@ -155,6 +167,9 @@ impl AppRuntime {
             next_perm_id: AtomicU64::new(1),
             active_clients: AtomicUsize::new(0),
             client_seq: AtomicU64::new(0),
+            http,
+            noctalia_catalog: Mutex::new(None),
+            noctalia_registry: Mutex::new(HashMap::new()),
         }
     }
 
@@ -632,6 +647,9 @@ fn load_themes(themes_dir: &Path) -> Vec<Value> {
         if let Some(t) = omarchy_t {
             out.push(t);
         }
+        if let Some(t) = parse_noctalia_live() {
+            out.push(t);
+        }
     }
     let mut files = Vec::new();
     if let Ok(rd) = fs::read_dir(themes_dir) {
@@ -673,6 +691,474 @@ fn load_themes(themes_dir: &Path) -> Vec<Value> {
         out.push(obj);
     }
     out
+}
+
+fn is_valid_hex(s: &str) -> bool {
+    let b = s.as_bytes();
+    b.len() == 7 && b[0] == b'#' && b[1..].iter().all(|c| c.is_ascii_hexdigit())
+}
+
+fn hex_rgb(s: &str) -> Option<(u8, u8, u8)> {
+    if !is_valid_hex(s) {
+        return None;
+    }
+    let r = u8::from_str_radix(&s[1..3], 16).ok()?;
+    let g = u8::from_str_radix(&s[3..5], 16).ok()?;
+    let b = u8::from_str_radix(&s[5..7], 16).ok()?;
+    Some((r, g, b))
+}
+
+fn rel_lum(c: u8) -> f64 {
+    let x = c as f64 / 255.0;
+    if x <= 0.03928 { x / 12.92 } else { ((x + 0.055) / 1.055).powf(2.4) }
+}
+
+fn contrast_ratio(a: &str, b: &str) -> f64 {
+    let (Some((r1, g1, b1)), Some((r2, g2, b2))) = (hex_rgb(a), hex_rgb(b)) else {
+        return 1.0;
+    };
+    let l1 = 0.2126 * rel_lum(r1) + 0.7152 * rel_lum(g1) + 0.0722 * rel_lum(b1);
+    let l2 = 0.2126 * rel_lum(r2) + 0.7152 * rel_lum(g2) + 0.0722 * rel_lum(b2);
+    let (hi, lo) = if l1 > l2 { (l1, l2) } else { (l2, l1) };
+    (hi + 0.05) / (lo + 0.05)
+}
+
+fn blend_hex(a: &str, b: &str, t: f64) -> String {
+    let (Some((r1, g1, b1)), Some((r2, g2, b2))) = (hex_rgb(a), hex_rgb(b)) else {
+        return a.to_string();
+    };
+    let mix = |x: u8, y: u8| -> u8 { ((x as f64) * (1.0 - t) + (y as f64) * t).round().clamp(0.0, 255.0) as u8 };
+    format!("#{:02x}{:02x}{:02x}", mix(r1, r2), mix(g1, g2), mix(b1, b2))
+}
+
+fn pick_hex<'a>(v: &'a Value, keys: &[&str]) -> Option<&'a str> {
+    keys.iter().find_map(|k| v.get(*k).and_then(|x| x.as_str())).filter(|s| is_valid_hex(s))
+}
+
+fn map_noctalia_variant(name: &str, mode: &str, variant: &Value) -> Option<Value> {
+    let bg = pick_hex(variant, &["surface", "mSurface"])?;
+    let card = pick_hex(variant, &["surface_container", "surfaceVariant", "mSurfaceVariant"]).unwrap_or(bg);
+    let panel = pick_hex(variant, &["surface_container_low"])
+        .map(ToString::to_string)
+        .unwrap_or_else(|| blend_hex(bg, card, 0.5));
+    let border = pick_hex(variant, &["outline_variant", "outline", "mOutline"]).unwrap_or("#2c303a");
+    let text = pick_hex(variant, &["on_surface", "mOnSurface"]).unwrap_or("#e5e7eb");
+    let muted = pick_hex(variant, &["on_surface_variant", "mOnSurfaceVariant"]).unwrap_or("#8b92a0");
+    let accent = pick_hex(variant, &["primary", "mPrimary"])?;
+    let sec = pick_hex(variant, &["secondary", "mSecondary"]);
+    let ter = pick_hex(variant, &["tertiary", "mTertiary"]);
+    let cyan = [sec, ter, Some(accent)]
+        .into_iter()
+        .flatten()
+        .find(|c| contrast_ratio(c, bg) >= 3.0)
+        .unwrap_or(accent);
+    let actual_mode = if mode == "light" { "light" } else { "dark" };
+    Some(json!({
+        "name": name, "mode": actual_mode,
+        "bg": bg, "panel": panel, "card": card, "border": border,
+        "text": text, "muted": muted, "accent": accent, "cyan": cyan
+    }))
+}
+
+#[derive(Clone, Copy)]
+struct BuiltinColors {
+    bg: &'static str,
+    panel: &'static str,
+    card: &'static str,
+    border: &'static str,
+    text: &'static str,
+    muted: &'static str,
+    accent: &'static str,
+    cyan: &'static str,
+}
+
+impl BuiltinColors {
+    fn to_variant_json(self) -> Value {
+        json!({
+            "surface": self.bg, "surface_container_low": self.panel, "surface_container": self.card,
+            "outline_variant": self.border, "on_surface": self.text, "on_surface_variant": self.muted,
+            "primary": self.accent, "secondary": self.cyan
+        })
+    }
+
+    fn preview(self) -> Value {
+        json!({ "bg": self.bg, "accent": self.accent, "cyan": self.cyan })
+    }
+}
+
+struct BuiltinPalette {
+    name: &'static str,
+    dark: BuiltinColors,
+    light: BuiltinColors,
+}
+
+const BUILTIN_NOCTALIA: &[BuiltinPalette] = &[
+    BuiltinPalette {
+        name: "Noctalia",
+        dark: BuiltinColors { bg: "#070722", panel: "#0c0c27", card: "#11112d", border: "#21215f", text: "#f3edf7", muted: "#7c80b4", accent: "#fff59b", cyan: "#a9aefe" },
+        light: BuiltinColors { bg: "#f3edf7", panel: "#eae3f2", card: "#e1d9ec", border: "#c5bdd6", text: "#070722", muted: "#4b4e7d", accent: "#3d449b", cyan: "#5960b8" },
+    },
+    BuiltinPalette {
+        name: "Ayu",
+        dark: BuiltinColors { bg: "#0b0e14", panel: "#131720", card: "#1e222a", border: "#3d424d", text: "#d1d1c7", muted: "#8e959e", accent: "#ffb454", cyan: "#39bae6" },
+        light: BuiltinColors { bg: "#f8f9fa", panel: "#eff1f3", card: "#e4e6e9", border: "#c9cdd2", text: "#42474c", muted: "#6e757c", accent: "#ff8f40", cyan: "#55b4d4" },
+    },
+    BuiltinPalette {
+        name: "Catppuccin",
+        dark: BuiltinColors { bg: "#1e1e2e", panel: "#272839", card: "#313244", border: "#585b70", text: "#cdd6f4", muted: "#a6adc8", accent: "#cba6f7", cyan: "#89b4fa" },
+        light: BuiltinColors { bg: "#eff1f5", panel: "#e6e9ef", card: "#ccd0da", border: "#9ca0b0", text: "#4c4f69", muted: "#6c6f85", accent: "#8839ef", cyan: "#1e66f5" },
+    },
+    BuiltinPalette {
+        name: "Dracula",
+        dark: BuiltinColors { bg: "#282a36", panel: "#313443", card: "#44475a", border: "#6272a4", text: "#f8f8f2", muted: "#b6bfd9", accent: "#bd93f9", cyan: "#8be9fd" },
+        light: BuiltinColors { bg: "#fffbeb", panel: "#f4efe0", card: "#e8e3d5", border: "#cfcfde", text: "#1f1f1f", muted: "#6c664b", accent: "#644ac9", cyan: "#036a96" },
+    },
+    BuiltinPalette {
+        name: "Eldritch",
+        dark: BuiltinColors { bg: "#212337", panel: "#292b40", card: "#323449", border: "#454759", text: "#ebfafa", muted: "#a4b1cd", accent: "#37f499", cyan: "#04d1f9" },
+        light: BuiltinColors { bg: "#eef7f7", panel: "#e2eeee", card: "#d5e4e4", border: "#b3c8c8", text: "#212337", muted: "#454759", accent: "#128a56", cyan: "#027a96" },
+    },
+    BuiltinPalette {
+        name: "Gruvbox",
+        dark: BuiltinColors { bg: "#282828", panel: "#2d2c2c", card: "#32302f", border: "#504945", text: "#ebdbb2", muted: "#a89984", accent: "#a9b665", cyan: "#7db2ba" },
+        light: BuiltinColors { bg: "#fbf1c7", panel: "#f2e5bc", card: "#ebdbb2", border: "#bdae93", text: "#3c3836", muted: "#665c54", accent: "#79740e", cyan: "#427b58" },
+    },
+    BuiltinPalette {
+        name: "Kanagawa",
+        dark: BuiltinColors { bg: "#1f1f28", panel: "#252530", card: "#2a2a37", border: "#54546d", text: "#dcd7ba", muted: "#9cabca", accent: "#7e9cd8", cyan: "#7fb4ca" },
+        light: BuiltinColors { bg: "#f2ecbc", panel: "#e7e1b1", card: "#dcd5a5", border: "#b5a67b", text: "#545464", muted: "#716e61", accent: "#4d699b", cyan: "#597b75" },
+    },
+    BuiltinPalette {
+        name: "Nord",
+        dark: BuiltinColors { bg: "#2e3440", panel: "#353b49", card: "#3b4252", border: "#4c566a", text: "#eceff4", muted: "#d8dee9", accent: "#88c0d0", cyan: "#81a1c1" },
+        light: BuiltinColors { bg: "#eceff4", panel: "#e5e9f0", card: "#d8dee9", border: "#b8c2d1", text: "#2e3440", muted: "#4c566a", accent: "#5e81ac", cyan: "#4c7b8b" },
+    },
+    BuiltinPalette {
+        name: "Rosé Pine",
+        dark: BuiltinColors { bg: "#191724", panel: "#1f1d2e", card: "#26233a", border: "#403d52", text: "#e0def4", muted: "#908caa", accent: "#ebbcba", cyan: "#9ccfd8" },
+        light: BuiltinColors { bg: "#faf4ed", panel: "#fffaf3", card: "#f2e9e1", border: "#dfdad9", text: "#575279", muted: "#797593", accent: "#d7827e", cyan: "#56949f" },
+    },
+    BuiltinPalette {
+        name: "Tokyo-Night",
+        dark: BuiltinColors { bg: "#1a1b26", panel: "#1f2335", card: "#24283b", border: "#414868", text: "#c0caf5", muted: "#a9b1d6", accent: "#7aa2f7", cyan: "#7dcfff" },
+        light: BuiltinColors { bg: "#e1e2e7", panel: "#d5d6db", card: "#c8c9d0", border: "#a8aecb", text: "#343b58", muted: "#6172b0", accent: "#2e7de9", cyan: "#007197" },
+    },
+];
+
+fn norm_palette_key(s: &str) -> String {
+    s.chars()
+        .filter_map(|c| match c {
+            'é' | 'è' | 'ê' | 'ë' | 'É' | 'È' | 'Ê' | 'Ë' => Some('e'),
+            c if c.is_ascii_alphanumeric() => Some(c.to_ascii_lowercase()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn read_toml_theme_section(path: &Path, map: &mut HashMap<String, String>) -> bool {
+    let Ok(raw) = fs::read_to_string(path) else { return false };
+    let mut in_theme = false;
+    for line in raw.lines() {
+        let t = line.trim();
+        if t.is_empty() || t.starts_with('#') {
+            continue;
+        }
+        if t.starts_with('[') && t.ends_with(']') {
+            in_theme = t == "[theme]";
+            continue;
+        }
+        if in_theme {
+            if let Some((k, v)) = t.split_once('=') {
+                let val = strip_inline_comment(v.trim()).trim_matches(['"', '\'']).trim();
+                if !val.is_empty() {
+                    map.insert(k.trim().to_string(), val.to_string());
+                }
+            }
+        }
+    }
+    true
+}
+
+fn read_noctalia_palette_file(path: &Path, mode: &str) -> Option<Value> {
+    let raw = fs::read_to_string(path).ok()?;
+    let v: Value = serde_json::from_str(&raw).ok()?;
+    let variant = v.get(mode).or_else(|| v.get("dark")).unwrap_or(&v);
+    let m = if v.get(mode).is_some() {
+        mode
+    } else if pick_hex(variant, &["surface", "mSurface"]).is_some_and(is_light_hex) {
+        "light"
+    } else {
+        "dark"
+    };
+    map_noctalia_variant("Noctalia", m, variant)
+}
+
+fn as_live_noctalia(mut theme: Value) -> Value {
+    theme["id"] = json!("noctalia");
+    theme["source"] = json!("live");
+    theme
+}
+
+fn parse_noctalia_live_in(cfg_dir: &Path, state_dir: &Path) -> Option<Value> {
+    parse_noctalia_live_raw(cfg_dir, state_dir).map(as_live_noctalia)
+}
+
+fn parse_noctalia_live_raw(cfg_dir: &Path, state_dir: &Path) -> Option<Value> {
+    // 1. Direct colors.json (Noctalia v4 or v5 user template)
+    if let Some(theme) = read_noctalia_palette_file(&cfg_dir.join("colors.json"), "dark") {
+        return Some(theme);
+    }
+
+    // 2. Noctalia v5 TOML config + state override
+    let mut map = HashMap::new();
+    let mut found = read_toml_theme_section(&cfg_dir.join("config.toml"), &mut map);
+    found |= read_toml_theme_section(&cfg_dir.join("settings.toml"), &mut map);
+    found |= read_toml_theme_section(&state_dir.join("settings.toml"), &mut map);
+    if !found {
+        return None;
+    }
+
+    let mode = if map.get("mode").is_some_and(|m| m.eq_ignore_ascii_case("light")) { "light" } else { "dark" };
+    let source = map.get("source").map(String::as_str).unwrap_or("builtin");
+
+    if source == "community" {
+        if let Some(name) = map.get("community_palette") {
+            let p1 = state_dir.join("community-palettes").join(format!("{name}.json"));
+            let p2 = state_dir.join("community-palettes").join(name).join(format!("{name}.json"));
+            if let Some(t) = read_noctalia_palette_file(&p1, mode).or_else(|| read_noctalia_palette_file(&p2, mode)) {
+                return Some(t);
+            }
+        }
+    } else if source == "custom" {
+        if let Some(name) = map.get("custom_palette") {
+            let p = cfg_dir.join("palettes").join(format!("{name}.json"));
+            if let Some(t) = read_noctalia_palette_file(&p, mode) {
+                return Some(t);
+            }
+        }
+    }
+
+    let wanted = map.get("builtin_palette").or_else(|| map.get("builtin")).map(String::as_str).unwrap_or("Noctalia");
+    let wanted_k = norm_palette_key(wanted);
+    let b = BUILTIN_NOCTALIA
+        .iter()
+        .find(|p| norm_palette_key(p.name) == wanted_k)
+        .unwrap_or(&BUILTIN_NOCTALIA[0]);
+    let v = if mode == "light" { b.light.to_variant_json() } else { b.dark.to_variant_json() };
+    map_noctalia_variant("Noctalia", mode, &v)
+}
+
+fn parse_noctalia_live() -> Option<Value> {
+    let home = dirs::home_dir()?;
+    let cfg_dir = std::env::var_os("NOCTALIA_CONFIG_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("XDG_CONFIG_HOME").map(|p| PathBuf::from(p).join("noctalia")))
+        .unwrap_or_else(|| home.join(".config/noctalia"));
+    let state_dir = std::env::var_os("NOCTALIA_STATE_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("XDG_STATE_HOME").map(|p| PathBuf::from(p).join("noctalia")))
+        .unwrap_or_else(|| home.join(".local/state/noctalia"));
+    parse_noctalia_live_in(&cfg_dir, &state_dir)
+}
+
+fn url_encode_segment(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for &b in s.as_bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{:02X}", b));
+        }
+    }
+    out
+}
+
+fn palette_slug(name: &str, mode: &str) -> String {
+    let mut base = String::new();
+    let mut prev_dash = true;
+    for ch in name.chars() {
+        let mapped = match ch {
+            'é' | 'è' | 'ê' | 'ë' | 'É' | 'È' | 'Ê' | 'Ë' => Some('e'),
+            c if c.is_ascii_alphanumeric() => Some(c.to_ascii_lowercase()),
+            _ => None,
+        };
+        if let Some(c) = mapped {
+            base.push(c);
+            prev_dash = false;
+        } else if !prev_dash {
+            base.push('-');
+            prev_dash = true;
+        }
+    }
+    while base.ends_with('-') {
+        base.pop();
+    }
+    if base.len() > 40 {
+        base.truncate(40);
+        while base.ends_with('-') {
+            base.pop();
+        }
+    }
+    if base.is_empty() {
+        base = "theme".into();
+    }
+    if mode == "light" { format!("{base}-light") } else { base }
+}
+
+fn preview_from_variant(v: &Value) -> Value {
+    let bg = pick_hex(v, &["surface", "mSurface"]).unwrap_or("#141416");
+    let accent = pick_hex(v, &["primary", "mPrimary"]).unwrap_or("#38bdf8");
+    let cyan = pick_hex(v, &["secondary", "mSecondary", "tertiary", "mTertiary"]).unwrap_or(accent);
+    json!({ "bg": bg, "accent": accent, "cyan": cyan })
+}
+
+async fn fetch_json_ok(http: &reqwest::Client, url: &str) -> Option<Value> {
+    let resp = http.get(url).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    resp.json::<Value>().await.ok()
+}
+
+async fn fetch_noctalia_catalog(app: &AppRuntime, force: bool) -> (Vec<Value>, Option<String>) {
+    if !force {
+        if let Some(ref cached) = *app.noctalia_catalog.lock().await {
+            return (cached.clone(), None);
+        }
+    }
+
+    let mut list: Vec<Value> = BUILTIN_NOCTALIA
+        .iter()
+        .map(|b| {
+            json!({
+                "name": b.name,
+                "base": "Core",
+                "core": true,
+                "slug_dark": palette_slug(b.name, "dark"),
+                "slug_light": palette_slug(b.name, "light"),
+                "dark": b.dark.preview(),
+                "light": b.light.preview()
+            })
+        })
+        .collect();
+
+    let remote = match fetch_json_ok(&app.http, "https://api.noctalia.dev/palettes").await {
+        Some(v) => Some(v),
+        None => fetch_json_ok(&app.http, "https://raw.githubusercontent.com/noctalia-dev/community-palettes/main/registry.json").await,
+    };
+
+    let Some(val) = remote else {
+        return (list, Some("Offline: showing 10 Noctalia Core palettes only".into()));
+    };
+
+    let mut reg_map = HashMap::new();
+    let arr_opt = val.as_array().or_else(|| val.get("themes").and_then(|t| t.as_array()));
+    let mut community = Vec::new();
+    if let Some(items) = arr_opt {
+        for item in items {
+            let Some(name) = item.get("name").and_then(|x| x.as_str()).filter(|s| !s.is_empty()) else {
+                continue;
+            };
+            if (item.pointer("/dark/mSurface").is_some() || item.pointer("/dark/surface").is_some())
+                && (item.pointer("/dark/mOutline").is_some() || item.pointer("/dark/outline_variant").is_some())
+            {
+                reg_map.insert(name.to_string(), item.clone());
+            }
+            let base = item.get("base").and_then(|x| x.as_str()).unwrap_or("Community");
+            let dark = item.get("dark").map(preview_from_variant).unwrap_or_else(|| json!({}));
+            let light = item.get("light").map(preview_from_variant).unwrap_or_else(|| json!({}));
+            community.push(json!({
+                "name": name,
+                "base": base,
+                "core": false,
+                "slug_dark": palette_slug(name, "dark"),
+                "slug_light": palette_slug(name, "light"),
+                "dark": dark,
+                "light": light
+            }));
+        }
+    }
+    community.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
+    list.extend(community);
+    if !reg_map.is_empty() {
+        *app.noctalia_registry.lock().await = reg_map;
+    }
+    *app.noctalia_catalog.lock().await = Some(list.clone());
+    (list, None)
+}
+
+async fn install_noctalia_theme(app: &AppRuntime, name: &str, mode: &str) -> Result<Value> {
+    let name = name.trim();
+    if name.is_empty() || name.len() > 80 {
+        anyhow::bail!("Invalid palette name");
+    }
+    let norm_mode = if mode.eq_ignore_ascii_case("light") { "light" } else { "dark" };
+
+    let variant_val = if let Some(b) = BUILTIN_NOCTALIA.iter().find(|p| p.name.eq_ignore_ascii_case(name)) {
+        if norm_mode == "light" { b.light.to_variant_json() } else { b.dark.to_variant_json() }
+    } else {
+        let enc = url_encode_segment(name);
+        let cached = app.noctalia_registry.lock().await.get(name).cloned();
+        let palette = match cached {
+            Some(v) => Some(v),
+            None => {
+                let u1 = format!("https://api.noctalia.dev/palette/{enc}");
+                let u2 = format!("https://raw.githubusercontent.com/noctalia-dev/community-palettes/main/{enc}/{enc}.json");
+                match fetch_json_ok(&app.http, &u1).await {
+                    Some(v) => Some(v),
+                    None => match fetch_json_ok(&app.http, &u2).await {
+                        Some(v) => Some(v),
+                        None => {
+                            let reg = fetch_json_ok(&app.http, "https://raw.githubusercontent.com/noctalia-dev/community-palettes/main/registry.json").await;
+                            reg.and_then(|r| {
+                                r.get("themes")?
+                                    .as_array()?
+                                    .iter()
+                                    .find(|t| t.get("name").and_then(|x| x.as_str()) == Some(name))
+                                    .cloned()
+                            })
+                        }
+                    },
+                }
+            }
+        }
+        .ok_or_else(|| anyhow::anyhow!("Could not fetch palette '{name}'"))?;
+
+        palette
+            .get(norm_mode)
+            .cloned()
+            .ok_or_else(|| anyhow::anyhow!("Palette '{name}' has no {norm_mode} variant"))?
+    };
+
+    let theme = map_noctalia_variant(name, norm_mode, &variant_val)
+        .ok_or_else(|| anyhow::anyhow!("Palette '{name}' missing required colors"))?;
+    let slug = palette_slug(name, norm_mode);
+    if !is_valid_slug(&slug) {
+        anyhow::bail!("Invalid generated theme slug");
+    }
+    let path = app.root.join("plugins/rs-rail/themes").join(format!("{slug}.json"));
+    atomic_write(&path, &(serde_json::to_string_pretty(&theme)? + "\n"))?;
+    Ok(json!({ "id": format!("custom:{slug}"), "slug": slug, "theme": theme }))
+}
+
+fn delete_custom_theme(themes_dir: &Path, id: &str) -> Result<()> {
+    let stem = id
+        .strip_prefix("custom:")
+        .ok_or_else(|| anyhow::anyhow!("Only custom themes can be deleted"))?;
+    if !is_valid_slug(stem) {
+        anyhow::bail!("Invalid theme id");
+    }
+    let themes_canon = themes_dir.canonicalize()?;
+    let target = themes_dir.join(format!("{stem}.json"));
+    let meta = fs::symlink_metadata(&target)?;
+    if meta.file_type().is_symlink() || !meta.is_file() {
+        anyhow::bail!("Not a regular theme file");
+    }
+    if !target.canonicalize()?.starts_with(&themes_canon) {
+        anyhow::bail!("Path outside themes directory");
+    }
+    fs::remove_file(&target)?;
+    Ok(())
 }
 
 fn dirty_project_set(root: &Path) -> std::collections::HashSet<String> {
@@ -1075,6 +1561,13 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         return write_http_json(&mut stream, 200, &json!({ "themes": load_themes(&app.root.join("plugins/rs-rail/themes")) })).await;
     }
 
+    if method == "GET" && path == "/api/noctalia/catalog" {
+        let force = query.split('&').any(|p| p == "refresh=1");
+        let (palettes, warning) = fetch_noctalia_catalog(&app, force).await;
+        return write_http_json(&mut stream, 200, &json!({ "palettes": palettes, "warning": warning })).await;
+    }
+
+
     if method == "GET" && path == "/api/file" {
         let rel = query.split('&').find_map(|p| p.strip_prefix("path=")).map(url_decode).unwrap_or_default();
         let active = app.active_project.lock().await.clone();
@@ -1216,6 +1709,24 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         return write_http_err(&mut stream, 415, "Content-Type must be application/json").await;
     }
     let payload: Value = serde_json::from_slice(&body).unwrap_or_else(|_| json!({}));
+
+
+    if method == "POST" && path == "/api/noctalia/install" {
+        let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("");
+        let mode = payload.get("mode").and_then(|v| v.as_str()).unwrap_or("dark");
+        return match install_noctalia_theme(&app, name, mode).await {
+            Ok(res) => write_http_json(&mut stream, 200, &res).await,
+            Err(e) => write_http_err(&mut stream, 400, &e.to_string()).await,
+        };
+    }
+
+    if method == "POST" && path == "/api/themes/delete" {
+        let id = payload.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        return match delete_custom_theme(&app.root.join("plugins/rs-rail/themes"), id) {
+            Ok(()) => write_http_json(&mut stream, 200, &json!({ "ok": true })).await,
+            Err(e) => write_http_err(&mut stream, 400, &e.to_string()).await,
+        };
+    }
 
     if method == "POST" && path == "/api/authorize" {
         let req_id = payload.get("req_id").and_then(|v| v.as_u64()).unwrap_or(0);
@@ -1917,15 +2428,7 @@ mod tests {
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(tmp.join("projects/demo")).unwrap();
 
-        let app = AppRuntime {
-            root: tmp.clone(),
-            sessions: Mutex::new(HashMap::new()),
-            active_project: Mutex::new("chat".into()),
-            pending_perms: Mutex::new(HashMap::new()),
-            next_perm_id: AtomicU64::new(1),
-            active_clients: AtomicUsize::new(0),
-            client_seq: AtomicU64::new(0),
-        };
+        let app = AppRuntime::new_in(tmp.clone());
         let sess = app.load_or_init_session("demo");
         assert!(sess.is_agent);
         assert!(tmp.join("projects/demo/.rs/config.json").is_file());
@@ -2140,5 +2643,60 @@ mod tests {
         assert_eq!(items[1].brief.as_deref(), Some("a.py"));
         assert_eq!(items[2].role, "assistant");
         assert_eq!(items[2].reasoning.as_deref(), Some("checked"));
+    }
+
+    #[test]
+    fn test_noctalia_live_parses_v4_colors_json_and_v5_settings_toml() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_noc_live_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let cfg = tmp.join("cfg");
+        let st = tmp.join("state");
+        fs::create_dir_all(st.join("community-palettes")).unwrap();
+        fs::create_dir_all(&cfg).unwrap();
+
+        // v5 settings.toml + cached community palette
+        fs::write(
+            st.join("settings.toml"),
+            "[theme]\nsource = \"community\"\ncommunity_palette = \"Gruvbox Material\"\nmode = \"light\"\n",
+        )
+        .unwrap();
+        fs::write(
+            st.join("community-palettes/Gruvbox Material.json"),
+            r##"{"light":{"surface":"#fbf1c7","surface_container":"#f2e5bc","outline_variant":"#bdae93","on_surface":"#3c3836","on_surface_variant":"#665c54","primary":"#6c782e","secondary":"#b47109"}}"##,
+        )
+        .unwrap();
+        let t_v5 = parse_noctalia_live_in(&cfg, &st).unwrap();
+        assert_eq!(t_v5["id"], "noctalia");
+        assert_eq!(t_v5["source"], "live");
+        assert_eq!(t_v5["mode"], "light");
+        assert_eq!(t_v5["bg"], "#fbf1c7");
+
+        // v4 / template colors.json takes precedence
+        fs::write(
+            cfg.join("colors.json"),
+            r##"{"mSurface":"#212337","mSurfaceVariant":"#323449","mOutline":"#454759","mOnSurface":"#ebfafa","mOnSurfaceVariant":"#a4b1cd","mPrimary":"#37f499","mSecondary":"#04d1f9"}"##,
+        )
+        .unwrap();
+        let t_v4 = parse_noctalia_live_in(&cfg, &st).unwrap();
+        assert_eq!(t_v4["mode"], "dark");
+        assert_eq!(t_v4["accent"], "#37f499");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_delete_custom_theme_enforces_containment() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_del_theme_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        fs::write(tmp.join("claude.json"), "{}").unwrap();
+
+        assert_eq!(palette_slug("Rosé Pine", "dark"), "rose-pine");
+        assert_eq!(palette_slug("Catppuccin Mocha", "light"), "catppuccin-mocha-light");
+        assert!(delete_custom_theme(&tmp, "omarchy").is_err());
+        assert!(delete_custom_theme(&tmp, "noctalia").is_err());
+        assert!(delete_custom_theme(&tmp, "custom:../claude").is_err());
+        delete_custom_theme(&tmp, "custom:claude").unwrap();
+        assert!(!tmp.join("claude.json").exists());
+        let _ = fs::remove_dir_all(&tmp);
     }
 }
