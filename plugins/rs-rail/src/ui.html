@@ -47,7 +47,8 @@
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; overflow: hidden; }
-  button, input, select, textarea { font: inherit; color: inherit; }
+  button, input, select, textarea, [tabindex] { font: inherit; color: inherit; outline: none; }
+  button:focus-visible, [tabindex]:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 2px; }
   button:disabled { opacity: 0.42; cursor: not-allowed; filter: none; }
   .app { display: flex; flex-direction: column; height: 100vh; }
 
@@ -153,7 +154,8 @@
   .think-box[open] .think-chev { transform: rotate(90deg); }
   .think-body { white-space: pre-wrap; margin: 5px 0 4px 6px; padding-left: 12px; border-left: 1px solid var(--border); color: var(--muted); opacity: 0.85; font-style: italic; font-size: 12px; line-height: 1.48; }
   .ans-row { display: flex; align-items: flex-start; gap: 9px; line-height: 1.55; }
-  .bullet { color: var(--cyan); font-size: 12px; margin-top: 2px; flex-shrink: 0; }
+  .bullet { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); font-size: 0; user-select: none; margin-top: 6px; flex-shrink: 0; }
+  .tool-title .bullet { margin-top: 0; }
   .ans-body { flex: 1; min-width: 0; word-break: break-word; }
   .ans-body h2, .ans-body h3, .ans-body h4 { margin: 10px 0 6px; font-weight: 600; color: var(--text); }
   .ans-body h2 { font-size: 15px; } .ans-body h3 { font-size: 14px; } .ans-body h4 { font-size: 13px; }
@@ -204,16 +206,28 @@
   .msg-imgs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
   .msg-img { max-width: 180px; max-height: 140px; border-radius: 6px; border: 1px solid var(--border); object-fit: cover; display: block; }
   .composer textarea { width: 100%; background: transparent; border: none; outline: none; resize: none; min-height: 36px; max-height: 180px; line-height: 1.45; color: var(--text); }
-  .comp-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .comp-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .comp-left, .comp-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .comp-select { background: var(--card); border: 1px solid var(--border); border-radius: 5px; padding: 3px 6px; font-size: 11.5px; color: var(--muted); }
-  .skill-chip { font-size: 11px; padding: 2px 7px; border-radius: 99px; border: 1px solid var(--cyan); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 14%, transparent); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
-  .skill-chip.off { border-color: var(--border); color: var(--muted); background: var(--card); opacity: .72; }
-  .skill-chip.off:hover { opacity: 1; color: var(--text); }
+  .micro-pill { height: 26px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 0 10px; font: inherit; font-size: 12px; color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; user-select: none; transition: background .12s, border-color .12s, color .12s; }
+  .micro-pill:hover { background: var(--hover); }
+  .micro-pill.muted { color: var(--muted); }
+  .micro-pill.muted:hover { color: var(--text); }
+  body.prompt-ghost .micro-pill { background: transparent; border-color: transparent; border-radius: 7px; padding: 0 7px; }
+  body.prompt-ghost .micro-pill:hover, body.prompt-ghost .micro-pill.open { background: var(--hover); }
+  body.prompt-ghost .skill-chip { border-radius: 7px; }
+  .pop-wrap { position: relative; display: inline-flex; }
+  .pop { position: absolute; bottom: calc(100% + 6px); left: 0; min-width: 148px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px; display: none; flex-direction: column; gap: 1px; box-shadow: 0 12px 28px rgba(0,0,0,.32); z-index: 30; }
+  .pop.open { display: flex; }
+  .pop button { background: transparent; border: none; border-radius: 6px; padding: 6px 9px; text-align: left; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+  .pop button:hover, .pop button.on { background: var(--hover); color: var(--text); }
+  .pop button.on { color: var(--accent); font-weight: 600; }
+  .chev { width: 11px; height: 11px; opacity: .65; flex-shrink: 0; transition: transform .15s; }
+  .micro-pill.open .chev { transform: rotate(180deg); }
+  .skill-chip { height: 26px; font-size: 11.5px; padding: 0 9px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--cyan) 40%, var(--border)); color: var(--cyan); background: color-mix(in srgb, var(--cyan) 12%, transparent); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; user-select: none; transition: .12s; }
+  .skill-chip.off { border-color: var(--border); color: var(--muted); background: var(--panel); opacity: .75; }
+  .skill-chip.off:hover { opacity: 1; color: var(--text); background: var(--hover); }
   .chip-x { opacity: .65; font-size: 10px; line-height: 1; padding: 0 1px; }
   .chip-x:hover { opacity: 1; color: var(--err-text); }
-
-  /* Inline / Command Autocomplete */
   .ac-pop { position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; max-height: min(220px, 40vh); overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 5px; display: none; flex-direction: column; gap: 2px; box-shadow: 0 14px 32px rgba(0,0,0,.5); z-index: 30; }
   .ac-pop.open { display: flex; }
   .ac-item { background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 6px 10px; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
@@ -235,6 +249,9 @@
   .nav-btn.active { background: var(--accent-bg); border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent); font-weight: 500; }
   .modal-pane { flex: 1; padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
   .setting-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; gap: 12px; }
+  .setting-row select, .comp-select { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 12px; color: var(--text); outline: none; cursor: pointer; transition: border-color .12s, background .12s; }
+  .setting-row select:hover, .comp-select:hover { background: var(--hover); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .setting-row select:focus, .comp-select:focus { border-color: var(--accent); }
   .setting-row.active-slot { border-color: color-mix(in srgb, var(--accent) 50%, transparent); background: var(--accent-bg); }
   .field { display: flex; flex-direction: column; gap: 5px; }
   .field input, .field select { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; color: var(--text); }
@@ -317,20 +334,13 @@
           <textarea id="msg-input" placeholder="Message... (/ commands, Enter to send)"></textarea>
           <div class="comp-bar">
             <div class="comp-left">
-              <button class="btn btn-sm" id="btn-model-pill" title="Open Providers">—</button>
-              <select class="comp-select" id="sel-reasoning" title="Reasoning setting">
-                <option value="">Default reasoning</option>
-                <option value="0">Off (0)</option>
-                <option value="250">t250</option>
-                <option value="500">t500</option>
-                <option value="1000">t1000</option>
-                <option value="low">low</option>
-                <option value="medium">medium</option>
-                <option value="high">high</option>
-                <option value="xhigh">xhigh</option>
-              </select>
-              <button class="btn btn-sm btn-icon" id="btn-img" title="Attach image (or paste)" aria-label="Attach image" style="display:none;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="5.7" cy="6" r="1"/><path d="M2.5 11.5l3.2-3.2 2.4 2.4 2.1-2.1 3.3 2.9"/></svg></button>
-              <div id="skills-bar" style="display:flex;gap:4px;flex-wrap:wrap;"></div>
+              <button class="micro-pill" id="btn-model-pill" title="Open Providers">—</button>
+              <div class="pop-wrap">
+                <button class="micro-pill muted" id="btn-reasoning-pill" title="Reasoning setting"><span id="reasoning-val">Default</span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg></button>
+                <div class="pop" id="pop-reasoning"></div>
+              </div>
+              <button class="micro-pill muted" id="btn-img" title="Attach image (or paste)" aria-label="Attach image" style="display:none;padding:0 8px;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="5.7" cy="6" r="1"/><path d="M2.5 11.5l3.2-3.2 2.4 2.4 2.1-2.1 3.3 2.9"/></svg></button>
+              <div id="skills-bar" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;"></div>
             </div>
             <div class="comp-right">
               <button class="btn-send-circle" id="btn-send" aria-label="Send message"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12.5V3.5"/><path d="M4 7.5L8 3.5l4 4"/></svg></button>
@@ -450,7 +460,8 @@ const DEFAULT_APPEARANCE = {
   uiFont: "JetBrains Mono",
   codeFont: "JetBrains Mono",
   codeSize: 12,
-  ligatures: false
+  ligatures: false,
+  promptBar: "pills"
 };
 
 function hexLum(hex) {
@@ -539,6 +550,7 @@ function applyAppearance(next) {
   root.setProperty("--mono", codeMap[cfg.codeFont] || codeMap["JetBrains Mono"]);
   root.setProperty("--code-size", `${cfg.codeSize}px`);
   root.setProperty("--ligatures", cfg.ligatures ? "normal" : "none");
+  document.body.classList.toggle("prompt-ghost", cfg.promptBar === "ghost");
 }
 applyAppearance();
 
@@ -762,14 +774,41 @@ function renderAll() {
     plist.appendChild(el);
   });
 
-  const rSel = $("sel-reasoning");
-  if (ap.reasoning && !Array.from(rSel.options).some(o => o.value === ap.reasoning)) {
-    const opt = document.createElement("option");
-    opt.value = ap.reasoning;
-    opt.textContent = /^\d+$/.test(ap.reasoning) ? `t${ap.reasoning}` : ap.reasoning;
-    rSel.appendChild(opt);
+  const standardReasons = [
+    ["", "Default reasoning"],
+    ["0", "Off (0)"],
+    ["250", "t250"],
+    ["350", "t350"],
+    ["500", "t500"],
+    ["1000", "t1000"],
+    ["low", "low"],
+    ["medium", "medium"],
+    ["high", "high"],
+    ["xhigh", "xhigh"]
+  ];
+  const curR = ap.reasoning || "";
+  const rList = [...standardReasons];
+  if (curR && !rList.some(([v]) => v === curR)) {
+    rList.splice(2, 0, [curR, /^\d+$/.test(curR) ? `t${curR}` : curR]);
   }
-  rSel.value = ap.reasoning || "";
+  const activePair = rList.find(([v]) => v === curR);
+  $("reasoning-val").textContent = activePair ? (/^\d+$/.test(activePair[0]) ? `t${activePair[0]}` : (activePair[0] === "0" ? "Off" : (activePair[0] === "" ? "Default" : activePair[1]))) : (curR ? `t${curR}` : "Default");
+
+  const popR = $("pop-reasoning");
+  popR.innerHTML = "";
+  for (const [val, lbl] of rList) {
+    const b = document.createElement("button");
+    b.className = val === curR ? "on" : "";
+    b.innerHTML = `<span>${esc(lbl)}</span><span>${val === curR ? "✓" : ""}</span>`;
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      popR.classList.remove("open");
+      $("btn-reasoning-pill").classList.remove("open");
+      await api("/api/settings/profile", { reasoning: val });
+      await loadState();
+    };
+    popR.appendChild(b);
+  }
 
 
 
@@ -831,7 +870,7 @@ function renderAll() {
     }
   }
 
-  $("task-body").textContent = ap.task_md || (ap.is_agent ? "No TASK.md found. Click /task above to run or set a goal." : "Chat mode (no tools).");
+  $("task-body").textContent = ap.task_md || (ap.is_agent ? "Agent mode (tools). No TASK.md." : "Chat mode (no tools).");
   const rt = $("btn-run-task");
   rt.disabled = !ap.is_agent;
   rt.textContent = !ap.is_agent ? "Chat" : (ap.task_md ? "Run" : "/task");
@@ -1510,6 +1549,17 @@ function renderModalTab() {
     ligRow.querySelector("button").onclick = () => { applyAppearance({ ligatures: !getAppearance().ligatures }); renderModalTab(); };
     pane.appendChild(ligRow);
 
+    const barRow = document.createElement("div");
+    barRow.className = "setting-row";
+    const isPills = ap.promptBar !== "ghost";
+    barRow.innerHTML = `<div><strong>Composer Style</strong><div class="muted">Unified micro-pills (B) or borderless ghost controls (A)</div></div>
+      <div style="display:flex;gap:4px;" class="rs-tabs">
+        <button class="rs-tab ${isPills ? "active" : ""}" id="btn-pbar-pills">Pills</button>
+        <button class="rs-tab ${!isPills ? "active" : ""}" id="btn-pbar-ghost">Ghost</button>
+      </div>`;
+    pane.appendChild(barRow);
+    $("btn-pbar-pills").onclick = () => { applyAppearance({ promptBar: "pills" }); renderModalTab(); };
+    $("btn-pbar-ghost").onclick = () => { applyAppearance({ promptBar: "ghost" }); renderModalTab(); };
 
     const r = document.createElement("div");
     r.className = "setting-row";
@@ -1669,10 +1719,20 @@ document.querySelectorAll(".nav-btn").forEach(b => b.onclick = () => {
   ACTIVE_TAB = b.dataset.tab; noctaliaBrowse = false; renderModalTab();
 });
 
-$("sel-reasoning").onchange = async (e) => { await api("/api/settings/profile", { reasoning: e.target.value }); await loadState(); };
+$("btn-reasoning-pill").onclick = (e) => {
+  e.stopPropagation();
+  const isOpen = $("pop-reasoning").classList.toggle("open");
+  $("btn-reasoning-pill").classList.toggle("open", isOpen);
+};
 $("msg-input").addEventListener("input", () => { acHl = 0; resizeInput(); updateSendReady(); updateAutocomplete(); });
 $("msg-input").addEventListener("click", () => updateAutocomplete());
-document.addEventListener("click", (e) => { if (!e.target.closest(".composer")) closeAc(); });
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".composer")) closeAc();
+  if (!e.target.closest(".pop-wrap")) {
+    $("pop-reasoning")?.classList.remove("open");
+    $("btn-reasoning-pill")?.classList.remove("open");
+  }
+});
 $("msg-input").addEventListener("keydown", (e) => {
   if ($("ac-pop").classList.contains("open") && acItems.length) {
     if (e.key === "ArrowDown") { e.preventDefault(); acHl = (acHl + 1) % acItems.length; updateAutocomplete(); return; }
