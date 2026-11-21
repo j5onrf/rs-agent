@@ -15,6 +15,7 @@
 #   ├── bin/rs-agent
 #   ├── bin/t3code-bridge                - #!/usr/bin/env bash
 #   ├── bin/ta
+#   ├── docs/index.html                  - RS Rail — Local-First Desktop &amp; Web UI for AI Agents
 #   ├── plugins/mcp/Readme.md            - # Model Context Protocol (MCP) Integration: `plugins/mcp/`
 #   ├── plugins/mcp/photocraft/Readme.md - Headless and live-bridge image editing engine for `rs-agent` via the Model Conte
 #   ├── plugins/mcp/photocraft/mcp-bridge.sh - #!/usr/bin/env bash
@@ -26,9 +27,17 @@
 #   ├── plugins/rs-rail/rs-rail.desktop  - [Desktop Entry]
 #   ├── plugins/rs-rail/src/main.rs      - CLI Entrypoint & Runtime Loop
 #   ├── plugins/rs-rail/src/ui.html      - --bg: #0c0c0e;
+#   ├── plugins/rs-rail/themes/catppuccin.json - "accent": "#cba6f7",
 #   ├── plugins/rs-rail/themes/claude.json - "name": "Claude",
+#   ├── plugins/rs-rail/themes/darkbot.json - "name": "DarkBot",
+#   ├── plugins/rs-rail/themes/dracula.json - "accent": "#bd93f9",
+#   ├── plugins/rs-rail/themes/eldritch.json - "accent": "#37f499",
+#   ├── plugins/rs-rail/themes/gruvbox.json - "accent": "#a9b665",
+#   ├── plugins/rs-rail/themes/kanagawa.json - "accent": "#7e9cd8",
+#   ├── plugins/rs-rail/themes/noctalia-light.json - "accent": "#3d449b",
 #   ├── plugins/rs-rail/themes/noctalia.json - "name": "Noctalia",
-#   ├── plugins/rs-rail/themes/openbot.json - "name": "OpenBot",
+#   ├── plugins/rs-rail/themes/pure-light.json - "name": "Pure Light",
+#   ├── plugins/rs-rail/themes/tokyo-night.json - "accent": "#7aa2f7",
 #   ├── plugins/t3code/Cargo.toml        - name = "t3code-bridge"
 #   ├── plugins/t3code/Readme.md         - A native Rust Agent Client Protocol (ACP) stdio bridge connecting the `rs-agent`
 #   ├── plugins/t3code/launch.sh         - #!/usr/bin/env bash
@@ -42,6 +51,7 @@
 #   ├── profiles/gem4.md                 - Google Gemini 4 Hydrogen High-Speed Systems & Coding Engineer
 #   ├── profiles/groot/groot.md          - Groot-19B-A3B Autonomous Systems Engineer
 #   ├── profiles/groot/groot2.md         - Groot-19B-A3B Autonomous Systems Engineer
+#   ├── profiles/inkling.md              - Inkling-2-Mini 26B-A3.4B Autonomous Code & MCP Systems Agent
 #   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer
 #   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer
 #   ├── profiles/nemo.md                 - NVIDIA Nemotron Ultra & Lightning Autonomous Systems Architect
@@ -61,6 +71,8 @@
 #   ├── rs-context.md                    - Rs-Agent Context Router
 #   ├── rs-hook.sh                       - Rs-Agent shell hook (minimal: < 0.2ms, Bash & Zsh, macOS & Linux)
 #   ├── skills/humanizer.md              - Anti-AI Slop Humanizer Directive
+#   ├── skills/impeccable-ui.md          - Distilled Impeccable Operate/Polish rules for lightweight HTML/CSS product UI
+#   ├── skills/minimalist-ui.md          - Classic style skill, opt-in: it runs only when called by name. Editorial product UI with a warm monochrome palette, typographic contrast and flat bento grids.
 #   ├── skills/ponytail.md               - Ponytail Architecture Directive for Rust
 #   ├── skills/ub-mode.md                - Uncle Bob Clean Code & Craftsmanship Directive
 #   ├── src/adapter.rs                   - fn: strip_line_gutters, normalize_params, heal_json_args
@@ -102,8 +114,8 @@
   L042: impl Default for RailConfig {
     L043: fn default() -> Self;
   }
-  L1890: async fn main() -> Result<()>;
-  L1910: mod tests;
+  L2411: async fn main() -> Result<()>;
+  L2431: mod tests;
 ```
 
 ### `plugins/t3code/src/main.rs`

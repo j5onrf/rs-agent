@@ -40,4 +40,4 @@ DIRECTIVES:
 
 HALT:
 When the PhotoCraft action succeeds, stop immediately with:
-`✓ Task complete: <summary>`
+`Task complete: <summary>`
