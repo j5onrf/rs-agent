@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="color-scheme" content="dark light" />
+<title>RS Rail — Local-First Desktop &amp; Web UI for AI Agents</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect x='8' y='8' width='112' height='112' rx='26' fill='%23f6f8fa'/%3E%3Cpath fill='none' stroke='%230d1117' stroke-width='14' stroke-linecap='round' stroke-linejoin='round' d='M64 40 L88 64 L64 88 L40 88'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+<style>
+  :root {
+    --bg: #070722; --panel: #0c0c27; --card: #11112d; --hover: #1a1b42; --border: #21215f;
+    --text: #f3edf7; --muted: #8d92c4; --dim: #6e73a8; --accent: #fff59b; --cyan: #a9aefe;
+    --accent-fg: #070722; --user-bg: rgba(255,245,155,0.14); --user-border: rgba(255,245,155,0.36);
+    --add-bg: rgba(34,197,94,0.14); --add-text: #86efac;
+    --del-bg: rgba(239,68,68,0.14); --del-text: #fca5a5;
+    --ambient-op: 0.30; --ambient-op-focus: 0.48;
+    --grid: rgba(169, 174, 254, 0.08); --glow: rgba(169, 174, 254, 0.18);
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --app-font: var(--mono);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; color: var(--text); font-family: var(--sans);
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(60% 45% at 50% 0%, var(--glow), transparent 70%),
+      linear-gradient(to right, var(--grid) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
+    background-size: 100% 100%, 36px 36px, 36px 36px;
+    transition: background-color .2s, color .2s;
+  }
+  body.t3 { background-image: none; }
+  button, input, textarea { font: inherit; color: inherit; outline: none; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 20px 24px 64px; }
+
+  /* Landing Top Nav & Hero */
+  nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 42px; gap: 12px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -.01em; }
+  .nav-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .pill-btn {
+    border: 1px solid var(--border); background: var(--panel); color: var(--muted);
+    border-radius: 999px; padding: 5px 11px; font-size: 12px; cursor: pointer;
+    font-family: var(--mono); text-decoration: none; transition: .15s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .pill-btn:hover, .pill-btn.active { color: var(--text); border-color: var(--cyan); background: var(--card); }
+  .hero { text-align: center; max-width: 720px; margin: 0 auto 26px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px;
+    border-radius: 999px; border: 1px solid var(--border); background: var(--panel);
+    color: var(--cyan); font-family: var(--mono); font-size: 11.5px; margin-bottom: 16px;
+  }
+  h1 { margin: 0 0 12px; font-size: clamp(32px, 4.8vw, 52px); line-height: 1.07; letter-spacing: -.03em; }
+  .sub { margin: 0 auto 22px; max-width: 600px; font-size: 15.5px; line-height: 1.55; color: var(--muted); }
+  .sub code { font-family: var(--mono); font-size: 13px; color: var(--text); background: var(--panel); border: 1px solid var(--border); padding: 1px 6px; border-radius: 5px; }
+  .actions { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; }
+  .cta {
+    background: var(--accent); color: var(--accent-fg); border: 1px solid var(--accent);
+    border-radius: 9px; padding: 9px 17px; font-weight: 600; font-size: 13.5px; text-decoration: none; cursor: pointer;
+  }
+  .cta:hover { filter: brightness(1.06); }
+  .cmd {
+    border: 1px solid var(--border); background: var(--panel); color: var(--text);
+    border-radius: 9px; padding: 8px 13px; font-family: var(--mono); font-size: 12px;
+    cursor: pointer; display: inline-flex; align-items: center; gap: 10px;
+  }
+  .cmd span { color: var(--cyan); font-size: 11px; }
+
+  /* Demo Controls Strip */
+  .controls-bar {
+    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+    margin: 26px 0 12px;
+  }
+  .themes, .cust-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+  .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 2px; gap: 2px; }
+  .seg button { border: none; background: transparent; color: var(--muted); border-radius: 999px; padding: 4px 10px; font-family: var(--mono); font-size: 11.5px; cursor: pointer; transition: .12s; }
+  .seg button.active { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+  .seg.quiet button.active { background: var(--card); color: var(--text); border: 1px solid var(--border); font-weight: 500; }
+
+  /* Full Embedded RS Rail App Frame */
+  .frame {
+    border: 1px solid var(--border); border-radius: 14px; background: var(--bg);
+    box-shadow: 0 28px 80px rgba(0, 0, 0, .42); overflow: hidden;
+    font-family: var(--app-font); font-size: 12.5px; height: 570px;
+    display: flex; flex-direction: column; position: relative;
+  }
+  .app-top {
+    height: 38px; min-height: 38px; background: var(--panel); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 10px; gap: 10px;
+  }
+  .tb-l, .tb-r { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .app-brand { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text); white-space: nowrap; }
+  .sep { width: 1px; height: 13px; background: var(--border); flex-shrink: 0; }
+  .tele { font-family: var(--mono); font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 5px; }
+  .tele strong { color: var(--text); font-weight: 500; }
+  .ctx-bar { width: 44px; height: 4px; background: color-mix(in srgb, var(--text) 16%, transparent); border-radius: 99px; overflow: hidden; }
+  .ctx-fill { display: block; height: 100%; background: var(--accent); border-radius: 99px; transition: width .2s; }
+  .g-btn { width: 25px; height: 25px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+  .g-btn:hover { background: var(--hover); color: var(--text); }
+  .g-x { opacity: 0.35; }
+  .g-x:hover { opacity: 1; color: var(--del-text); background: var(--del-bg); }
+
+  .app-main { flex: 1; display: flex; min-height: 0; }
+  .sb-l { width: 206px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  .sb-r { width: 214px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  .sb-l.hidden, .sb-r.hidden { display: none; }
+  .sb-head { padding: 8px 9px 6px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .tabs { display: flex; gap: 3px; }
+  .tab { background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 2px 7px; font-size: 11px; color: var(--dim); cursor: pointer; }
+  .tab.active { background: var(--card); border-color: var(--border); color: var(--text); }
+  .btn-xs { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; font-size: 11px; color: var(--text); cursor: pointer; white-space: nowrap; }
+  .btn-xs:hover { background: var(--hover); }
+  .btn-xs:disabled { opacity: 0.45; cursor: default; }
+
+  .proj-list { flex: 1; overflow-y: auto; padding: 4px 6px; display: flex; flex-direction: column; gap: 1px; }
+  .proj-item { padding: 5px 7px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 7px; border: 1px solid transparent; color: var(--muted); }
+  .proj-item:hover { background: var(--hover); color: var(--text); }
+  .proj-item.active { background: var(--user-bg); border-color: var(--user-border); color: var(--text); }
+  .proj-l { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .proj-badge { width: 18px; height: 18px; border-radius: 4px; background: var(--card); border: 1px solid var(--border); color: var(--muted); font-family: var(--mono); font-size: 9px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase; }
+  .proj-item.active .proj-badge { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+  .proj-name { font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sb-foot { padding: 6px 8px; display: flex; }
+  .sb-foot .g-btn { opacity: 0; transition: opacity .15s; }
+  .sb-l:hover .sb-foot .g-btn { opacity: 1; }
+
+  .rs-top { flex: 1; display: flex; flex-direction: column; min-height: 0; border-bottom: 1px solid var(--border); }
+  .rs-lbl { font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+  .file-list { flex: 1; overflow-y: auto; padding: 2px 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+  .file-row { padding: 4px 7px; border-radius: 5px; font-family: var(--mono); font-size: 11px; color: var(--muted); cursor: pointer; }
+  .file-row:hover { background: var(--hover); color: var(--text); }
+  .rs-bot { height: 40%; min-height: 140px; display: flex; flex-direction: column; }
+  .task-body { flex: 1; padding: 6px 10px; font-family: var(--mono); font-size: 11px; color: var(--muted); line-height: 1.45; white-space: pre-wrap; overflow-y: auto; }
+
+  /* Center Chat & Agent Stream */
+  .center { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+  .stream { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 11px; }
+  .turn-wrap { max-width: 720px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 11px; }
+  .msg-u { align-self: flex-end; background: var(--user-bg); border: 1px solid var(--user-border); color: var(--text); padding: 7px 11px; border-radius: 8px; max-width: 76%; line-height: 1.48; font-size: 12.5px; }
+  .msg-a { display: flex; flex-direction: column; gap: 7px; }
+  .stream.chat-mode .msg-a { align-self: flex-start; max-width: 76%; background: var(--panel); border: 1px solid var(--border); padding: 9px 13px; border-radius: 8px; }
+  .think summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); user-select: none; }
+  .think summary::-webkit-details-marker { display: none; }
+  .think-body { margin: 5px 0 3px 5px; padding-left: 10px; border-left: 1px solid var(--border); color: var(--muted); font-size: 11.5px; line-height: 1.45; }
+  .ans-row { display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; font-size: 12.5px; }
+  .bullet { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); margin-top: 6px; flex-shrink: 0; }
+  .stream.chat-mode .ans-row .bullet { display: none; }
+  .t-card { border: 1px solid var(--border); background: var(--panel); border-radius: 6px; overflow: hidden; font-family: var(--mono); font-size: 11.5px; }
+  .t-head { padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
+  .t-head:hover { background: var(--hover); }
+  .t-title { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .t-title .bullet { margin-top: 0; }
+  .t-sum { color: var(--dim); padding: 0 10px 6px 23px; font-size: 11px; }
+  .t-diff { border-top: 1px solid var(--border); background: var(--bg); padding: 4px 10px; color: var(--add-text); background: var(--add-bg); border-left: 2px solid var(--add-text); }
+  .t-raw { display: none; margin: 0; padding: 7px 10px; border-top: 1px solid var(--border); background: var(--bg); color: var(--muted); font-size: 11px; white-space: pre-wrap; }
+  .t-card.open .t-raw { display: block; }
+
+  /* Demo Composer + Ambient Light */
+  .comp-wrap { padding: 8px 20px 14px; position: relative; isolation: isolate; }
+  .composer { position: relative; max-width: 720px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 9px 11px 8px; display: flex; flex-direction: column; gap: 7px; }
+  .frame.ambient .composer { border-color: color-mix(in srgb, var(--accent) 26%, var(--border)); }
+  .frame.ambient .composer:focus-within { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+  .frame.ambient .composer::before {
+    content: ""; position: absolute; top: 42%; left: 2%; right: 2%; bottom: -14px; border-radius: 999px;
+    background: radial-gradient(ellipse 50% 50% at 50% 50%, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, transparent) 45%, color-mix(in srgb, var(--accent) 26%, transparent) 72%, transparent 100%);
+    opacity: var(--ambient-op); z-index: -1; pointer-events: none; transform: translateZ(0); transition: opacity .25s;
+  }
+  .frame.ambient .composer:focus-within::before { opacity: var(--ambient-op-focus); }
+  .composer input { width: 100%; background: transparent; border: none; color: var(--text); font-size: 12.5px; }
+  .composer input::placeholder { color: var(--muted); opacity: 0.82; }
+  .comp-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .comp-l { display: flex; align-items: center; gap: 6px; position: relative; }
+  .m-pill { height: 24px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 0 9px; font-family: var(--mono); font-size: 11px; color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+  .m-pill:hover { background: var(--hover); }
+  .m-pill.muted { color: var(--muted); }
+  .frame.ghost .m-pill { background: transparent; border-color: transparent; border-radius: 6px; padding: 0 7px; }
+  .frame.ghost .m-pill:hover { background: var(--hover); }
+  .pop { position: absolute; bottom: calc(100% + 6px); left: 140px; min-width: 130px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 4px; display: none; flex-direction: column; gap: 1px; z-index: 30; }
+  .pop.open { display: flex; }
+  .pop button { background: transparent; border: none; border-radius: 5px; padding: 5px 8px; text-align: left; font-family: var(--mono); font-size: 11px; color: var(--muted); cursor: pointer; display: flex; justify-content: space-between; }
+  .pop button:hover, .pop button.on { background: var(--hover); color: var(--text); }
+  .pop button.on { color: var(--accent); font-weight: 600; }
+  .send-btn { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--border); background: var(--panel); color: var(--muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  .send-btn.ready { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+
+  /* Hover Card inside Demo */
+  .hover-card { position: fixed; z-index: 50; pointer-events: none; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 185px; display: none; flex-direction: column; gap: 4px; font-family: var(--mono); font-size: 11px; }
+  .hover-card.open { display: flex; }
+  .hc-row { display: flex; justify-content: space-between; color: var(--muted); }
+
+  @media (max-width: 860px) { .sb-r { display: none; } }
+  @media (max-width: 640px) { .sb-l { display: none; } .frame { height: 500px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 128 128" aria-hidden="true">
+        <defs><linearGradient id="rail_bg" x1="0.2" y1="0" x2="0.8" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="55%" stop-color="#f6f8fa"/><stop offset="100%" stop-color="#eaecef"/></linearGradient></defs>
+        <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#rail_bg)"/>
+        <path fill="none" stroke="#0d1117" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" d="M 64 40 L 88 64 L 64 88 L 40 88"/>
+      </svg>
+      <span>RS Rail</span>
+    </div>
+    <div class="nav-right">
+      <button class="pill-btn active" id="mode-jules">Grid</button>
+      <button class="pill-btn" id="mode-t3">Clean</button>
+      <a class="pill-btn" href="https://github.com/j5onrf/rs-agent">GitHub ↗</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="badge">rs-agent v0.8.0 · rs-rail v0.3.0 · Rust + ui.html</div>
+    <h1>A fast desktop &amp; web UI for local AI agents.</h1>
+    <p class="sub">
+      <strong>rs-rail</strong> is a native web and desktop UI in a single Rust binary with <code>ui.html</code> compiled in, running on <code>127.0.0.1:24243</code> and built directly on <code>rs-agent</code>.
+    </p>
+    <div class="actions">
+      <a class="cta" href="https://github.com/j5onrf/rs-agent">Get Started on GitHub</a>
+      <button class="cmd" id="copy-cmd">$ git clone https://github.com/j5onrf/rs-agent.git <span>Copy</span></button>
+    </div>
+  </section>
+
+  <!-- Interactive Theme + Chat/Agent + Appearance Customizer -->
+  <div class="controls-bar">
+    <div class="themes" id="theme-bar"></div>
+    <div class="cust-bar">
+      <div class="seg" id="seg-mode">
+        <button data-m="chat" class="active">Chat</button>
+        <button data-m="agent">Agent</button>
+      </div>
+      <div class="seg quiet" id="seg-bots">
+        <button data-b="on" class="active">Micro-Bots</button>
+        <button data-b="off">Letters</button>
+      </div>
+      <div class="seg quiet" id="seg-amb">
+        <button data-a="off" class="active">Ambient Off</button>
+        <button data-a="on">Ambient On</button>
+      </div>
+      <div class="seg quiet" id="seg-pill">
+        <button data-p="pills" class="active">Pills</button>
+        <button data-p="ghost">Ghost</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Full Interactive RS Rail Demo -->
+  <div class="frame" id="demo-frame">
+    <header class="app-top">
+      <div class="tb-l">
+        <span class="app-brand">
+          <svg width="15" height="15" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"><path d="M49 24 L72 47 L50 69 L24 69"/></svg>
+          <span>RS Rail</span>
+        </span>
+        <button type="button" class="g-btn" id="btn-sb-l" title="Toggle Projects Sidebar">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg>
+        </button>
+        <span class="sep"></span>
+        <span class="tele" id="d-prof"><strong>chat</strong> · no tools · t250</span>
+      </div>
+      <div class="tb-r">
+        <span class="tele" id="d-stats">CH 92% · 142.9 t/s</span>
+        <span class="sep"></span>
+        <span class="tele"><span id="d-ctx">6.4% / 8.2k</span> <span class="ctx-bar"><span class="ctx-fill" id="d-ctx-fill" style="width:6.4%"></span></span></span>
+        <button type="button" class="g-btn" id="btn-sb-r" title="Toggle Workspace Panel">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="10" y1="2.5" x2="10" y2="13.5"/></svg>
+        </button>
+        <button type="button" class="g-btn g-x" title="Close RS Rail">✕</button>
+      </div>
+    </header>
+
+    <div class="app-main">
+      <aside class="sb-l" id="sb-l">
+        <div class="sb-head">
+          <div class="tabs"><span class="tab active">Projects</span><span class="tab">Profiles</span></div>
+          <button type="button" class="btn-xs">+</button>
+        </div>
+        <div class="proj-list" id="proj-list"></div>
+        <div class="sb-foot">
+          <button type="button" class="g-btn" title="Settings (Ctrl+,)">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="5.5" cy="4.5" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10.5" cy="8" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="6.5" cy="11.5" r="1.5" fill="var(--panel)"/></svg>
+          </button>
+        </div>
+      </aside>
+
+      <section class="center">
+        <div class="stream chat-mode" id="stream">
+          <div class="turn-wrap" id="turn-wrap"></div>
+        </div>
+        <div class="comp-wrap">
+          <div class="composer">
+            <input id="d-input" placeholder="Message chat... (/ commands, Enter to send)" />
+            <div class="comp-bar">
+              <div class="comp-l">
+                <button type="button" class="m-pill">Ling-3.0-tiny · local</button>
+                <button type="button" class="m-pill muted" id="btn-reason"><span id="r-val">t250</span> ⌄</button>
+                <div class="pop" id="pop-r">
+                  <button data-r="Off"><span>Off</span><span></span></button>
+                  <button data-r="t250" class="on"><span>t250</span><span>✓</span></button>
+                  <button data-r="t500"><span>t500</span><span></span></button>
+                  <button data-r="high"><span>high</span><span></span></button>
+                </div>
+              </div>
+              <button type="button" class="send-btn" id="d-send">↑</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="sb-r" id="sb-r">
+        <div class="rs-top">
+          <div class="sb-head">
+            <span class="rs-lbl" id="d-files-lbl">FILES (1)</span>
+            <div style="display:flex;gap:4px;"><button type="button" class="btn-xs">Reset</button><button type="button" class="btn-xs">Export .md</button></div>
+          </div>
+          <div class="file-list" id="d-files"></div>
+        </div>
+        <div class="rs-bot">
+          <div class="sb-head">
+            <div class="tabs">
+              <button type="button" class="tab active" id="rt-task">TASK.md</button>
+              <button type="button" class="tab" id="rt-mem">Memory</button>
+            </div>
+            <button type="button" class="btn-xs" id="d-task-btn" disabled>Chat</button>
+          </div>
+          <div class="task-body" id="d-task-body">Chat mode (no tools).</div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
+<div class="hover-card" id="hover-card"></div>
+
+<script>
+const PALETTES = [
+  { name: "Noctalia",   bg: "#070722", panel: "#0c0c27", card: "#11112d", border: "#21215f", text: "#f3edf7", muted: "#8d92c4", accent: "#fff59b", cyan: "#a9aefe", fg: "#070722", light: false },
+  { name: "Eldritch",   bg: "#212337", panel: "#292b40", card: "#323449", border: "#454759", text: "#ebfafa", muted: "#a4b1cd", accent: "#37f499", cyan: "#04d1f9", fg: "#05140a", light: false },
+  { name: "Gruvbox",    bg: "#282828", panel: "#2d2c2c", card: "#32302f", border: "#504945", text: "#ebdbb2", muted: "#a89984", accent: "#a9b665", cyan: "#7db2ba", fg: "#1d2021", light: false },
+  { name: "Catppuccin", bg: "#1e1e2e", panel: "#272839", card: "#313244", border: "#585b70", text: "#cdd6f4", muted: "#a6adc8", accent: "#cba6f7", cyan: "#89b4fa", fg: "#11111b", light: false },
+  { name: "Claude",     bg: "#141413", panel: "#1b1a18", card: "#23221f", border: "#36332e", text: "#f0efec", muted: "#b1ada1", accent: "#d97757", cyan: "#83a598", fg: "#ffffff", light: false },
+  { name: "Pure Light", bg: "#ffffff", panel: "#f8f9fa", card: "#f1f3f4", border: "#dadce0", text: "#1f1f1f", muted: "#5f6368", accent: "#1a73e8", cyan: "#1a73e8", fg: "#ffffff", light: true }
+];
+
+const PROJECTS = [
+  { name:"chat", prof:"chat", files:1, mode:"chat" },
+  { name:"flint", prof:"flint", files:2, mode:"agent" },
+  { name:"gem35", prof:"gem35", files:0, mode:"agent" },
+  { name:"groot", prof:"groot", files:3, mode:"agent" },
+  { name:"lfm3", prof:"lfm3", files:1, mode:"agent" },
+  { name:"ling-tiny", prof:"6-tool", files:2, mode:"agent" },
+  { name:"nemo", prof:"core4", files:4, mode:"agent" },
+  { name:"qwen38", prof:"qwen38", files:2, mode:"agent" },
+  { name:"sage", prof:"sage", files:1, mode:"agent" },
+  { name:"tokenlab", prof:"tokenlab", files:0, mode:"agent" }
+];
+
+let demoMode = "chat", activeProj = "chat", useBots = true, extraMsgs = [];
+
+function botSvg(name) {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 16777619);
+  const r = [];
+  for (let y = 0; y < 5; y++) for (let x = 0; x < 3; x++) if ((h >> ((y*3+x)%24)) & 1 || (y===1 && x===1)) {
+    r.push(`<rect x="${3+x*2}" y="${3+y*2}" width="2" height="2" rx="0.4"/>`);
+    if (x<2) r.push(`<rect x="${11-x*2}" y="${3+y*2}" width="2" height="2" rx="0.4"/>`);
+  }
+  return `<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">${r.join("")}</svg>`;
+}
+
+const bar = document.getElementById("theme-bar");
+function setPal(p, idx) {
+  const r = document.documentElement.style;
+  r.setProperty("--bg", p.bg); r.setProperty("--panel", p.panel); r.setProperty("--card", p.card);
+  r.setProperty("--hover", `color-mix(in srgb, ${p.text} 6%, ${p.card})`);
+  r.setProperty("--border", p.border); r.setProperty("--text", p.text); r.setProperty("--muted", p.muted);
+  r.setProperty("--dim", `color-mix(in srgb, ${p.muted} 82%, ${p.bg})`);
+  r.setProperty("--accent", p.accent); r.setProperty("--cyan", p.cyan); r.setProperty("--accent-fg", p.fg);
+  r.setProperty("--user-bg", `color-mix(in srgb, ${p.accent} ${p.light ? "18%" : "20%"}, ${p.panel})`);
+  r.setProperty("--user-border", `color-mix(in srgb, ${p.accent} ${p.light ? "34%" : "42%"}, ${p.border})`);
+  r.setProperty("--add-bg", p.light ? "rgba(22,163,74,0.10)" : "rgba(34,197,94,0.14)");
+  r.setProperty("--add-text", p.light ? "#15803d" : "#86efac");
+  r.setProperty("--del-bg", p.light ? "rgba(220,38,38,0.10)" : "rgba(239,68,68,0.14)");
+  r.setProperty("--del-text", p.light ? "#dc2626" : "#fca5a5");
+  r.setProperty("--ambient-op", p.light ? "0.38" : "0.30");
+  r.setProperty("--ambient-op-focus", p.light ? "0.56" : "0.48");
+  r.setProperty("--grid", p.light ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)");
+  r.setProperty("--glow", `color-mix(in srgb, ${p.cyan} 22%, transparent)`);
+  bar.querySelectorAll("button").forEach((b, i) => b.classList.toggle("active", i === idx));
+}
+PALETTES.forEach((p, idx) => {
+  const b = document.createElement("button");
+  b.className = "pill-btn" + (idx === 0 ? " active" : "");
+  b.innerHTML = `<span class="swatch" style="background:${p.accent}"></span>${p.name}`;
+  b.onclick = () => setPal(p, idx);
+  bar.appendChild(b);
+});
+
+function renderProjects() {
+  const list = document.getElementById("proj-list"), hc = document.getElementById("hover-card");
+  list.innerHTML = "";
+  PROJECTS.forEach(p => {
+    const el = document.createElement("div");
+    el.className = "proj-item" + (p.name === activeProj ? " active" : "");
+    const badge = useBots ? botSvg(p.name) : p.name.slice(0,2).toUpperCase();
+    el.innerHTML = `<div class="proj-l"><span class="proj-badge">${badge}</span><span class="proj-name">${p.name}</span></div>`;
+    el.onclick = () => switchMode(p.mode, p.name);
+    el.onmouseenter = () => {
+      const rect = el.getBoundingClientRect();
+      hc.innerHTML = `<div style="font-weight:600;color:var(--text)">${p.name}</div><div class="hc-row"><span>Profile</span><span>${p.prof}</span></div><div class="hc-row"><span>Workspace</span><span>${p.files ? p.files + " file(s)" : "empty"}</span></div>`;
+      hc.style.left = `${rect.right + 8}px`; hc.style.top = `${rect.top}px`; hc.classList.add("open");
+    };
+    el.onmouseleave = () => hc.classList.remove("open");
+    list.appendChild(el);
+  });
+}
+
+function renderDemo() {
+  const isChat = demoMode === "chat";
+  const reason = document.getElementById("r-val").textContent;
+  document.getElementById("d-prof").innerHTML = isChat
+    ? `<strong>chat</strong> · no tools · ${reason}`
+    : `<strong>${activeProj}</strong> · 6-tool · ${reason} · adp`;
+  document.getElementById("d-stats").textContent = isChat ? "CH 92% · 142.9 t/s" : "CH 99% · 157.6 t/s";
+  document.getElementById("d-ctx").textContent = isChat ? "6.4% / 8.2k" : "20.4% / 8.2k";
+  document.getElementById("d-ctx-fill").style.width = isChat ? "6.4%" : "20.4%";
+  document.getElementById("d-input").placeholder = `Message ${activeProj}... (/ commands, Enter to send)`;
+
+  const files = isChat ? ["New Document.txt"] : ["hello_test.py", "math_demo.py"];
+  document.getElementById("d-files-lbl").textContent = `FILES (${files.length})`;
+  document.getElementById("d-files").innerHTML = files.map(f => `<div class="file-row">${f}</div>`).join("");
+  const tb = document.getElementById("d-task-btn");
+  tb.disabled = isChat; tb.textContent = isChat ? "Chat" : "/task";
+  document.getElementById("d-task-body").textContent = isChat ? "Chat mode (no tools)." : "No TASK.md.";
+
+  const stream = document.getElementById("stream"), wrap = document.getElementById("turn-wrap");
+  stream.classList.toggle("chat-mode", isChat);
+  if (isChat) {
+    wrap.innerHTML = `
+      <div class="msg-u">hi</div>
+      <div class="msg-a"><div class="ans-row"><span class="bullet"></span><div>Hello.</div></div></div>
+      <div class="msg-u">tell me a story about homeaid lemonaid</div>
+      <div class="msg-a">
+        <details class="think"><summary><span>Thought 1.3s ›</span></summary><div class="think-body">Drafting a short warm story around Clara's "Homeaid Lemonade" stand.</div></details>
+        <div class="ans-row"><span class="bullet"></span><div>Once, in a sleepy little town nestled between rolling hills and old oak trees, there stood a roadside stand. Clara called her lemonade "Homeaid" because it was the kind of drink that helped you feel grounded, steady, and at home again.</div></div>
+      </div>`;
+  } else {
+    wrap.innerHTML = `
+      <div class="msg-u">create a small python script called hello_test.py that prints hello world</div>
+      <details class="think"><summary><span>1 Step 1.1s ›</span></summary><div class="think-body">The user wants me to create a simple Python script called hello_test.py that prints "hello world". I'll use write_file to create it.</div></details>
+      <div class="t-card"><div class="t-head"><span><span class="bullet" style="display:inline-block;margin-right:6px;vertical-align:middle;"></span><strong>Write</strong> <span style="color:var(--muted)">(projects/ling-tiny/hello_test.py)</span></span><span style="color:var(--muted)">0.0s</span></div><div class="t-sum">⎿ Updated projects/ling-tiny/hello_test.py (+1 -0)</div><div class="t-diff">1 +  print("hello world")</div></div>
+      <details class="think"><summary><span>2 Step 0.9s ›</span></summary><div class="think-body">Running the script to verify stdout.</div></details>
+      <div class="t-card" onclick="this.classList.toggle('open')"><div class="t-head"><span><span class="bullet" style="display:inline-block;margin-right:6px;vertical-align:middle;"></span><strong>Bash</strong> <span style="color:var(--muted)">(python3 projects/ling-tiny/hello_test.py)</span></span><span style="color:var(--muted)">0.0s</span></div><div class="t-sum">⎿ hello world</div><pre class="t-raw">hello world\nexit code 0</pre></div>
+      <div class="ans-row"><span class="bullet"></span><div>Task complete: Created hello_test.py that prints "hello world".</div></div>`;
+  }
+  extraMsgs.forEach(m => {
+    wrap.insertAdjacentHTML("beforeend", `<div class="msg-u">${m.u.replace(/</g,"&lt;")}</div><div class="msg-a"><div class="ans-row"><span class="bullet"></span><div>${m.a}</div></div></div>`);
+  });
+  stream.scrollTop = stream.scrollHeight;
+  renderProjects();
+}
+
+function switchMode(mode, proj) {
+  demoMode = mode;
+  activeProj = proj || (mode === "chat" ? "chat" : "ling-tiny");
+  extraMsgs = [];
+  document.querySelectorAll("#seg-mode button").forEach(b => b.classList.toggle("active", b.dataset.m === mode));
+  renderDemo();
+}
+
+document.querySelectorAll("#seg-mode button").forEach(b => b.onclick = () => switchMode(b.dataset.m));
+document.querySelectorAll("#seg-bots button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#seg-bots button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active"); useBots = b.dataset.b === "on"; renderProjects();
+});
+document.querySelectorAll("#seg-amb button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#seg-amb button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active"); document.getElementById("demo-frame").classList.toggle("ambient", b.dataset.a === "on");
+});
+document.querySelectorAll("#seg-pill button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#seg-pill button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active"); document.getElementById("demo-frame").classList.toggle("ghost", b.dataset.p === "ghost");
+});
+
+document.getElementById("btn-sb-l").onclick = () => document.getElementById("sb-l").classList.toggle("hidden");
+document.getElementById("btn-sb-r").onclick = () => document.getElementById("sb-r").classList.toggle("hidden");
+document.getElementById("mode-jules").onclick = (e) => { document.body.classList.remove("t3"); e.target.classList.add("active"); document.getElementById("mode-t3").classList.remove("active"); };
+document.getElementById("mode-t3").onclick = (e) => { document.body.classList.add("t3"); e.target.classList.add("active"); document.getElementById("mode-jules").classList.remove("active"); };
+document.getElementById("copy-cmd").onclick = (e) => {
+  navigator.clipboard.writeText("git clone https://github.com/j5onrf/rs-agent.git");
+  e.currentTarget.lastElementChild.textContent = "Copied";
+};
+
+document.getElementById("btn-reason").onclick = (e) => { e.stopPropagation(); document.getElementById("pop-r").classList.toggle("open"); };
+document.querySelectorAll("#pop-r button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#pop-r button").forEach(x => { x.classList.remove("on"); x.lastChild.textContent = ""; });
+  b.classList.add("on"); b.lastChild.textContent = "✓";
+  document.getElementById("r-val").textContent = b.dataset.r;
+  document.getElementById("pop-r").classList.remove("open");
+  renderDemo();
+});
+document.addEventListener("click", (e) => { if (!e.target.closest(".comp-l")) document.getElementById("pop-r").classList.remove("open"); });
+
+const inp = document.getElementById("d-input"), sendBtn = document.getElementById("d-send");
+const sendDemo = () => {
+  const txt = inp.value.trim();
+  if (!txt) return;
+  inp.value = ""; sendBtn.classList.remove("ready");
+  extraMsgs.push({
+    u: txt,
+    a: demoMode === "chat"
+      ? "Interactive static preview — run <code>rail</code> locally to stream live responses from llama-server or cloud providers."
+      : "Interactive static preview — locally <code>rs-rail</code> runs parallel tools and inline diffs inside your workspace sandbox."
+  });
+  renderDemo();
+};
+inp.addEventListener("input", () => sendBtn.classList.toggle("ready", inp.value.trim().length > 0));
+inp.addEventListener("keydown", (e) => { if (e.key === "Enter") sendDemo(); });
+sendBtn.onclick = sendDemo;
+
+renderDemo();
+</script>
+</body>
+</html>
