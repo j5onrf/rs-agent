@@ -647,6 +647,36 @@ fn parse_omarchy_toml(dir: &Path) -> Option<Value> {
 }
 
 
+fn parse_theme_json_file(path: &Path) -> Option<Value> {
+    let stem = path.file_stem().and_then(|s| s.to_str())?;
+    let raw = fs::read_to_string(path).ok()?;
+    let v: Value = serde_json::from_str(&raw).ok()?;
+    let bg = v.get("bg").and_then(|x| x.as_str())?;
+    let accent = v.get("accent").and_then(|x| x.as_str())?;
+    let panel = v.get("panel").and_then(|x| x.as_str()).unwrap_or(bg);
+    let card = v.get("card").and_then(|x| x.as_str()).unwrap_or(panel);
+    let border = v.get("border").and_then(|x| x.as_str()).unwrap_or("#2c303a");
+    let text = v.get("text").and_then(|x| x.as_str()).unwrap_or("#e5e7eb");
+    let muted = v.get("muted").and_then(|x| x.as_str()).unwrap_or("#8b92a0");
+    let cyan = v.get("cyan").and_then(|x| x.as_str()).unwrap_or(accent);
+    let name = v.get("name").and_then(|x| x.as_str()).unwrap_or(stem);
+    let mode = v.get("mode").and_then(|x| x.as_str()).unwrap_or(if is_light_hex(bg) { "light" } else { "dark" });
+    let mut obj = json!({
+        "id": format!("custom:{stem}"), "name": name, "source": "custom", "mode": mode,
+        "bg": bg, "panel": panel, "card": card, "border": border,
+        "text": text, "muted": muted, "accent": accent, "cyan": cyan
+    });
+    for extra in ["active_bg", "active_border", "user_bg", "user_border", "topbar_bg"] {
+        if let Some(s) = v.get(extra).and_then(|x| x.as_str()) {
+            obj[extra] = Value::String(s.to_string());
+        }
+    }
+    if let Some(b) = v.get("semantic_diffs").and_then(|x| x.as_bool()) {
+        obj["semantic_diffs"] = Value::Bool(b);
+    }
+    Some(obj)
+}
+
 fn load_themes(themes_dir: &Path) -> Vec<Value> {
     let mut out = Vec::new();
     if let Some(home) = dirs::home_dir() {
@@ -657,7 +687,7 @@ fn load_themes(themes_dir: &Path) -> Vec<Value> {
         if let Some(t) = omarchy_t {
             out.push(t);
         }
-        if let Some(t) = parse_noctalia_live() {
+        if let Some(t) = parse_noctalia_live_with_themes(themes_dir) {
             out.push(t);
         }
     }
@@ -672,33 +702,9 @@ fn load_themes(themes_dir: &Path) -> Vec<Value> {
     }
     files.sort();
     for path in files {
-        let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else { continue };
-        let Ok(raw) = fs::read_to_string(&path) else { continue };
-        let Ok(v) = serde_json::from_str::<Value>(&raw) else { continue };
-        let Some(bg) = v.get("bg").and_then(|x| x.as_str()) else { continue };
-        let Some(accent) = v.get("accent").and_then(|x| x.as_str()) else { continue };
-        let panel = v.get("panel").and_then(|x| x.as_str()).unwrap_or(bg);
-        let card = v.get("card").and_then(|x| x.as_str()).unwrap_or(panel);
-        let border = v.get("border").and_then(|x| x.as_str()).unwrap_or("#2c303a");
-        let text = v.get("text").and_then(|x| x.as_str()).unwrap_or("#e5e7eb");
-        let muted = v.get("muted").and_then(|x| x.as_str()).unwrap_or("#8b92a0");
-        let cyan = v.get("cyan").and_then(|x| x.as_str()).unwrap_or(accent);
-        let name = v.get("name").and_then(|x| x.as_str()).unwrap_or(stem);
-        let mode = v.get("mode").and_then(|x| x.as_str()).unwrap_or(if is_light_hex(bg) { "light" } else { "dark" });
-        let mut obj = json!({
-            "id": format!("custom:{stem}"), "name": name, "source": "custom", "mode": mode,
-            "bg": bg, "panel": panel, "card": card, "border": border,
-            "text": text, "muted": muted, "accent": accent, "cyan": cyan
-        });
-        for extra in ["active_bg", "active_border", "user_bg", "user_border", "topbar_bg"] {
-            if let Some(s) = v.get(extra).and_then(|x| x.as_str()) {
-                obj[extra] = Value::String(s.to_string());
-            }
+        if let Some(obj) = parse_theme_json_file(&path) {
+            out.push(obj);
         }
-        if let Some(b) = v.get("semantic_diffs").and_then(|x| x.as_bool()) {
-            obj["semantic_diffs"] = Value::Bool(b);
-        }
-        out.push(obj);
     }
     out
 }
@@ -910,10 +916,14 @@ fn as_live_noctalia(mut theme: Value) -> Value {
 }
 
 fn parse_noctalia_live_in(cfg_dir: &Path, state_dir: &Path) -> Option<Value> {
-    parse_noctalia_live_raw(cfg_dir, state_dir).map(as_live_noctalia)
+    parse_noctalia_live_raw_in(cfg_dir, state_dir, None).map(as_live_noctalia)
 }
 
-fn parse_noctalia_live_raw(cfg_dir: &Path, state_dir: &Path) -> Option<Value> {
+fn parse_noctalia_live_in_with_themes(cfg_dir: &Path, state_dir: &Path, themes_dir: &Path) -> Option<Value> {
+    parse_noctalia_live_raw_in(cfg_dir, state_dir, Some(themes_dir)).map(as_live_noctalia)
+}
+
+fn parse_noctalia_live_raw_in(cfg_dir: &Path, state_dir: &Path, themes_dir: Option<&Path>) -> Option<Value> {
     // 1. Direct colors.json (Noctalia v4 or v5 user template)
     if let Some(theme) = read_noctalia_palette_file(&cfg_dir.join("colors.json"), "dark") {
         return Some(theme);
@@ -931,7 +941,13 @@ fn parse_noctalia_live_raw(cfg_dir: &Path, state_dir: &Path) -> Option<Value> {
     let mode = if map.get("mode").is_some_and(|m| m.eq_ignore_ascii_case("light")) { "light" } else { "dark" };
     let source = map.get("source").map(String::as_str).unwrap_or("builtin");
 
-    if source == "community" {
+    if source == "wallpaper" {
+        if let Some(td) = themes_dir {
+            if let Some(t) = parse_theme_json_file(&td.join("noctalia.json")) {
+                return Some(t);
+            }
+        }
+    } else if source == "community" {
         if let Some(name) = map.get("community_palette") {
             let p1 = state_dir.join("community-palettes").join(format!("{name}.json"));
             let p2 = state_dir.join("community-palettes").join(name).join(format!("{name}.json"));
@@ -958,7 +974,7 @@ fn parse_noctalia_live_raw(cfg_dir: &Path, state_dir: &Path) -> Option<Value> {
     map_noctalia_variant("Noctalia", mode, &v)
 }
 
-fn parse_noctalia_live() -> Option<Value> {
+fn parse_noctalia_live_with_themes(themes_dir: &Path) -> Option<Value> {
     let home = dirs::home_dir()?;
     let cfg_dir = std::env::var_os("NOCTALIA_CONFIG_HOME")
         .map(PathBuf::from)
@@ -968,7 +984,7 @@ fn parse_noctalia_live() -> Option<Value> {
         .map(PathBuf::from)
         .or_else(|| std::env::var_os("XDG_STATE_HOME").map(|p| PathBuf::from(p).join("noctalia")))
         .unwrap_or_else(|| home.join(".local/state/noctalia"));
-    parse_noctalia_live_in(&cfg_dir, &state_dir)
+    parse_noctalia_live_in_with_themes(&cfg_dir, &state_dir, themes_dir)
 }
 
 fn url_encode_segment(s: &str) -> String {
@@ -2686,6 +2702,26 @@ mod tests {
         let t_v4 = parse_noctalia_live_in(&cfg, &st).unwrap();
         assert_eq!(t_v4["mode"], "dark");
         assert_eq!(t_v4["accent"], "#37f499");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_noctalia_live_wallpaper_uses_template_json() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_noc_wall_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let cfg = tmp.join("cfg");
+        let st = tmp.join("state");
+        let th = tmp.join("themes");
+        fs::create_dir_all(&cfg).unwrap();
+        fs::create_dir_all(&st).unwrap();
+        fs::create_dir_all(&th).unwrap();
+        fs::write(st.join("settings.toml"), "[theme]\nsource = \"wallpaper\"\nbuiltin = \"Nord\"\nmode = \"dark\"\n").unwrap();
+        fs::write(th.join("noctalia.json"), r##"{"name":"Noctalia","mode":"dark","bg":"#292714","accent":"#e4d467","cyan":"#a9d65c"}"##).unwrap();
+        let t = parse_noctalia_live_in_with_themes(&cfg, &st, &th).unwrap();
+        assert_eq!(t["id"], "noctalia");
+        assert_eq!(t["source"], "live");
+        assert_eq!(t["bg"], "#292714");
+        assert_eq!(t["accent"], "#e4d467");
         let _ = fs::remove_dir_all(&tmp);
     }
 
