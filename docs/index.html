@@ -68,12 +68,16 @@
   }
   .cmd span { color: var(--cyan); font-size: 11px; }
 
-  /* Demo Controls Strip */
-  .controls-bar {
-    display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
-    margin: 26px 0 12px;
-  }
-  .themes, .cust-bar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  /* Single Centered Theme Row */
+  .themes { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 26px 0 14px; }
+  .cust-wrap { position: relative; display: inline-flex; align-items: center; }
+  .cust-pop { position: absolute; top: calc(100% + 8px); right: 0; width: 228px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: none; flex-direction: column; gap: 8px; box-shadow: 0 14px 34px rgba(0,0,0,.38); z-index: 40; font-family: var(--mono); font-size: 11px; }
+  .cust-pop.open { display: flex; }
+  .cust-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); }
+  .cust-pop .seg { padding: 1px; }
+  .cust-pop .seg button { padding: 3px 7px; font-size: 10.5px; }
+  .tb-r .seg { padding: 1px; }
+  .tb-r .seg button { padding: 2px 8px; font-size: 11px; }
   .swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
   .seg { display: inline-flex; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 2px; gap: 2px; }
   .seg button { border: none; background: transparent; color: var(--muted); border-radius: 999px; padding: 4px 10px; font-family: var(--mono); font-size: 11.5px; cursor: pointer; transition: .12s; }
@@ -199,11 +203,7 @@
 <div class="wrap">
   <nav>
     <div class="brand">
-      <svg width="22" height="22" viewBox="0 0 128 128" aria-hidden="true">
-        <defs><linearGradient id="rail_bg" x1="0.2" y1="0" x2="0.8" y2="1"><stop offset="0%" stop-color="#ffffff"/><stop offset="55%" stop-color="#f6f8fa"/><stop offset="100%" stop-color="#eaecef"/></linearGradient></defs>
-        <rect x="8" y="8" width="112" height="112" rx="26" fill="url(#rail_bg)"/>
-        <path fill="none" stroke="#0d1117" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" d="M 64 40 L 88 64 L 64 88 L 40 88"/>
-      </svg>
+      <svg width="20" height="20" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M49 24 L72 47 L50 69 L24 69"/></svg>
       <span>RS Rail</span>
     </div>
     <div class="nav-right">
@@ -225,28 +225,7 @@
     </div>
   </section>
 
-  <!-- Interactive Theme + Chat/Agent + Appearance Customizer -->
-  <div class="controls-bar">
-    <div class="themes" id="theme-bar"></div>
-    <div class="cust-bar">
-      <div class="seg" id="seg-mode">
-        <button data-m="chat" class="active">Chat</button>
-        <button data-m="agent">Agent</button>
-      </div>
-      <div class="seg quiet" id="seg-bots">
-        <button data-b="on" class="active">Micro-Bots</button>
-        <button data-b="off">Letters</button>
-      </div>
-      <div class="seg quiet" id="seg-amb">
-        <button data-a="off" class="active">Ambient Off</button>
-        <button data-a="on">Ambient On</button>
-      </div>
-      <div class="seg quiet" id="seg-pill">
-        <button data-p="pills" class="active">Pills</button>
-        <button data-p="ghost">Ghost</button>
-      </div>
-    </div>
-  </div>
+  <div class="themes" id="theme-bar"></div>
 
   <!-- Full Interactive RS Rail Demo -->
   <div class="frame" id="demo-frame">
@@ -266,6 +245,16 @@
         <span class="tele" id="d-stats">CH 92% · 142.9 t/s</span>
         <span class="sep"></span>
         <span class="tele"><span id="d-ctx">6.4% / 8.2k</span> <span class="ctx-bar"><span class="ctx-fill" id="d-ctx-fill" style="width:6.4%"></span></span></span>
+        <div class="cust-wrap">
+          <button type="button" class="g-btn" id="btn-cust" title="Customize Demo">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="5.5" cy="4.5" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10.5" cy="8" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="6.5" cy="11.5" r="1.5" fill="var(--panel)"/></svg>
+          </button>
+          <div class="cust-pop" id="cust-pop">
+            <div class="cust-row"><span>Badges</span><div class="seg quiet" id="seg-bots"><button data-b="on" class="active">Bots</button><button data-b="off">Letters</button></div></div>
+            <div class="cust-row"><span>Ambient</span><div class="seg quiet" id="seg-amb"><button data-a="off" class="active">Off</button><button data-a="on">On</button></div></div>
+            <div class="cust-row"><span>Composer</span><div class="seg quiet" id="seg-pill"><button data-p="pills" class="active">Pills</button><button data-p="ghost">Ghost</button></div></div>
+          </div>
+        </div>
         <button type="button" class="g-btn" id="btn-sb-r" title="Toggle Workspace Panel">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="10" y1="2.5" x2="10" y2="13.5"/></svg>
         </button>
@@ -281,7 +270,7 @@
         </div>
         <div class="proj-list" id="proj-list"></div>
         <div class="sb-foot">
-          <button type="button" class="g-btn" title="Settings (Ctrl+,)">
+          <button type="button" class="g-btn" id="btn-sb-cust" title="Customize Demo">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="5.5" cy="4.5" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10.5" cy="8" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="6.5" cy="11.5" r="1.5" fill="var(--panel)"/></svg>
           </button>
         </div>
@@ -503,7 +492,15 @@ document.querySelectorAll("#pop-r button").forEach(b => b.onclick = () => {
   document.getElementById("pop-r").classList.remove("open");
   renderDemo();
 });
-document.addEventListener("click", (e) => { if (!e.target.closest(".comp-l")) document.getElementById("pop-r").classList.remove("open"); });
+const custPop = document.getElementById("cust-pop");
+const toggleCust = (e) => { e.stopPropagation(); custPop.classList.toggle("open"); };
+document.getElementById("btn-cust").onclick = toggleCust;
+document.getElementById("btn-sb-cust").onclick = toggleCust;
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".comp-l")) document.getElementById("pop-r").classList.remove("open");
+  if (!e.target.closest(".cust-wrap")) custPop.classList.remove("open");
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") custPop.classList.remove("open"); });
 
 const inp = document.getElementById("d-input"), sendBtn = document.getElementById("d-send");
 const sendDemo = () => {
