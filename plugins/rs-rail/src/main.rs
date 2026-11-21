@@ -305,13 +305,17 @@ fn git_status_brief(dir: &Path) -> (String, bool) {
     let mut in_git = false;
     while let Some(d) = cur {
         if d.join(".git").exists() {
+            // Do not attribute the parent rs-agent repo's status to a project without its own .git.
+            if d.join("projects").is_dir() && dir != d {
+                break;
+            }
             in_git = true;
             break;
         }
         cur = d.parent();
     }
     if !in_git {
-        return ("git: [none]".into(), false);
+        return (String::new(), false);
     }
     let Ok(out) = std::process::Command::new("git")
         .arg("-C")
@@ -1026,14 +1030,8 @@ async fn fetch_json_ok(http: &reqwest::Client, url: &str) -> Option<Value> {
     resp.json::<Value>().await.ok()
 }
 
-async fn fetch_noctalia_catalog(app: &AppRuntime, force: bool) -> (Vec<Value>, Option<String>) {
-    if !force {
-        if let Some(ref cached) = *app.noctalia_catalog.lock().await {
-            return (cached.clone(), None);
-        }
-    }
-
-    let mut list: Vec<Value> = BUILTIN_NOCTALIA
+fn builtin_noctalia_list() -> Vec<Value> {
+    BUILTIN_NOCTALIA
         .iter()
         .map(|b| {
             json!({
@@ -1046,7 +1044,15 @@ async fn fetch_noctalia_catalog(app: &AppRuntime, force: bool) -> (Vec<Value>, O
                 "light": b.light.preview()
             })
         })
-        .collect();
+        .collect()
+}
+
+async fn fetch_community_catalog(app: &AppRuntime, force: bool) -> (Vec<Value>, Option<String>) {
+    if !force {
+        if let Some(ref cached) = *app.noctalia_catalog.lock().await {
+            return (cached.clone(), None);
+        }
+    }
 
     let remote = match fetch_json_ok(&app.http, "https://api.noctalia.dev/palettes").await {
         Some(v) => Some(v),
@@ -1054,7 +1060,7 @@ async fn fetch_noctalia_catalog(app: &AppRuntime, force: bool) -> (Vec<Value>, O
     };
 
     let Some(val) = remote else {
-        return (list, Some("Offline: showing 10 Noctalia Core palettes only".into()));
+        return (Vec::new(), Some("Offline: could not load community palettes".into()));
     };
 
     let mut reg_map = HashMap::new();
@@ -1085,12 +1091,11 @@ async fn fetch_noctalia_catalog(app: &AppRuntime, force: bool) -> (Vec<Value>, O
         }
     }
     community.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
-    list.extend(community);
     if !reg_map.is_empty() {
         *app.noctalia_registry.lock().await = reg_map;
     }
-    *app.noctalia_catalog.lock().await = Some(list.clone());
-    (list, None)
+    *app.noctalia_catalog.lock().await = Some(community.clone());
+    (community, None)
 }
 
 async fn install_noctalia_theme(app: &AppRuntime, name: &str, mode: &str) -> Result<Value> {
@@ -1165,30 +1170,6 @@ fn delete_custom_theme(themes_dir: &Path, id: &str) -> Result<()> {
     }
     fs::remove_file(&target)?;
     Ok(())
-}
-
-fn dirty_project_set(root: &Path) -> std::collections::HashSet<String> {
-    let mut set = std::collections::HashSet::new();
-    if let Ok(out) = std::process::Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["--no-optional-locks", "status", "--porcelain", "--untracked-files=normal", "--", "projects/"])
-        .output()
-    {
-        for line in String::from_utf8_lossy(&out.stdout).lines() {
-            if line.len() < 4 {
-                continue;
-            }
-            let p = line[3..].trim().trim_matches('"');
-            let p = p.rsplit(" -> ").next().unwrap_or(p);
-            if let Some(rest) = p.strip_prefix("projects/") {
-                if let Some(proj) = rest.split('/').next() {
-                    set.insert(proj.to_string());
-                }
-            }
-        }
-    }
-    set
 }
 
 fn list_workspace_files(dir: &Path, root: &Path, include_rs: bool, out: &mut Vec<String>) {
@@ -1569,7 +1550,17 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
 
     if method == "GET" && path == "/api/noctalia/catalog" {
         let force = query.split('&').any(|p| p == "refresh=1");
-        let (palettes, warning) = fetch_noctalia_catalog(&app, force).await;
+        let scope = query.split('&').find_map(|p| p.strip_prefix("scope=")).unwrap_or("all");
+        let (palettes, warning) = match scope {
+            "core" => (builtin_noctalia_list(), None),
+            "community" => fetch_community_catalog(&app, force).await,
+            _ => {
+                let mut all = builtin_noctalia_list();
+                let (comm, warn) = fetch_community_catalog(&app, force).await;
+                all.extend(comm);
+                (all, warn)
+            }
+        };
         return write_http_json(&mut stream, 200, &json!({ "palettes": palettes, "warning": warning })).await;
     }
 
@@ -1605,7 +1596,6 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         }
 
         let active_name = app.active_project.lock().await.clone();
-        let dirty_set = dirty_project_set(&app.root);
         let mut proj_entries = Vec::new();
         let mut active_files = Vec::new();
         if let Ok(rd) = fs::read_dir(app.root.join("projects")) {
@@ -1622,11 +1612,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 }
                 let cfg = WorkspaceConfig::load_or_default(&p);
                 let prof = if name == "chat" { "chat".into() } else { cfg.profile_name };
-                let dirty = if p.join(".git").exists() {
-                    git_status_brief(&p).1
-                } else {
-                    dirty_set.contains(&name)
-                };
+                let has_git = p.join(".git").exists();
+                let dirty = has_git && git_status_brief(&p).1;
                 let mut files = Vec::new();
                 list_workspace_files(&p, &p, false, &mut files);
                 let file_count = files.len();
@@ -1636,6 +1623,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 proj_entries.push(json!({
                     "name": name,
                     "profile_name": prof,
+                    "has_git": has_git,
                     "dirty": dirty,
                     "file_count": file_count
                 }));
@@ -2715,6 +2703,25 @@ mod tests {
         assert!(delete_custom_theme(&tmp, "custom:../claude").is_err());
         delete_custom_theme(&tmp, "custom:claude").unwrap();
         assert!(!tmp.join("claude.json").exists());
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_builtin_noctalia_list_is_core_and_offline() {
+        let list = builtin_noctalia_list();
+        assert_eq!(list.len(), BUILTIN_NOCTALIA.len());
+        assert!(list.iter().all(|v| v["core"] == true && v["base"] == "Core"));
+    }
+
+    #[test]
+    fn test_git_status_brief_ignores_parent_rs_agent_repo() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_git_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join(".git")).unwrap();
+        fs::create_dir_all(tmp.join("projects/nogit")).unwrap();
+        let (lbl, dirty) = git_status_brief(&tmp.join("projects/nogit"));
+        assert_eq!(lbl, "");
+        assert!(!dirty);
         let _ = fs::remove_dir_all(&tmp);
     }
 }

@@ -48,26 +48,34 @@
   * { box-sizing: border-box; }
   html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; overflow: hidden; }
   button, input, select, textarea, [tabindex] { font: inherit; color: inherit; outline: none; }
+  input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.82; }
   button:focus-visible, [tabindex]:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: 2px; }
   button:disabled { opacity: 0.42; cursor: not-allowed; filter: none; }
   .app { display: flex; flex-direction: column; height: 100vh; }
 
   /* Topbar */
-  .topbar { height: 42px; min-height: 42px; background: var(--topbar-bg, var(--panel)); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; gap: 12px; }
-  .tb-left, .tb-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
-  .brand { font-weight: 700; letter-spacing: .3px; display: flex; align-items: center; gap: 6px; color: var(--text); white-space: nowrap; }
-  .pill { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 3px 8px; font-size: 12px; color: var(--muted); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; cursor: default; user-select: none; transition: background .12s, color .12s; }
-  .pill:hover { background: var(--hover); color: var(--text); }
-  .ctx-bar { width: 56px; height: 6px; background: color-mix(in srgb, var(--text) 20%, transparent); border-radius: 99px; overflow: hidden; flex-shrink: 0; }
+  .topbar { height: 40px; min-height: 40px; background: var(--topbar-bg, var(--panel)); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; gap: 10px; }
+  .tb-left, .tb-right { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .brand { font-weight: 600; letter-spacing: .2px; display: inline-flex; align-items: center; gap: 7px; color: var(--text); white-space: nowrap; background: transparent; border: none; padding: 3px 6px; margin-left: -6px; border-radius: 6px; cursor: pointer; }
+  .brand:hover { background: var(--hover); }
+  .sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
+  .tele { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; user-select: none; }
+  .tele strong { color: var(--text); font-weight: 500; }
+  .git-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
+  .git-dot.dirty { background: var(--accent); }
+  .ctx-bar { width: 46px; height: 4px; background: color-mix(in srgb, var(--text) 16%, transparent); border-radius: 99px; overflow: hidden; flex-shrink: 0; }
   .ctx-fill { display: block; height: 100%; background: var(--accent); border-radius: 99px; width: 0%; transition: width .2s, background .2s; }
-  .btn { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 12px; color: var(--text); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .btn { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; color: var(--text); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
   .btn:hover { background: var(--hover); }
   .btn-primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
   .btn-primary:hover { filter: brightness(1.08); }
   .btn-danger { background: var(--del-bg); color: var(--err-text); border-color: rgba(239,68,68,.4); }
   .btn-sm { padding: 2px 8px; font-size: 11px; }
   .btn-icon { padding: 4px 6px; }
-  #btn-close-app { margin-left: 10px; border-radius: 50%; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .topbar .btn-icon { background: transparent; border-color: transparent; color: var(--muted); }
+  .topbar .btn-icon:hover { background: var(--hover); color: var(--text); }
+  #btn-close-app { margin-left: 0; width: 25px; height: 25px; padding: 0; border-radius: 6px; opacity: 0.35; display: inline-flex; align-items: center; justify-content: center; transition: opacity .12s, background .12s, color .12s; }
+  #btn-close-app:hover { opacity: 1; color: var(--err-text); background: var(--del-bg); }
   .btn-send-circle { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background .12s, border-color .12s, color .12s, filter .12s; }
   .btn-send-circle:hover { background: var(--hover); color: var(--text); }
   .btn-send-circle.ready { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
@@ -81,17 +89,21 @@
 
   /* Main 3-pane body */
   .main { flex: 1; display: flex; min-height: 0; }
-  .sidebar-left { width: 235px; min-width: 200px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
-  .sidebar-right { width: 280px; min-width: 235px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .sidebar-left { width: 230px; min-width: 200px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  .sidebar-right { width: 230px; min-width: 200px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .sidebar-left.hidden, .sidebar-right.hidden { display: none; }
   .sec-head { padding: 10px 12px 6px; font-size: 12px; font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
   .rs-head { padding: 8px 12px 6px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-  .proj-list { flex: 1; overflow-y: auto; padding: 6px 6px 12px; }
-  .proj-item { padding: 6px 8px; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 2px; border: 1px solid transparent; }
+  .proj-list { flex: 1; overflow-y: auto; padding: 6px 6px 8px; }
+  .sb-foot { padding: 6px 8px 8px; display: flex; align-items: center; }
+  .sb-foot .btn-icon { background: transparent; border-color: transparent; color: var(--muted); opacity: 0; transition: opacity .15s, background .12s, color .12s; }
+  .sidebar-left:hover .sb-foot .btn-icon, .sb-foot .btn-icon:focus-visible { opacity: 1; }
+  .sb-foot .btn-icon:hover { opacity: 1; background: var(--hover); color: var(--text); }
+  .proj-item { padding: 5px 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 1px; border: 1px solid transparent; }
   .proj-item:hover { background: var(--hover); }
   .proj-item.active { background: var(--active-bg, var(--user-bg)); border-color: var(--active-border, var(--user-border)); }
   .proj-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-  .proj-badge { width: 20px; height: 20px; border-radius: 5px; background: var(--card); border: 1px solid var(--border); color: var(--muted); font-size: 10px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase; }
+  .proj-badge { width: 18px; height: 18px; border-radius: 4px; background: var(--card); border: 1px solid var(--border); color: var(--muted); font-size: 9.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase; }
   .proj-item.active .proj-badge { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
   .proj-name { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .proj-acts { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
@@ -135,10 +147,10 @@
   .stream::-webkit-scrollbar-track, .proj-list::-webkit-scrollbar-track, .file-list::-webkit-scrollbar-track, .modal-pane::-webkit-scrollbar-track { background: transparent; }
   .stream::-webkit-scrollbar-thumb, .proj-list::-webkit-scrollbar-thumb, .file-list::-webkit-scrollbar-thumb, .modal-pane::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 35%, transparent); border-radius: 99px; }
   .stream::-webkit-scrollbar-thumb:hover, .proj-list::-webkit-scrollbar-thumb:hover, .file-list::-webkit-scrollbar-thumb:hover, .modal-pane::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--muted) 65%, transparent); }
-  .turn-wrap { max-width: 880px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
-  .msg-user { align-self: flex-end; background: var(--user-bg); border: 1px solid var(--user-border); color: var(--user-text); padding: 8px 13px; border-radius: 10px; max-width: 78%; white-space: pre-wrap; word-break: break-word; line-height: 1.45; }
+  .turn-wrap { max-width: 820px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  .msg-user { align-self: flex-end; background: var(--user-bg); border: 1px solid var(--user-border); color: var(--user-text); padding: 8px 12px; border-radius: 8px; max-width: 74%; white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
   .msg-assistant { display: flex; flex-direction: column; gap: 8px; }
-  .stream.chat-mode .msg-assistant { align-self: flex-start; max-width: 78%; min-width: 0; background: var(--panel); border: 1px solid var(--border); padding: 8px 13px; border-radius: 10px; }
+  .stream.chat-mode .msg-assistant { align-self: flex-start; max-width: 74%; min-width: 0; background: var(--panel); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px; }
   .stream.chat-mode .msg-assistant:empty { display: none; }
   .stream.chat-mode .ans-body code { background: var(--card); }
   .stream.chat-mode .think-box summary { margin-left: -4px; }
@@ -152,9 +164,10 @@
   .think-box summary:hover { background: var(--card); border-color: var(--border); }
   .think-box summary:hover .think-step, .think-box summary:hover .think-meta, .think-box summary:hover .think-chev { color: var(--text); opacity: 1; }
   .think-box[open] .think-chev { transform: rotate(90deg); }
-  .think-body { white-space: pre-wrap; margin: 5px 0 4px 6px; padding-left: 12px; border-left: 1px solid var(--border); color: var(--muted); opacity: 0.85; font-style: italic; font-size: 12px; line-height: 1.48; }
+  .think-body { white-space: pre-wrap; margin: 5px 0 4px 6px; padding-left: 12px; border-left: 1px solid var(--border); color: var(--muted); opacity: 0.85; font-size: 12px; line-height: 1.48; }
   .ans-row { display: flex; align-items: flex-start; gap: 9px; line-height: 1.55; }
   .bullet { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); font-size: 0; user-select: none; margin-top: 6px; flex-shrink: 0; }
+  .stream.chat-mode .ans-row .bullet { display: none; }
   .tool-title .bullet { margin-top: 0; }
   .ans-body { flex: 1; min-width: 0; word-break: break-word; }
   .ans-body h2, .ans-body h3, .ans-body h4 { margin: 10px 0 6px; font-weight: 600; color: var(--text); }
@@ -170,17 +183,20 @@
   .code-wrap pre { margin: 0; padding: 10px 12px; overflow-x: auto; font-family: var(--mono); font-size: var(--code-size); line-height: 1.45; font-variant-ligatures: var(--ligatures); }
 
   /* Tool Cards & Framed Error Card */
-  .tool-card { border: 1px solid var(--border); background: var(--panel); border-radius: 8px; overflow: hidden; }
-  .tool-head { padding: 7px 11px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: var(--mono); font-size: 12px; cursor: pointer; }
+  .tool-card { border: 1px solid var(--border); background: var(--panel); border-radius: 6px; overflow: hidden; }
+  .tool-head { padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: var(--mono); font-size: 11.5px; font-variant-numeric: tabular-nums; cursor: pointer; }
+  .tool-head:hover { background: var(--hover); }
   .tool-title { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tool-brief { color: var(--muted); }
-  .tool-summary { color: var(--dim); font-size: 11.5px; padding: 0 11px 7px 26px; font-family: var(--mono); }
+  .tool-summary { color: var(--dim); font-size: 11.5px; padding: 0 10px 6px 24px; font-family: var(--mono); }
   .tool-err { color: var(--err-text); }
-  .err-card { max-width: 880px; width: 100%; margin: 0 auto; border: 1px solid rgba(239,68,68,.42); background: var(--del-bg); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .err-card { max-width: 820px; width: 100%; margin: 0 auto; border: 1px solid rgba(239,68,68,.42); background: var(--del-bg); border-radius: 6px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
   .err-msg { color: var(--err-text); font-family: var(--mono); font-size: 12px; white-space: pre-wrap; word-break: break-word; }
   .err-acts { display: flex; justify-content: flex-end; }
   .diff-box { border-top: 1px solid var(--border); background: var(--code-bg); font-family: var(--mono); font-size: var(--code-size); overflow-x: auto; padding: 4px 0; font-variant-ligatures: var(--ligatures); }
-  .diff-line { padding: 0 10px 0 0; white-space: pre; display: flex; gap: 10px; }
+  .diff-line { padding: 0 10px 0 0; white-space: pre; display: flex; gap: 10px; min-width: max-content; border-left: 2px solid transparent; }
+  .diff-line.add { background: var(--add-bg); border-left-color: var(--add-text); }
+  .diff-line.del { background: var(--del-bg); border-left-color: var(--del-text); }
   .diff-line.ctx { color: var(--muted); }
   .diff-num { width: 46px; padding: 1px 6px; text-align: right; color: var(--dim); user-select: none; flex-shrink: 0; }
   .diff-line.del .diff-num { background: var(--del-bg); color: var(--del-text); }
@@ -195,9 +211,19 @@
   .gate-actions { display: flex; gap: 8px; }
 
   /* Composer */
-  .composer-wrap { padding: 8px 24px 16px; background: var(--bg); }
-  .composer { position: relative; max-width: 880px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s; }
+  .composer-wrap { padding: 10px 24px 16px; background: var(--bg); position: relative; isolation: isolate; }
+  .composer { position: relative; max-width: 820px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px 9px; display: flex; flex-direction: column; gap: 8px; transition: border-color .15s; }
+  body.comp-compact .composer { padding: 7px 11px; gap: 4px; border-radius: 10px; }
+  body.comp-compact .composer textarea { min-height: 22px; line-height: 1.4; }
+  body.comp-compact .comp-left { min-height: 26px; }
+  body.comp-compact .micro-pill, body.comp-compact .skill-chip { height: 24px; font-size: 11.5px; }
+  body.comp-compact #btn-model-pill { line-height: 22px; }
+  body.comp-compact .btn-send-circle { width: 26px; height: 26px; }
   .composer:focus-within { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+  body.ambient-light .composer { border-color: color-mix(in srgb, var(--accent) 26%, var(--border)); }
+  body.ambient-light .composer:focus-within { border-color: color-mix(in srgb, var(--accent) 48%, var(--border)); }
+  body.ambient-light .composer::before { content: ""; position: absolute; top: 42%; left: 2%; right: 2%; bottom: -16px; border-radius: 999px; background: radial-gradient(ellipse 50% 50% at 50% 50%, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, transparent) 45%, color-mix(in srgb, var(--accent) 26%, transparent) 72%, transparent 100%); opacity: var(--ambient-op, 0.30); z-index: -1; pointer-events: none; transform: translateZ(0); transition: opacity .25s ease; }
+  body.ambient-light .composer:focus-within::before { opacity: var(--ambient-op-focus, 0.48); }
   .img-strip { display: none; gap: 6px; flex-wrap: wrap; }
   .img-strip.open { display: flex; }
   .img-thumb { position: relative; width: 44px; height: 44px; border-radius: 6px; border: 1px solid var(--border); overflow: hidden; background: var(--bg); }
@@ -206,19 +232,22 @@
   .msg-imgs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 6px; }
   .msg-img { max-width: 180px; max-height: 140px; border-radius: 6px; border: 1px solid var(--border); object-fit: cover; display: block; }
   .composer textarea { width: 100%; background: transparent; border: none; outline: none; resize: none; min-height: 36px; max-height: 180px; line-height: 1.45; color: var(--text); }
-  .comp-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-  .comp-left, .comp-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .comp-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+  .comp-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; min-height: 30px; }
+  .comp-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  #skills-bar { display: contents; }
+  #btn-model-pill { display: inline-block; max-width: min(320px, 100%); overflow: hidden; text-overflow: ellipsis; line-height: 24px; }
   .micro-pill { height: 26px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 0 10px; font: inherit; font-size: 12px; color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; user-select: none; transition: background .12s, border-color .12s, color .12s; }
-  .micro-pill:hover { background: var(--hover); }
+  .micro-pill:hover, .micro-pill.open { background: var(--hover); }
   .micro-pill.muted { color: var(--muted); }
-  .micro-pill.muted:hover { color: var(--text); }
+  .micro-pill.muted:hover, .micro-pill.muted.open { color: var(--text); }
   body.prompt-ghost .micro-pill { background: transparent; border-color: transparent; border-radius: 7px; padding: 0 7px; }
   body.prompt-ghost .micro-pill:hover, body.prompt-ghost .micro-pill.open { background: var(--hover); }
   body.prompt-ghost .skill-chip { border-radius: 7px; }
   .pop-wrap { position: relative; display: inline-flex; }
-  .pop { position: absolute; bottom: calc(100% + 6px); left: 0; min-width: 148px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px; display: none; flex-direction: column; gap: 1px; box-shadow: 0 12px 28px rgba(0,0,0,.32); z-index: 30; }
+  .pop { position: absolute; bottom: calc(100% + 6px); left: 0; min-width: 168px; max-height: min(320px, 55vh); overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px; display: none; flex-direction: column; gap: 1px; box-shadow: 0 12px 28px rgba(0,0,0,.32); z-index: 30; }
   .pop.open { display: flex; }
-  .pop button { background: transparent; border: none; border-radius: 6px; padding: 6px 9px; text-align: left; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+  .pop button { background: transparent; border: none; border-radius: 6px; padding: 6px 9px; text-align: left; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 12px; white-space: nowrap; }
   .pop button:hover, .pop button.on { background: var(--hover); color: var(--text); }
   .pop button.on { color: var(--accent); font-weight: 600; }
   .chev { width: 11px; height: 11px; opacity: .65; flex-shrink: 0; transition: transform .15s; }
@@ -243,8 +272,9 @@
   .modal-head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 600; }
   .modal-body { flex: 1; display: flex; min-height: 0; }
   .modal-nav { width: 190px; border-right: 1px solid var(--border); padding: 10px 8px; display: flex; flex-direction: column; gap: 2px; background: var(--nav-bg); }
-  .nav-group { font-size: 10.5px; color: var(--dim); padding: 8px 10px 4px; font-weight: 600; letter-spacing: .06em; }
-  .nav-btn { text-align: left; background: transparent; border: 1px solid transparent; padding: 7px 10px; border-radius: 6px; cursor: pointer; color: var(--muted); }
+  .nav-group { font-size: 10px; color: var(--muted); opacity: 0.58; padding: 6px 10px 4px; font-weight: 600; letter-spacing: .08em; user-select: none; }
+  .nav-btn + .nav-group { margin-top: 8px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--border) 65%, transparent); }
+  .nav-btn { text-align: left; background: transparent; border: 1px solid transparent; padding: 7px 10px; border-radius: 6px; cursor: pointer; color: color-mix(in srgb, var(--text) 78%, var(--muted)); }
   .nav-btn:hover { background: var(--hover); color: var(--text); }
   .nav-btn.active { background: var(--accent-bg); border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--accent); font-weight: 500; }
   .modal-pane { flex: 1; padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
@@ -289,20 +319,22 @@
 <div class="app">
   <header class="topbar">
     <div class="tb-left">
-      <div class="brand"><svg width="18" height="18" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M49 24 L72 47 L50 69 L24 69"/></svg><span>RS Rail</span></div>
+      <button type="button" class="brand" id="btn-brand-settings" title="Settings (Ctrl+,)"><svg width="16" height="16" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M49 24 L72 47 L50 69 L24 69"/></svg><span>RS Rail</span></button>
       <button class="btn btn-sm btn-icon" id="btn-toggle-proj" title="Toggle Projects Sidebar (Ctrl+B)" aria-label="Toggle sidebar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg></button>
-      <span class="pill" id="tb-profile">—</span>
-      <span class="pill" id="tb-git">git: —</span>
+      <span class="sep"></span>
+      <span class="tele" id="tb-profile">—</span>
+      <span class="sep" id="tb-git-sep" style="display:none;"></span>
+      <span class="tele" id="tb-git" style="display:none;"><span class="git-dot" id="tb-git-dot"></span><span id="tb-git-txt"></span></span>
     </div>
     <div class="tb-right">
-      <span class="pill" id="tb-stats" style="display:none;"></span>
-      <span class="pill" id="tb-ctx">
+      <span class="tele" id="tb-stats" style="display:none;"></span>
+      <span class="sep" id="tb-stats-sep" style="display:none;"></span>
+      <span class="tele" id="tb-ctx">
         <span id="tb-usage">ctx 8.2k</span>
         <span class="ctx-bar"><span class="ctx-fill" id="tb-ctx-fill"></span></span>
       </span>
       <button class="btn btn-sm btn-icon" id="btn-toggle-task" title="Toggle Workspace Panel (Files, TASK, Memory, Export)" aria-label="Toggle workspace panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="10" y1="2.5" x2="10" y2="13.5"/></svg></button>
-      <button class="btn btn-sm btn-icon" id="btn-settings" title="Settings" aria-label="Settings"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="5.5" cy="4.5" r="1.5" fill="var(--card)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10.5" cy="8" r="1.5" fill="var(--card)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="6.5" cy="11.5" r="1.5" fill="var(--card)"/></svg></button>
-      <button class="btn btn-sm btn-icon" id="btn-close-app" aria-label="Close RS Rail"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button>
+      <button class="btn btn-sm btn-icon" id="btn-close-app" title="Close RS Rail" aria-label="Close RS Rail"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button>
     </div>
   </header>
 
@@ -316,6 +348,9 @@
         <button class="btn btn-sm btn-icon" id="btn-new-proj" title="New Workspace" aria-label="New Workspace"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3.5" x2="8" y2="12.5"/><line x1="3.5" y1="8" x2="12.5" y2="8"/></svg></button>
       </div>
       <div class="proj-list" id="proj-list"></div>
+      <div class="sb-foot">
+        <button class="btn btn-sm btn-icon" id="btn-settings" title="Settings (Ctrl+,)" aria-label="Settings"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="5.5" cy="4.5" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10.5" cy="8" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="6.5" cy="11.5" r="1.5" fill="var(--panel)"/></svg></button>
+      </div>
     </aside>
 
     <section class="center">
@@ -331,20 +366,20 @@
           <div class="ac-pop" id="ac-pop"></div>
           <input type="file" id="img-file" accept="image/*" multiple hidden />
           <div class="img-strip" id="img-strip"></div>
-          <textarea id="msg-input" placeholder="Message... (/ commands, Enter to send)"></textarea>
+          <textarea id="msg-input" rows="1" placeholder="Message... (/ commands, Enter to send)"></textarea>
           <div class="comp-bar">
             <div class="comp-left">
-              <button class="micro-pill" id="btn-model-pill" title="Open Providers">—</button>
+              <button type="button" class="micro-pill" id="btn-model-pill" title="Open Providers">—</button>
               <div class="pop-wrap">
-                <button class="micro-pill muted" id="btn-reasoning-pill" title="Reasoning setting"><span id="reasoning-val">Default</span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg></button>
-                <div class="pop" id="pop-reasoning"></div>
+                <button type="button" class="micro-pill muted" id="btn-reasoning-pill" title="Reasoning setting" aria-haspopup="menu" aria-expanded="false"><span id="reasoning-val">Default</span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg></button>
+                <div class="pop" id="pop-reasoning" role="menu"></div>
               </div>
-              <button class="micro-pill muted" id="btn-img" title="Attach image (or paste)" aria-label="Attach image" style="display:none;padding:0 8px;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="5.7" cy="6" r="1"/><path d="M2.5 11.5l3.2-3.2 2.4 2.4 2.1-2.1 3.3 2.9"/></svg></button>
-              <div id="skills-bar" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;"></div>
+              <button type="button" class="micro-pill muted" id="btn-img" title="Attach image (or paste)" aria-label="Attach image" style="display:none;padding:0 8px;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="5.7" cy="6" r="1"/><path d="M2.5 11.5l3.2-3.2 2.4 2.4 2.1-2.1 3.3 2.9"/></svg></button>
+              <div id="skills-bar"></div>
             </div>
             <div class="comp-right">
-              <button class="btn-send-circle" id="btn-send" aria-label="Send message"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12.5V3.5"/><path d="M4 7.5L8 3.5l4 4"/></svg></button>
-              <button class="btn-send-circle stop" id="btn-stop" title="Stop generation" aria-label="Stop generation" style="display:none;"><svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><rect x="1.5" y="1.5" width="9" height="9" rx="2"/></svg></button>
+              <button type="button" class="btn-send-circle" id="btn-send" aria-label="Send message"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12.5V3.5"/><path d="M4 7.5L8 3.5l4 4"/></svg></button>
+              <button type="button" class="btn-send-circle stop" id="btn-stop" title="Stop generation" aria-label="Stop generation" style="display:none;"><svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><rect x="1.5" y="1.5" width="9" height="9" rx="2"/></svg></button>
             </div>
           </div>
         </div>
@@ -449,7 +484,7 @@ let ACTIVE_TAB = "providers";
 let STREAMING = false;
 let skillFilter = "";
 let lastSentPayload = null;
-let noctaliaBrowse = false, noctaliaMode = "dark", noctaliaFilter = "", noctaliaCatalog = null, noctaliaWarn = "", noctaliaBusy = "";
+let noctaliaBrowse = false, noctaliaSource = "core", noctaliaMode = "dark", noctaliaFilter = "", noctaliaCore = null, noctaliaCommunity = null, noctaliaWarn = "", noctaliaBusy = "";
 
 const BUILTIN_THEMES = [
   { id:"dark-default", name:"Dark Default", mode:"dark", bg:"#09090b", panel:"#0f0f12", card:"#16161a", border:"#232329", text:"#ececef", muted:"#8e8e98", accent:"#1a73e8", cyan:"#669df6", active_bg:"#151923", active_border:"#28344d" }
@@ -461,7 +496,10 @@ const DEFAULT_APPEARANCE = {
   codeFont: "JetBrains Mono",
   codeSize: 12,
   ligatures: false,
-  promptBar: "pills"
+  promptBar: "pills",
+  composerSize: "default",
+  ambientLight: false,
+  microBots: true
 };
 
 function hexLum(hex) {
@@ -476,6 +514,7 @@ function getAppearance() {
     const c = { ...DEFAULT_APPEARANCE, ...JSON.parse(localStorage.getItem("rs_rail_appearance") || "{}") };
     if (c.theme === "pitch-dark") c.theme = "dark-default";
     if (c.theme === "pure-light") c.theme = "custom:pure-light";
+    if (c.ambientLight === undefined && c.auroraGlow !== undefined) c.ambientLight = c.auroraGlow;
     return c;
   }
   catch { return { ...DEFAULT_APPEARANCE }; }
@@ -505,7 +544,7 @@ function applyAppearance(next) {
   const vars = {
     "--bg": t.bg, "--panel": t.panel, "--card": t.card, "--border": t.border,
     "--text": t.text, "--muted": t.muted,
-    "--dim": `color-mix(in srgb, ${t.muted} 70%, ${t.bg})`,
+    "--dim": `color-mix(in srgb, ${t.muted} 82%, ${t.bg})`,
     "--hover": `color-mix(in srgb, ${t.text} 6%, ${t.card})`,
     "--nav-bg": `color-mix(in srgb, ${t.bg} 55%, ${t.panel})`,
     "--code-bg": `color-mix(in srgb, ${t.bg} ${isLight ? "35%" : "75%"}, ${t.panel})`,
@@ -532,6 +571,8 @@ function applyAppearance(next) {
     "--syn-str": isLight ? "#15803d" : "#86efac",
     "--syn-num": isLight ? "#b45309" : "#fcd34d",
     "--syn-cmt": `color-mix(in srgb, ${t.muted} 70%, ${t.bg})`,
+    "--ambient-op": isLight ? "0.38" : "0.30",
+    "--ambient-op-focus": isLight ? "0.56" : "0.48",
   };
   const root = document.documentElement.style;
   root.colorScheme = isLight ? "light" : "dark";
@@ -551,6 +592,9 @@ function applyAppearance(next) {
   root.setProperty("--code-size", `${cfg.codeSize}px`);
   root.setProperty("--ligatures", cfg.ligatures ? "normal" : "none");
   document.body.classList.toggle("prompt-ghost", cfg.promptBar === "ghost");
+  document.body.classList.toggle("comp-compact", cfg.composerSize === "compact");
+  document.body.classList.toggle("ambient-light", !!cfg.ambientLight);
+  resizeInput();
 }
 applyAppearance();
 
@@ -647,8 +691,15 @@ async function api(path, body) {
   return res.json();
 }
 
+function closeReasoningPop() {
+  $("pop-reasoning")?.classList.remove("open");
+  const b = $("btn-reasoning-pill");
+  if (b) { b.classList.remove("open"); b.setAttribute("aria-expanded", "false"); }
+}
+
 async function loadState(project) {
   closeAc();
+  closeReasoningPop();
   const q = project ? `?project=${encodeURIComponent(project)}` : "";
   STATE = await api(`/api/state${q}`);
   renderAll();
@@ -696,6 +747,21 @@ function setRsNote(msg) {
   el._t = setTimeout(() => { el.textContent = ""; }, 4000);
 }
 
+function botSvg(name) {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 16777619);
+  const rects = [];
+  for (let y = 0; y < 5; y++) {
+    for (let x = 0; x < 3; x++) {
+      if ((h >> ((y * 3 + x) % 24)) & 1 || (y === 1 && x === 1)) {
+        rects.push(`<rect x="${3 + x * 2}" y="${3 + y * 2}" width="2" height="2" rx="0.4"/>`);
+        if (x < 2) rects.push(`<rect x="${11 - x * 2}" y="${3 + y * 2}" width="2" height="2" rx="0.4"/>`);
+      }
+    }
+  }
+  return `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">${rects.join("")}</svg>`;
+}
+
 function renderAll() {
   if (!STATE) return;
   const ap = STATE.active_project;
@@ -703,10 +769,18 @@ function renderAll() {
   const headLabel = !ap.profile_name
     ? `${ap.name} · missing profile`
     : (normId(ap.profile_name) !== normId(ap.name) ? `${ap.name} · ${ap.profile_name}` : ap.name);
-  $("tb-profile").textContent = `${headLabel} · ${ap.hud_summary}`;
+  $("tb-profile").innerHTML = `<strong>${esc(headLabel)}</strong> · ${esc(ap.hud_summary)}`;
   $("tb-profile").title = ap.profile_name ? `Project: ${ap.name}\nProfile: ${ap.profile_name}` : `Project: ${ap.name}\nProfile file missing`;
-  $("tb-git").textContent = ap.git || "git: [none]";
+  const gitLabel = (ap.git || "").replace(/^git:\s*/i, "").trim();
+  const showGit = !!gitLabel && gitLabel !== "[none]";
+  $("tb-git-sep").style.display = showGit ? "inline-block" : "none";
+  $("tb-git").style.display = showGit ? "inline-flex" : "none";
+  if (showGit) {
+    $("tb-git-txt").textContent = gitLabel;
+    $("tb-git-dot").classList.toggle("dirty", gitLabel.includes("modified"));
+  }
   $("btn-model-pill").textContent = `${STATE.provider.model} · ${STATE.provider.endpoint}`;
+  $("btn-model-pill").title = `${STATE.provider.model} · ${STATE.provider.endpoint} (Open Providers)`;
   $("btn-img").style.display = STATE.provider.is_local ? "none" : "inline-flex";
   disarmReset();
   $("btn-reset").style.display = (ap.history && ap.history.length) ? "inline-flex" : "none";
@@ -726,12 +800,14 @@ function renderAll() {
     const spdPart = `${(s.tps || 0).toFixed(1)} t/s`;
     stPill.textContent = `${chPart}${spdPart}`;
     stPill.style.display = "inline-flex";
+    $("tb-stats-sep").style.display = "inline-block";
     $("tb-usage").textContent = `${pct.toFixed(1)}% / ${ctxLbl}`;
     const fill = $("tb-ctx-fill");
     fill.style.width = `${pct}%`;
     fill.style.background = pct > 85 ? "var(--err-text)" : (pct > 70 ? "var(--warn-text)" : "var(--accent)");
   } else {
     stPill.style.display = "none";
+    $("tb-stats-sep").style.display = "none";
     $("tb-usage").textContent = `ctx ${ctxLbl}`;
     const fill = $("tb-ctx-fill");
     fill.style.width = "0%";
@@ -742,14 +818,17 @@ function renderAll() {
   const plist = $("proj-list");
   plist.innerHTML = "";
   const hc = $("proj-hover");
+  const useBots = getAppearance().microBots !== false;
   STATE.projects.forEach((p, idx) => {
     const el = document.createElement("div");
     el.className = "proj-item" + (p.name === ap.name ? " active" : "");
-    const abbr = p.name.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || p.name.slice(0, 2);
+    const badgeInner = useBots
+      ? botSvg(p.name)
+      : esc(p.name.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || p.name.slice(0, 2));
     const delBtn = p.file_count > 0
       ? `<button class="proj-del" title="Delete ${p.file_count} file(s)"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11"/><path d="M6 2.5h4"/><path d="M4.5 4.5l.7 9h5.6l.7-9"/></svg></button>`
       : "";
-    el.innerHTML = `<div class="proj-left"><span class="proj-badge">${esc(abbr)}</span><span class="proj-name">${esc(p.name)}</span></div><div class="proj-acts">${delBtn}<span class="proj-dot ${p.dirty ? "dirty" : ""}"></span></div>`;
+    el.innerHTML = `<div class="proj-left"><span class="proj-badge">${badgeInner}</span><span class="proj-name">${esc(p.name)}</span></div><div class="proj-acts">${delBtn}<span class="proj-dot ${p.dirty ? "dirty" : ""}"></span></div>`;
     el.onclick = () => { hc.classList.remove("open"); loadState(p.name); };
     const db = el.querySelector(".proj-del");
     if (db) {
@@ -763,9 +842,9 @@ function renderAll() {
     }
     el.onmouseenter = () => {
       const r = el.getBoundingClientRect();
-      const kbd = idx < 9 ? `<span class="ph-kbd">Ctrl+${idx + 1}</span>` : "";
       const filesTxt = p.file_count ? `${p.file_count} file(s)` : "empty";
-      hc.innerHTML = `<div class="ph-top"><span>${esc(p.name)}</span>${kbd}</div><div class="ph-row"><span>Profile</span><span>${esc(p.profile_name)}</span></div><div class="ph-row"><span>Workspace</span><span>${filesTxt}</span></div><div class="ph-row"><span>Git</span><span>${p.dirty ? "modified" : "clean"}</span></div>`;
+      const gitRow = p.has_git ? `<div class="ph-row"><span>Git</span><span>${p.dirty ? "modified" : "clean"}</span></div>` : "";
+      hc.innerHTML = `<div class="ph-top"><span>${esc(p.name)}</span></div><div class="ph-row"><span>Profile</span><span>${esc(p.profile_name)}</span></div><div class="ph-row"><span>Workspace</span><span>${filesTxt}</span></div>${gitRow}`;
       hc.style.left = `${r.right + 8}px`;
       hc.style.top = `${Math.min(r.top, window.innerHeight - 110)}px`;
       hc.classList.add("open");
@@ -798,12 +877,13 @@ function renderAll() {
   popR.innerHTML = "";
   for (const [val, lbl] of rList) {
     const b = document.createElement("button");
+    b.type = "button";
+    b.setAttribute("role", "menuitem");
     b.className = val === curR ? "on" : "";
     b.innerHTML = `<span>${esc(lbl)}</span><span>${val === curR ? "✓" : ""}</span>`;
     b.onclick = async (e) => {
       e.stopPropagation();
-      popR.classList.remove("open");
-      $("btn-reasoning-pill").classList.remove("open");
+      closeReasoningPop();
       await api("/api/settings/profile", { reasoning: val });
       await loadState();
     };
@@ -870,7 +950,7 @@ function renderAll() {
     }
   }
 
-  $("task-body").textContent = ap.task_md || (ap.is_agent ? "Agent mode (tools). No TASK.md." : "Chat mode (no tools).");
+  $("task-body").textContent = ap.task_md || (ap.is_agent ? "No TASK.md." : "Chat mode (no tools).");
   const rt = $("btn-run-task");
   rt.disabled = !ap.is_agent;
   rt.textContent = !ap.is_agent ? "Chat" : (ap.task_md ? "Run" : "/task");
@@ -1100,6 +1180,7 @@ async function sendMessage(overrideText, overrideImgs) {
     renderImgStrip();
   }
   closeAc();
+  closeReasoningPop();
   if (!imgs.length && text.startsWith("/") && await runLocalSlash(text)) return;
 
   lastSentPayload = { text, imgs };
@@ -1351,46 +1432,52 @@ function renderModalTab() {
   } else if (ACTIVE_TAB === "appearance") {
     const ap = getAppearance();
     if (noctaliaBrowse) {
+      const activeList = noctaliaSource === "core" ? noctaliaCore : noctaliaCommunity;
       pane.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
           <div style="display:flex;align-items:center;gap:8px;">
             <button class="btn btn-sm" id="btn-noc-back">← Back</button>
-            <strong style="font-size:13px;">Noctalia Palettes</strong>
+            <div class="rs-tabs">
+              <button class="rs-tab ${noctaliaSource==="core"?"active":""}" id="btn-noc-core">Built-in</button>
+              <button class="rs-tab ${noctaliaSource==="community"?"active":""}" id="btn-noc-comm">Community</button>
+            </div>
           </div>
           <div style="display:flex;align-items:center;gap:6px;">
             <div class="rs-tabs">
               <button class="rs-tab ${noctaliaMode==="dark"?"active":""}" id="btn-noc-dark">Dark</button>
               <button class="rs-tab ${noctaliaMode==="light"?"active":""}" id="btn-noc-light">Light</button>
             </div>
-            <button class="btn btn-sm" id="btn-noc-refresh" title="Refresh catalog">↻</button>
+            ${noctaliaSource==="community" ? `<button class="btn btn-sm" id="btn-noc-refresh" title="Refresh community catalog">↻</button>` : ""}
           </div>
         </div>
-        <input class="skills-filter" id="noc-search" placeholder="Search Noctalia built-in &amp; community palettes..." value="${esc(noctaliaFilter)}" />
-        ${noctaliaWarn ? `<div class="muted">${esc(noctaliaWarn)}</div>` : ""}
+        <input class="skills-filter" id="noc-search" placeholder="${noctaliaSource==="core"?"Filter built-in palettes...":"Search community palettes..."}" value="${esc(noctaliaFilter)}" />
+        ${noctaliaSource==="community" && noctaliaWarn ? `<div class="muted">${esc(noctaliaWarn)}</div>` : ""}
         <div class="noc-list" id="noc-list"></div>`;
 
       $("btn-noc-back").onclick = () => { noctaliaBrowse = false; renderModalTab(); };
+      $("btn-noc-core").onclick = () => { noctaliaSource = "core"; noctaliaWarn = ""; renderModalTab(); };
+      $("btn-noc-comm").onclick = () => { noctaliaSource = "community"; renderModalTab(); };
       $("btn-noc-dark").onclick = () => { noctaliaMode = "dark"; renderModalTab(); };
       $("btn-noc-light").onclick = () => { noctaliaMode = "light"; renderModalTab(); };
-      const fetchCatalog = async (force) => {
-        if (force) { noctaliaCatalog = null; noctaliaWarn = ""; renderModalTab(); }
+      const fetchCatalog = async (scope, force) => {
+        if (force) { if (scope === "community") noctaliaCommunity = null; noctaliaWarn = ""; renderModalTab(); }
         try {
-          const res = await api(`/api/noctalia/catalog${force ? "?refresh=1" : ""}`);
-          noctaliaCatalog = res.palettes || [];
-          noctaliaWarn = res.warning || "";
+          const res = await api(`/api/noctalia/catalog?scope=${scope}${force ? "&refresh=1" : ""}`);
+          if (scope === "core") noctaliaCore = res.palettes || [];
+          else { noctaliaCommunity = res.palettes || []; noctaliaWarn = res.warning || ""; }
         } catch (err) {
-          noctaliaCatalog = [];
-          noctaliaWarn = err.message;
+          if (scope === "core") noctaliaCore = [];
+          else { noctaliaCommunity = []; noctaliaWarn = err.message; }
         }
         if ($("modal-settings").classList.contains("open") && ACTIVE_TAB === "appearance" && noctaliaBrowse) renderModalTab();
       };
-      $("btn-noc-refresh").onclick = () => fetchCatalog(true);
+      if ($("btn-noc-refresh")) $("btn-noc-refresh").onclick = () => fetchCatalog("community", true);
 
       const drawNocList = () => {
         const list = $("noc-list");
-        if (!noctaliaCatalog) { list.innerHTML = `<div class="muted">Loading Noctalia palettes...</div>`; return; }
+        if (!activeList) { list.innerHTML = `<div class="muted">Loading ${noctaliaSource === "core" ? "built-in" : "community"} palettes...</div>`; return; }
         const q = noctaliaFilter.trim().toLowerCase();
-        const items = noctaliaCatalog.filter((p) => !q || p.name.toLowerCase().includes(q) || (p.base || "").toLowerCase().includes(q));
+        const items = activeList.filter((p) => !q || p.name.toLowerCase().includes(q) || (p.base || "").toLowerCase().includes(q));
         list.innerHTML = "";
         if (!items.length) { list.innerHTML = `<div class="muted">No matching palettes.</div>`; return; }
         const installedIds = new Set((STATE?.themes || []).filter((x) => x.source === "custom").map((x) => x.id));
@@ -1458,7 +1545,7 @@ function renderModalTab() {
       const sInp = $("noc-search");
       sInp.oninput = (e) => { noctaliaFilter = e.target.value; drawNocList(); };
       sInp.focus();
-      if (!noctaliaCatalog) fetchCatalog(false);
+      if (!activeList) fetchCatalog(noctaliaSource, false);
       return;
     }
 
@@ -1507,7 +1594,7 @@ function renderModalTab() {
     thHead.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;";
     thHead.innerHTML = `<div><div style="font-weight:600">Themes</div><div class="muted">Fallback + custom <code>plugins/rs-rail/themes/*.json</code></div></div><div style="display:flex;gap:6px;"><button class="btn btn-sm" id="btn-browse-noctalia">+ Noctalia</button><button class="btn btn-sm" id="btn-reload-themes">Reload</button></div>`;
     pane.appendChild(thHead);
-    $("btn-browse-noctalia").onclick = () => { noctaliaBrowse = true; renderModalTab(); };
+    $("btn-browse-noctalia").onclick = () => { noctaliaBrowse = true; noctaliaSource = "core"; noctaliaWarn = ""; renderModalTab(); };
     $("btn-reload-themes").onclick = () => loadState();
 
     const grid = document.createElement("div");
@@ -1561,6 +1648,42 @@ function renderModalTab() {
     $("btn-pbar-pills").onclick = () => { applyAppearance({ promptBar: "pills" }); renderModalTab(); };
     $("btn-pbar-ghost").onclick = () => { applyAppearance({ promptBar: "ghost" }); renderModalTab(); };
 
+    const szRow = document.createElement("div");
+    szRow.className = "setting-row";
+    const isCompact = ap.composerSize === "compact";
+    szRow.innerHTML = `<div><strong>Composer Size</strong><div class="muted">Height and density of the message box</div></div>
+      <div style="display:flex;gap:4px;" class="rs-tabs">
+        <button class="rs-tab ${!isCompact ? "active" : ""}" id="btn-csz-default">Default</button>
+        <button class="rs-tab ${isCompact ? "active" : ""}" id="btn-csz-compact">Compact</button>
+      </div>`;
+    pane.appendChild(szRow);
+    $("btn-csz-default").onclick = () => { applyAppearance({ composerSize: "default" }); renderModalTab(); };
+    $("btn-csz-compact").onclick = () => { applyAppearance({ composerSize: "compact" }); renderModalTab(); };
+
+    const glowRow = document.createElement("div");
+    glowRow.className = "setting-row";
+    const glowOn = !!ap.ambientLight;
+    glowRow.innerHTML = `<div><strong>Composer Ambient Light</strong><div class="muted">Subtle theme-reactive underglow behind the composer</div></div>
+      <div style="display:flex;gap:4px;" class="rs-tabs">
+        <button class="rs-tab ${!glowOn ? "active" : ""}" id="btn-glow-off">Off</button>
+        <button class="rs-tab ${glowOn ? "active" : ""}" id="btn-glow-on">On</button>
+      </div>`;
+    pane.appendChild(glowRow);
+    $("btn-glow-off").onclick = () => { applyAppearance({ ambientLight: false }); renderModalTab(); };
+    $("btn-glow-on").onclick = () => { applyAppearance({ ambientLight: true }); renderModalTab(); };
+
+    const botRow = document.createElement("div");
+    botRow.className = "setting-row";
+    const botsOn = ap.microBots !== false;
+    botRow.innerHTML = `<div><strong>Project Badges</strong><div class="muted">Deterministic micro-bot icons or 2-letter monograms</div></div>
+      <div style="display:flex;gap:4px;" class="rs-tabs">
+        <button class="rs-tab ${botsOn ? "active" : ""}" id="btn-bots-on">Micro-Bots</button>
+        <button class="rs-tab ${!botsOn ? "active" : ""}" id="btn-bots-off">Letters</button>
+      </div>`;
+    pane.appendChild(botRow);
+    $("btn-bots-on").onclick = () => { applyAppearance({ microBots: true }); renderAll(); };
+    $("btn-bots-off").onclick = () => { applyAppearance({ microBots: false }); renderAll(); };
+
     const r = document.createElement("div");
     r.className = "setting-row";
     r.innerHTML = `<div><strong>Auto-Expand Steps</strong><div class="muted">Expand reasoning steps by default · Synced with CLI <code>/tk</code> via state.json</div></div><button class="btn btn-sm">${STATE.ui_prefs.show_thinking !== false ? "Expanded" : "Collapsed"}</button>`;
@@ -1583,6 +1706,7 @@ function updateAutocomplete() {
   const q = val.slice(1).toLowerCase();
   acItems = SLASH_CMDS.filter((c) => c.cmd.slice(1).startsWith(q));
   if (!acItems.length) { closeAc(); return; }
+  closeReasoningPop();
   if (acHl >= acItems.length) acHl = 0;
 
   const pop = $("ac-pop");
@@ -1619,10 +1743,13 @@ $("btn-toggle-proj").onclick = toggleLeft;
 if (localStorage.getItem("rs_rail_left_hidden") === "1") $("sidebar-left").classList.add("hidden");
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
+    closeReasoningPop();
+    closeAc();
     $("modal-settings").classList.remove("open");
     $("modal-new-proj").classList.remove("open");
     $("modal-file").classList.remove("open");
   }
+  if ((e.ctrlKey || e.metaKey) && e.key === ",") { e.preventDefault(); openSettings(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") { e.preventDefault(); toggleLeft(); }
   if ((e.ctrlKey || e.metaKey) && /^[1-9]$/.test(e.key) && STATE?.projects?.[+e.key - 1]) { e.preventDefault(); loadState(STATE.projects[+e.key - 1].name); }
 });
@@ -1673,9 +1800,11 @@ $("rs-tab-mem").onclick = () => {
   $("btn-save-mem").style.display = "inline-flex"; $("btn-run-task").style.display = "none";
 };
 function resizeInput() {
-  const el = $("msg-input");
+  const el = document.getElementById("msg-input");
+  if (!el) return;
+  const minH = getAppearance().composerSize === "compact" ? 22 : 36;
   el.style.height = "auto";
-  el.style.height = el.value ? `${Math.min(Math.max(el.scrollHeight, 36), 180)}px` : "";
+  el.style.height = el.value ? `${Math.min(Math.max(el.scrollHeight, minH), 180)}px` : "";
 }
 
 $("btn-run-task").onclick = () => {
@@ -1706,6 +1835,7 @@ $("btn-export-md").onclick = async () => {
   } catch (err) { setRsNote(err.message); }
 };
 $("btn-settings").onclick = () => openSettings();
+$("btn-brand-settings").onclick = () => openSettings();
 $("btn-profiles-nav").onclick = () => openSettings("profiles");
 $("btn-close-app").onclick = async () => {
   try { await api("/api/shutdown", {}); } catch {}
@@ -1715,23 +1845,27 @@ $("btn-close-app").onclick = async () => {
 $("btn-model-pill").onclick = () => openSettings("providers");
 $("btn-close-settings").onclick = () => $("modal-settings").classList.remove("open");
 $("btn-close-file").onclick = () => $("modal-file").classList.remove("open");
+document.querySelectorAll(".modal-backdrop").forEach((m) => {
+  let downOnBg = false;
+  m.addEventListener("mousedown", (e) => { downOnBg = e.target === m; });
+  m.addEventListener("click", (e) => { if (downOnBg && e.target === m) m.classList.remove("open"); downOnBg = false; });
+});
 document.querySelectorAll(".nav-btn").forEach(b => b.onclick = () => {
   ACTIVE_TAB = b.dataset.tab; noctaliaBrowse = false; renderModalTab();
 });
 
 $("btn-reasoning-pill").onclick = (e) => {
   e.stopPropagation();
+  closeAc();
   const isOpen = $("pop-reasoning").classList.toggle("open");
   $("btn-reasoning-pill").classList.toggle("open", isOpen);
+  $("btn-reasoning-pill").setAttribute("aria-expanded", String(isOpen));
 };
 $("msg-input").addEventListener("input", () => { acHl = 0; resizeInput(); updateSendReady(); updateAutocomplete(); });
 $("msg-input").addEventListener("click", () => updateAutocomplete());
 document.addEventListener("click", (e) => {
   if (!e.target.closest(".composer")) closeAc();
-  if (!e.target.closest(".pop-wrap")) {
-    $("pop-reasoning")?.classList.remove("open");
-    $("btn-reasoning-pill")?.classList.remove("open");
-  }
+  if (!e.target.closest(".pop-wrap")) closeReasoningPop();
 });
 $("msg-input").addEventListener("keydown", (e) => {
   if ($("ac-pop").classList.contains("open") && acItems.length) {
