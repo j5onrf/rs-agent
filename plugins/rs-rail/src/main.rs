@@ -915,10 +915,6 @@ fn as_live_noctalia(mut theme: Value) -> Value {
     theme
 }
 
-fn parse_noctalia_live_in(cfg_dir: &Path, state_dir: &Path) -> Option<Value> {
-    parse_noctalia_live_raw_in(cfg_dir, state_dir, None).map(as_live_noctalia)
-}
-
 fn parse_noctalia_live_in_with_themes(cfg_dir: &Path, state_dir: &Path, themes_dir: &Path) -> Option<Value> {
     parse_noctalia_live_raw_in(cfg_dir, state_dir, Some(themes_dir)).map(as_live_noctalia)
 }
@@ -2687,7 +2683,7 @@ mod tests {
             r##"{"light":{"surface":"#fbf1c7","surface_container":"#f2e5bc","outline_variant":"#bdae93","on_surface":"#3c3836","on_surface_variant":"#665c54","primary":"#6c782e","secondary":"#b47109"}}"##,
         )
         .unwrap();
-        let t_v5 = parse_noctalia_live_in(&cfg, &st).unwrap();
+        let t_v5 = parse_noctalia_live_in_with_themes(&cfg, &st, &cfg).unwrap();
         assert_eq!(t_v5["id"], "noctalia");
         assert_eq!(t_v5["source"], "live");
         assert_eq!(t_v5["mode"], "light");
@@ -2699,7 +2695,7 @@ mod tests {
             r##"{"mSurface":"#212337","mSurfaceVariant":"#323449","mOutline":"#454759","mOnSurface":"#ebfafa","mOnSurfaceVariant":"#a4b1cd","mPrimary":"#37f499","mSecondary":"#04d1f9"}"##,
         )
         .unwrap();
-        let t_v4 = parse_noctalia_live_in(&cfg, &st).unwrap();
+        let t_v4 = parse_noctalia_live_in_with_themes(&cfg, &st, &cfg).unwrap();
         assert_eq!(t_v4["mode"], "dark");
         assert_eq!(t_v4["accent"], "#37f499");
         let _ = fs::remove_dir_all(&tmp);

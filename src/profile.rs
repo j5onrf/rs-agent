@@ -228,14 +228,11 @@ impl Profile {
     pub fn hud_summary(&self, is_agent: bool) -> String {
         let mut parts: Vec<String> = Vec::new();
         if is_agent {
-            parts.push(
-                match self.tier {
-                    ToolTier::PureBash => "purebash",
-                    ToolTier::Core4 => "core4",
-                    ToolTier::Smol => "6-tool",
-                }
-                .to_string(),
-            );
+            match self.tier {
+                ToolTier::PureBash => parts.push("purebash".to_string()),
+                ToolTier::Core4 => parts.push("core4".to_string()),
+                ToolTier::Smol => {}
+            }
         } else {
             parts.push("no tools".to_string());
         }
@@ -1164,7 +1161,7 @@ mod tests {
     #[test]
     fn test_hud_summary_formats_frontmatter() {
         let ling = Profile::parse("---\nadapters: true\nreasoning_budget: 350\n---\nhi");
-        assert_eq!(ling.hud_summary(true), "6-tool · t350 · adp");
+        assert_eq!(ling.hud_summary(true), "t350 · adp");
 
         let gem = Profile::parse("---\ncore4: true\nreasoning_budget: xhigh\nmemory: true\ndelegate: true\nmcp: photocraft\n---\nhi");
         assert_eq!(gem.hud_summary(true), "core4 · xhigh · mem · del · mcp:photocraft");
@@ -1199,7 +1196,7 @@ mod tests {
         let p = Profile::parse("---\nmcp: photocraft\nmcp_tools: doc_new, doc_save, ui_set\n---\nhi");
         assert_eq!(p.mcp_servers, vec!["photocraft"]);
         assert_eq!(p.mcp_tools, vec!["doc_new", "doc_save", "ui_set"]);
-        assert_eq!(p.hud_summary(true), "6-tool · mcp:photocraft(3)");
+        assert_eq!(p.hud_summary(true), "mcp:photocraft(3)");
     }
 
     #[test]

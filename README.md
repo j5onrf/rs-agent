@@ -1,7 +1,7 @@
 <h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
 
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.8.0.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.9.0.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=secondary&logo=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT.svg?variant=secondary" alt="License"></a>
@@ -24,7 +24,7 @@
 | Tier | Tested Models | Workload |
 | :--- | :--- | :--- |
 | **Sub-27B**<br />*(SLM)* | `Raon-1-nano` · `LFM3-1.7B` · `Ling-3.0-tiny*` · `MiniCPM5-2B` · `Qwen3.5-2B+` · `MiniCPM-V-4.7-1B` · `LFM2.5-24B-A2B` | Tool calling, fast refactoring, single-turn edits |
-| **27B+**<br />*(LLM)* | `Groot-19B-A3B` · `Clover-35B-A3B` · `Sage-A1.5-35B` · `Flint-40B-A2.5B*` · `Qwen3.8-35B-D` · `KAT-Coder-V2.5` · `Ornith-1.5-35B` · `Tiel-Coder-35B` · `Qwen3.8-27B` · `Qwen4.0-27B` · `Qwen3.8-Flash` · `DeepSeek-V4.1` | Deep reasoning, complex logic, multi-turn loops |
+| **27B+**<br />*(LLM)* | `Inkling-2-Mini*` · `Groot-19B-A3B` · `Clover-35B-A3B` · `Sage-A1.5-35B` · `Flint-40B-A2.5B` · `Qwen3.8-35B-D` · `KAT-Coder-V2.5` · `Ornith-1.5-35B` · `Tiel-Coder-35B` · `Qwen3.8-27B` · `Qwen4.0-27B` · `Qwen3.8-Flash` · `DeepSeek-V4.1` | Deep reasoning, complex logic, multi-turn loops |
 
 *\* Primary edge baselines • Auto-discovers local models on `http://127.0.0.1:8080`*
 
@@ -110,14 +110,14 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
-╭─── rs-agent v0.8.0 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.9.0 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ purebash · t256 · adp · mcp:photocraft(7)   │
 │   │ Li │  artcraft/photocraft-l            │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · clean                │ ─────────────────────────────────────────── │
 │   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · 15 steps · local                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 
-╭─── rs-agent v0.8.0 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.9.0 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  nvidia/nemotron-3.5-lightning:fr…│ core4 · medium                              │
 │   │ nv │  nemo                             │ ─────────────────────────────────────────── │
 │   ╰────╯  git: main · 9 modified           │ ctx 65.5k · 10 steps · openrouter           │
@@ -205,12 +205,12 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 
 | Rank | Model | Par Eff | Agent Index |
 | :---: | :--- | :---: | :---: |
+| **1** | **Inkling-2-Mini** | **185.7%** | **100.0 (A+)** |
 | **1** | **Flint-40B-A2.5B** | **185.7%** | **100.0 (A+)** |
 | **2** | **Groot-19B-A3B** *(MTP)* | **162.5%** | **100.0 (A+)** |
 | **3** | **Sage-A1.5-35B** | **111.1%** | **100.0 (A+)** |
 | **—** | **Ling-3.0-tiny** *(SLM)* | **162.5%** | **100.0 (A+)** |
 | **—** | **LFM3-1.7B** *(SLM)* | **173.3%** | **100.0 (A+)** |
-
 ---
 
 ## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Developer Tools (`tools/`)
