@@ -174,9 +174,9 @@
 
   /* Demo Composer + Ambient Light */
   .comp-wrap { padding: 8px 20px 14px; position: relative; isolation: isolate; }
-  .composer { position: relative; max-width: 720px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 9px 11px 8px; display: flex; flex-direction: column; gap: 7px; }
+  .composer { position: relative; max-width: 720px; margin: 0 auto; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 9px 11px 8px; display: flex; flex-direction: column; gap: 7px; transition: border-color .15s; }
   .frame.ambient .composer { border-color: color-mix(in srgb, var(--accent) 26%, var(--border)); }
-  .frame.ambient .composer:focus-within { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+  .composer:focus-within, .frame.ambient .composer:focus-within { border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
   .frame.ambient .composer::before {
     content: ""; position: absolute; top: 42%; left: 2%; right: 2%; bottom: -14px; border-radius: 999px;
     background: radial-gradient(ellipse 50% 50% at 50% 50%, var(--accent) 0%, color-mix(in srgb, var(--accent) 70%, transparent) 45%, color-mix(in srgb, var(--accent) 26%, transparent) 72%, transparent 100%);
