@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark light" />
 <title>RS Rail — Local-First Desktop &amp; Web UI for AI Agents</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'%3E%3Crect x='8' y='8' width='112' height='112' rx='26' fill='%23f6f8fa'/%3E%3Cpath fill='none' stroke='%230d1117' stroke-width='14' stroke-linecap='round' stroke-linejoin='round' d='M64 40 L88 64 L64 88 L40 88'/%3E%3C/svg%3E" />
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" />
 <style>
   :root {
     --bg: #070722; --panel: #0c0c27; --card: #11112d; --hover: #1a1b42; --border: #21215f;
@@ -208,6 +208,11 @@
       <span>RS Rail</span>
     </div>
     <div class="nav-right">
+      <div class="seg quiet" id="font-sw" title="Preview page font">
+        <button data-f="jb" class="active">JB Mono</button>
+        <button data-f="plex">IBM Plex</button>
+        <button data-f="geist">Geist</button>
+      </div>
       <button class="pill-btn active" id="mode-jules">Grid</button>
       <button class="pill-btn" id="mode-t3">Clean</button>
       <a class="pill-btn" href="https://github.com/j5onrf/rs-agent">GitHub ↗</a>
@@ -215,7 +220,7 @@
   </nav>
 
   <section class="hero">
-    <div class="badge">rs-agent · rs-rail · omarchy · noctalia</div>
+    <div class="badge">Rs-Agent · RS Rail · Llama.cpp · Omarchy · Noctalia</div>
     <h1>A fast desktop &amp; web UI for local AI agents.</h1>
     <p class="sub">
       <strong>rs-rail</strong> is a native web and desktop UI in a single Rust binary with <code>ui.html</code> compiled in, running on <code>127.0.0.1:24243</code> and built directly on <code>rs-agent</code>.
@@ -333,7 +338,8 @@ const PALETTES = [
   { name: "Gruvbox",    bg: "#282828", panel: "#2d2c2c", card: "#32302f", border: "#504945", text: "#ebdbb2", muted: "#a89984", accent: "#a9b665", cyan: "#7db2ba", fg: "#1d2021", light: false },
   { name: "Catppuccin", bg: "#1e1e2e", panel: "#272839", card: "#313244", border: "#585b70", text: "#cdd6f4", muted: "#a6adc8", accent: "#cba6f7", cyan: "#89b4fa", fg: "#11111b", light: false },
   { name: "Claude",     bg: "#141413", panel: "#1b1a18", card: "#23221f", border: "#36332e", text: "#f0efec", muted: "#b1ada1", accent: "#d97757", cyan: "#83a598", fg: "#ffffff", light: false },
-  { name: "Pure Light", bg: "#ffffff", panel: "#f8f9fa", card: "#f1f3f4", border: "#dadce0", text: "#1f1f1f", muted: "#5f6368", accent: "#1a73e8", cyan: "#1a73e8", fg: "#ffffff", light: true }
+  { name: "Light",      bg: "#ffffff", panel: "#f8f9fa", card: "#f1f3f4", border: "#dadce0", text: "#1f1f1f", muted: "#5f6368", accent: "#1a73e8", cyan: "#1a73e8", fg: "#ffffff", light: true },
+  { name: "Dark",       bg: "#09090b", panel: "#0f0f12", card: "#18181b", border: "#27272a", text: "#f4f4f5", muted: "#a1a1aa", accent: "#fafafa", cyan: "#e4e4e7", glow: "rgba(255,255,255,0.10)", fg: "#09090b", light: false }
 ];
 
 const PROJECTS = [
@@ -379,7 +385,7 @@ function setPal(p, idx) {
   r.setProperty("--ambient-op", p.light ? "0.38" : "0.30");
   r.setProperty("--ambient-op-focus", p.light ? "0.56" : "0.48");
   r.setProperty("--grid", p.light ? "rgba(0,0,0,0.05)" : "rgba(255,255,255,0.05)");
-  r.setProperty("--glow", `color-mix(in srgb, ${p.cyan} 22%, transparent)`);
+  r.setProperty("--glow", p.glow || `color-mix(in srgb, ${p.cyan} 22%, transparent)`);
   bar.querySelectorAll("button").forEach((b, i) => b.classList.toggle("active", i === idx));
   if (typeof drawGrid === "function") drawGrid();
 }
@@ -612,6 +618,20 @@ if (finePtr) {
 }
 window.addEventListener("resize", resizeGrid, { passive: true });
 resizeGrid();
+
+
+const FONTS = {
+  jb:    { body: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace', mono: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace' },
+  plex:  { body: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace',  mono: '"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace' },
+  geist: { body: '"Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', mono: '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace' }
+};
+document.querySelectorAll("#font-sw button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#font-sw button").forEach(x => x.classList.remove("active"));
+  b.classList.add("active");
+  const f = FONTS[b.dataset.f];
+  document.body.style.fontFamily = f.body;
+  document.documentElement.style.setProperty("--mono", f.mono);
+});
 
 renderDemo();
 </script>
