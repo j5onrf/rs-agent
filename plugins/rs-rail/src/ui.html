@@ -56,7 +56,7 @@
   /* Topbar */
   .topbar { height: 40px; min-height: 40px; background: var(--topbar-bg, var(--panel)); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; gap: 10px; }
   .tb-left, .tb-right { display: flex; align-items: center; gap: 9px; min-width: 0; }
-  .brand { font-weight: 600; letter-spacing: .2px; display: inline-flex; align-items: center; gap: 7px; color: var(--text); white-space: nowrap; background: transparent; border: none; padding: 3px 6px; margin-left: -6px; border-radius: 6px; cursor: pointer; }
+  .brand { font-weight: 600; letter-spacing: .2px; display: inline-flex; align-items: center; gap: 7px; color: var(--text); white-space: nowrap; background: transparent; border: none; padding: 4px 5px; margin-left: 0; border-radius: 6px; cursor: pointer; }
   .brand:hover { background: var(--hover); }
   .sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
   .tele { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; user-select: none; }
@@ -64,9 +64,8 @@
   .git-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
   .git-dot.dirty { background: var(--accent); }
   #tb-ctx { position: relative; cursor: default; }
-  .ctx-ring { width: 14px; height: 14px; flex-shrink: 0; }
-  .ctx-ring .trk { stroke: color-mix(in srgb, var(--text) 16%, transparent); fill: none; }
-  .ctx-ring .arc { fill: none; stroke-linecap: round; transition: stroke-dashoffset .22s ease, stroke .2s, opacity .2s; }
+  .ctx-bar { width: 34px; height: 3px; background: color-mix(in srgb, var(--text) 16%, transparent); border-radius: 99px; overflow: hidden; flex-shrink: 0; }
+  .ctx-fill { display: block; height: 100%; background: var(--accent); border-radius: 99px; width: 0%; transition: width .22s ease, background .2s; }
   .ctx-tip { position: absolute; right: 0; top: calc(100% + 8px); background: var(--panel); border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; font-size: 11px; line-height: 1.4; color: var(--text); white-space: nowrap; box-shadow: 0 10px 24px rgba(0,0,0,.35); opacity: 0; pointer-events: none; transform: translateY(-2px); transition: opacity .12s ease, transform .12s ease; z-index: 40; }
   .ctx-tip .muted { font-size: 10.5px; }
   .ctx-tip:empty { display: none; }
@@ -80,7 +79,7 @@
   .btn-icon { padding: 4px 6px; }
   .topbar .btn-icon { background: transparent; border-color: transparent; color: var(--muted); }
   .topbar .btn-icon:hover { background: var(--hover); color: var(--text); }
-  #btn-close-app { margin-left: 0; width: 25px; height: 25px; padding: 0; border-radius: 6px; opacity: 0.35; display: inline-flex; align-items: center; justify-content: center; transition: opacity .12s, background .12s, color .12s; }
+  #btn-close-app { margin-left: 0; width: 25px; height: 25px; padding: 0; border-radius: 6px; opacity: 1; display: inline-flex; align-items: center; justify-content: center; transition: opacity .12s, background .12s, color .12s; }
   #btn-close-app:hover { opacity: 1; color: var(--err-text); background: var(--del-bg); }
   .btn-send-circle { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background .12s, border-color .12s, color .12s, filter .12s; }
   .btn-send-circle:hover { background: var(--hover); color: var(--text); }
@@ -337,9 +336,8 @@
 <div class="app">
   <header class="topbar">
     <div class="tb-left">
-      <button type="button" class="brand" id="btn-brand-settings"><svg width="16" height="16" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M49 24 L72 47 L50 69 L24 69"/></svg><span>RS Rail</span></button>
       <button class="btn btn-sm btn-icon" id="btn-toggle-proj" aria-label="Toggle sidebar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg></button>
-      <span class="sep"></span>
+      <button type="button" class="brand" id="btn-brand-settings" aria-label="Settings"><svg width="16" height="16" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M49 24 L72 47 L50 69 L24 69"/></svg></button>
       <span class="tele" id="tb-profile">—</span>
       <span class="sep" id="tb-git-sep" style="display:none;"></span>
       <span class="tele" id="tb-git" style="display:none;"><span class="git-dot" id="tb-git-dot"></span><span id="tb-git-txt"></span></span>
@@ -348,10 +346,7 @@
       <span class="tele" id="tb-stats" style="display:none;"></span>
       <span class="sep" id="tb-stats-sep" style="display:none;"></span>
       <span class="tele" id="tb-ctx">
-        <svg class="ctx-ring" viewBox="0 0 16 16" aria-hidden="true">
-          <circle class="trk" cx="8" cy="8" r="5.5" stroke-width="2.2"/>
-          <circle class="arc" id="tb-ctx-arc" cx="8" cy="8" r="5.5" stroke-width="2.2" stroke-dasharray="34.56" stroke-dashoffset="34.56" transform="rotate(-90 8 8)" style="opacity:0"/>
-        </svg>
+        <span class="ctx-bar"><span class="ctx-fill" id="tb-ctx-fill"></span></span>
         <span id="tb-usage">8.2k</span>
         <span class="ctx-tip" id="tb-ctx-tip"></span>
       </span>
@@ -812,9 +807,8 @@ function renderAll() {
   const ctxMax = STATE.provider.max_tokens || 8192;
   const ctxLbl = ctxMax >= 1000000 ? `${(ctxMax/1000000).toFixed(1)}M` : (ctxMax >= 1000 ? `${(ctxMax/1000).toFixed(1)}k` : ctxMax);
   const stPill = $("tb-stats");
-  const arc = $("tb-ctx-arc");
+  const fill = $("tb-ctx-fill");
   const tip = $("tb-ctx-tip");
-  const circ = 34.56;
   $("tb-usage").textContent = ctxLbl;
   if (ap.last_stats) {
     const s = ap.last_stats;
@@ -828,18 +822,16 @@ function renderAll() {
     stPill.textContent = `${chPart}${spdPart}`;
     stPill.style.display = "inline-flex";
     $("tb-stats-sep").style.display = "inline-block";
-    const visPct = used > 0 ? Math.max(pct, 2.5) : 0;
-    arc.style.strokeDashoffset = (circ * (1 - visPct / 100)).toFixed(2);
-    arc.style.stroke = pct > 85 ? "var(--err-text)" : (pct > 70 ? "var(--warn-text)" : "var(--accent)");
-    arc.style.opacity = used > 0 ? "1" : "0";
+    fill.style.width = `${used > 0 ? Math.max(pct, 6) : 0}%`;
+    fill.style.background = pct > 85 ? "var(--err-text)" : (pct > 70 ? "var(--warn-text)" : "var(--accent)");
     const meta = [`in ${(s.prompt_tokens || 0).toLocaleString()}`, `out ${(s.completion_tokens || 0).toLocaleString()}`];
     if (s.cached_tokens) meta.push(`cached ${s.cached_tokens.toLocaleString()}`);
     tip.innerHTML = `<div><strong>${pct.toFixed(1)}%</strong> · ${used.toLocaleString()} / ${ctxMax.toLocaleString()}</div><div class="muted">${meta.join(" · ")}</div>`;
   } else {
     stPill.style.display = "none";
     $("tb-stats-sep").style.display = "none";
-    arc.style.strokeDashoffset = String(circ);
-    arc.style.opacity = "0";
+    fill.style.width = "0%";
+    fill.style.background = "var(--accent)";
     tip.innerHTML = `<div><strong>0.0%</strong> · 0 / ${ctxMax.toLocaleString()}</div><div class="muted">Context budget ready</div>`;
   }
 
