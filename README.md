@@ -61,7 +61,7 @@
 
 ## <img alt="rs-rail" src="assets/rs-rail.svg" width="26" height="26" /> RS Rail (Desktop & Web)
 
-**rs-rail** is a native web and desktop UI in a single Rust binary with `ui.html` compiled in, running on `http://127.0.0.1:24243` and built directly on `rs-agent` ([**Live Demo**](https://j5onrf.github.io/rs-agent/)).
+**rs-rail** is a native web and desktop UI in a single Rust binary with `ui.html` compiled in, running on `http://127.0.0.1:24243` and built directly on `rs-agent`.
 
 | **Interactive Demo** · [j5onrf.github.io/rs-agent](https://j5onrf.github.io/rs-agent/) |
 | :--- |
