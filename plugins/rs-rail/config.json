@@ -1,4 +1,7 @@
 {
   "show_right_panel": true,
-  "last_project": "inkling2"
+  "last_project": "chat",
+  "project_names": {
+    "chat": "chatbot"
+  }
 }

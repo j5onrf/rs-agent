@@ -61,12 +61,16 @@
   .sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
   .tele { font-family: var(--mono); font-size: 11.5px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; user-select: none; }
   .tele strong { color: var(--text); font-weight: 500; }
+  #tb-profile, #tb-git-txt, #tb-stats, #tb-usage { display: inline-flex; align-items: center; gap: 3ch; }
+  #tb-profile { margin-left: -6px; }
+  #tb-stats { margin-right: calc(3ch - 9px); }
+  #tb-ctx { margin-right: max(0px, calc(3ch - 17px)); }
   .git-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
   .git-dot.dirty { background: var(--accent); }
   #tb-ctx { position: relative; cursor: default; }
-  .ctx-bar { width: 34px; height: 3px; background: color-mix(in srgb, var(--text) 16%, transparent); border-radius: 99px; overflow: hidden; flex-shrink: 0; }
+  .ctx-bar { display: block; width: 100%; height: 4px; background: color-mix(in srgb, var(--text) 14%, transparent); border-radius: 99px; overflow: hidden; }
   .ctx-fill { display: block; height: 100%; background: var(--accent); border-radius: 99px; width: 0%; transition: width .22s ease, background .2s; }
-  .ctx-tip { position: absolute; right: 0; top: calc(100% + 8px); background: var(--panel); border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; font-size: 11px; line-height: 1.4; color: var(--text); white-space: nowrap; box-shadow: 0 10px 24px rgba(0,0,0,.35); opacity: 0; pointer-events: none; transform: translateY(-2px); transition: opacity .12s ease, transform .12s ease; z-index: 40; }
+  .ctx-tip { position: absolute; right: 0; top: calc(100% + 8px); min-width: 170px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 11px; line-height: 1.4; color: var(--text); white-space: nowrap; box-shadow: 0 10px 24px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 5px; opacity: 0; pointer-events: none; transform: translateY(-2px); transition: opacity .12s ease, transform .12s ease; z-index: 40; }
   .ctx-tip .muted { font-size: 10.5px; }
   .ctx-tip:empty { display: none; }
   #tb-ctx:hover .ctx-tip { opacity: 1; transform: translateY(0); }
@@ -99,6 +103,9 @@
   .sidebar-left.hidden, .sidebar-right.hidden { display: none; }
   .sec-head { padding: 10px 12px 6px; font-size: 12px; font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
   .rs-head { padding: 8px 10px 6px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .rs-head .btn-icon { background: transparent; border-color: transparent; color: var(--muted); padding: 3px 5px; }
+  .rs-head .btn-icon:hover { background: var(--hover); color: var(--text); }
+  .rs-head .btn-icon.btn-danger { background: var(--del-bg); border-color: rgba(239,68,68,.4); color: var(--err-text); padding: 2px 7px; }
   .proj-list { flex: 1; overflow-y: auto; padding: 6px 6px 8px; }
   .sb-foot { padding: 6px 8px 8px; display: flex; align-items: center; }
   .sb-foot .btn-icon { background: transparent; border-color: transparent; color: var(--muted); opacity: 0; transition: opacity .15s, background .12s, color .12s; }
@@ -344,10 +351,8 @@
     </div>
     <div class="tb-right">
       <span class="tele" id="tb-stats" style="display:none;"></span>
-      <span class="sep" id="tb-stats-sep" style="display:none;"></span>
       <span class="tele" id="tb-ctx">
-        <span class="ctx-bar"><span class="ctx-fill" id="tb-ctx-fill"></span></span>
-        <span id="tb-usage">8.2k</span>
+        <span id="tb-usage">0.0%</span>
         <span class="ctx-tip" id="tb-ctx-tip"></span>
       </span>
       <button class="btn btn-sm btn-icon" id="btn-toggle-task" aria-label="Toggle workspace panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="10" y1="2.5" x2="10" y2="13.5"/></svg></button>
@@ -407,7 +412,7 @@
       <div class="rs-top">
         <div class="rs-head">
           <span style="white-space:nowrap;flex-shrink:0;">Files (<span id="files-count">0</span>)</span>
-          <div style="display:flex;gap:5px;align-items:center;"><button class="btn btn-sm" id="btn-reset" style="display:none;">Reset</button><button class="btn btn-sm" id="btn-export-md">Export .md</button></div>
+          <div style="display:flex;gap:3px;align-items:center;"><button class="btn btn-sm btn-icon" id="btn-reset" title="Reset session" aria-label="Reset session" style="display:none;"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9L2.5 5.7"/><path d="M2.5 2.5v3.2h3.2"/></svg></button><button class="btn btn-sm btn-icon" id="btn-export-md" title="Export .md" aria-label="Export .md"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.5v7.5"/><path d="M5 7l3 3 3-3"/><path d="M3 12.5h10"/></svg></button></div>
         </div>
         <div class="file-list" id="file-list"></div>
       </div>
@@ -786,7 +791,8 @@ function renderAll() {
   if (!STATE) return;
   const ap = STATE.active_project;
   const dispName = projDisplay(ap.name);
-  $("tb-profile").innerHTML = `<strong>${esc(dispName)}</strong> · ${esc(ap.hud_summary)}`;
+  const hudParts = String(ap.hud_summary || "").split(" · ").filter(Boolean);
+  $("tb-profile").innerHTML = `<strong>${esc(dispName)}</strong>${hudParts.map(t => `<span>${esc(t)}</span>`).join("")}`;
   const projTip = dispName !== ap.name ? `${dispName} (${ap.name})` : ap.name;
   $("tb-profile").title = `Project: ${projTip}\nProfile: ${ap.profile_name || "missing"}`;
   const gitLabel = (ap.git || "").replace(/^git:\s*/i, "").trim();
@@ -794,7 +800,7 @@ function renderAll() {
   $("tb-git-sep").style.display = showGit ? "inline-block" : "none";
   $("tb-git").style.display = showGit ? "inline-flex" : "none";
   if (showGit) {
-    $("tb-git-txt").textContent = gitLabel;
+    $("tb-git-txt").innerHTML = gitLabel.split(" · ").filter(Boolean).map(t => `<span>${esc(t)}</span>`).join("");
     $("tb-git-dot").classList.toggle("dirty", gitLabel.includes("modified"));
   }
   $("btn-model-pill").textContent = `${STATE.provider.model} · ${STATE.provider.endpoint}`;
@@ -805,11 +811,9 @@ function renderAll() {
 
   $("sidebar-right").classList.toggle("hidden", STATE.ui_prefs?.show_right_panel === false);
   const ctxMax = STATE.provider.max_tokens || 8192;
-  const ctxLbl = ctxMax >= 1000000 ? `${(ctxMax/1000000).toFixed(1)}M` : (ctxMax >= 1000 ? `${(ctxMax/1000).toFixed(1)}k` : ctxMax);
   const stPill = $("tb-stats");
-  const fill = $("tb-ctx-fill");
+  const usageEl = $("tb-usage");
   const tip = $("tb-ctx-tip");
-  $("tb-usage").textContent = ctxLbl;
   if (ap.last_stats) {
     const s = ap.last_stats;
     const used = (s.prompt_tokens || 0) + (s.completion_tokens || 0);
@@ -817,22 +821,20 @@ function renderAll() {
     const cPct = s.cached_tokens > 0 && s.prompt_tokens > 0
       ? Math.min(100, Math.round((s.cached_tokens / s.prompt_tokens) * 100))
       : 0;
-    const chPart = cPct > 0 ? `CH ${cPct}% · ` : "";
-    const spdPart = `${(s.tps || 0).toFixed(1)} t/s`;
-    stPill.textContent = `${chPart}${spdPart}`;
+    const chSpan = cPct > 0 ? `<span>CH ${cPct}%</span>` : "";
+    const spdSpan = `<span>${(s.tps || 0).toFixed(1)} t/s</span>`;
+    stPill.innerHTML = `${chSpan}${spdSpan}`;
     stPill.style.display = "inline-flex";
-    $("tb-stats-sep").style.display = "inline-block";
-    fill.style.width = `${used > 0 ? Math.max(pct, 6) : 0}%`;
-    fill.style.background = pct > 85 ? "var(--err-text)" : (pct > 70 ? "var(--warn-text)" : "var(--accent)");
+    const col = pct > 85 ? "var(--err-text)" : (pct > 70 ? "var(--warn-text)" : "var(--accent)");
+    const barW = used > 0 ? Math.max(pct, 3).toFixed(1) : "0";
+    usageEl.innerHTML = pct > 70 ? `<span style="color:${col}">${pct.toFixed(1)}%</span>` : `${pct.toFixed(1)}%`;
     const meta = [`in ${(s.prompt_tokens || 0).toLocaleString()}`, `out ${(s.completion_tokens || 0).toLocaleString()}`];
     if (s.cached_tokens) meta.push(`cached ${s.cached_tokens.toLocaleString()}`);
-    tip.innerHTML = `<div><strong>${pct.toFixed(1)}%</strong> · ${used.toLocaleString()} / ${ctxMax.toLocaleString()}</div><div class="muted">${meta.join(" · ")}</div>`;
+    tip.innerHTML = `<span class="ctx-bar"><span class="ctx-fill" style="width:${barW}%;background:${col}"></span></span><div><strong>${used.toLocaleString()}</strong> / ${ctxMax.toLocaleString()} tokens</div><div class="muted">${meta.join(" · ")}</div>`;
   } else {
     stPill.style.display = "none";
-    $("tb-stats-sep").style.display = "none";
-    fill.style.width = "0%";
-    fill.style.background = "var(--accent)";
-    tip.innerHTML = `<div><strong>0.0%</strong> · 0 / ${ctxMax.toLocaleString()}</div><div class="muted">Context budget ready</div>`;
+    usageEl.textContent = "0.0%";
+    tip.innerHTML = `<span class="ctx-bar"><span class="ctx-fill" style="width:0%"></span></span><div><strong>0</strong> / ${ctxMax.toLocaleString()} tokens</div><div class="muted">Context budget ready</div>`;
   }
 
   // Projects list (filtered by visibility)
@@ -881,8 +883,9 @@ function renderAll() {
     plist.appendChild(el);
   });
 
+  const fmtR = (v) => /^\d+$/.test(v) ? (v === "0" ? "Off" : `${v}t`) : v;
   const standardReasons = [
-    ["", "Default reasoning"],
+    ["", "Model default"],
     ["0", "Off (0)"],
     ["250", "250t"],
     ["350", "350t"],
@@ -894,12 +897,16 @@ function renderAll() {
     ["xhigh", "xhigh"]
   ];
   const curR = ap.reasoning || "";
-  const rList = [...standardReasons];
+  const profR = ap.profile_reasoning || "";
+  const rList = standardReasons.map(([v, l]) => [v, profR && v === profR ? `${l} (profile)` : l]);
+  if (profR && !rList.some(([v]) => v === profR)) {
+    rList.splice(2, 0, [profR, `${fmtR(profR)} (profile)`]);
+  }
   if (curR && !rList.some(([v]) => v === curR)) {
-    rList.splice(2, 0, [curR, /^\d+$/.test(curR) ? `${curR}t` : curR]);
+    rList.splice(2, 0, [curR, fmtR(curR)]);
   }
   const activePair = rList.find(([v]) => v === curR);
-  $("reasoning-val").textContent = activePair ? (/^\d+$/.test(activePair[0]) ? `${activePair[0]}t` : (activePair[0] === "0" ? "Off" : (activePair[0] === "" ? "Default" : activePair[1]))) : (curR ? `${curR}t` : "Default");
+  $("reasoning-val").textContent = activePair ? (activePair[0] === "" ? "Default" : fmtR(activePair[0])) : (curR ? fmtR(curR) : "Default");
 
   const popR = $("pop-reasoning");
   popR.innerHTML = "";
@@ -1975,13 +1982,14 @@ $("msg-input").addEventListener("paste", (e) => {
 });
 $("btn-send").onclick = () => sendMessage();
 $("btn-stop").onclick = () => api("/api/stop", {});
+const RESET_SVG = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9L2.5 5.7"/><path d="M2.5 2.5v3.2h3.2"/></svg>`;
 function disarmReset() {
   const b = $("btn-reset");
   if (!b) return;
   clearTimeout(b._t);
   delete b.dataset.arm;
   b.classList.remove("btn-danger");
-  b.textContent = "Reset";
+  b.innerHTML = RESET_SVG;
 }
 $("btn-reset").onclick = async () => {
   const b = $("btn-reset");

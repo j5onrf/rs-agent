@@ -288,6 +288,14 @@ struct TurnStats {
     tps: f64,
 }
 
+fn reasoning_to_string(r: &Option<ReasoningSetting>) -> String {
+    match r {
+        Some(ReasoningSetting::Tokens(n)) => n.to_string(),
+        Some(ReasoningSetting::Tier(t)) => t.clone(),
+        None => String::new(),
+    }
+}
+
 struct SessionState {
     project_name: String,
     workspace: PathBuf,
@@ -301,6 +309,7 @@ struct SessionState {
     ctx_override: Option<usize>,
     hud_summary: String,
     reasoning: Option<ReasoningSetting>,
+    profile_reasoning: Option<ReasoningSetting>,
     active_skills: Vec<String>,
     llm_history: Vec<ChatMessage>,
     ui_history: Vec<UiTurnItem>,
@@ -407,7 +416,7 @@ impl AppRuntime {
         let hud_summary = prof.hud_summary(cfg.is_agent);
         set_profile_max_tokens(prof.ctx);
         let sys = build_system_prompt(&prof, &proj_dir, cfg.is_agent, &active_skills);
-        let final_reasoning = if reasoning.is_some() { reasoning } else if saved.reasoning.is_some() { None } else { prof.reasoning_budget };
+        let final_reasoning = if reasoning.is_some() { reasoning } else if saved.reasoning.is_some() { None } else { prof.reasoning_budget.clone() };
 
         let mut llm_history = vec![ChatMessage::system(sys)];
         llm_history.extend(saved.messages.clone());
@@ -430,6 +439,7 @@ impl AppRuntime {
             ctx_override: prof.ctx,
             hud_summary,
             reasoning: final_reasoning,
+            profile_reasoning: prof.reasoning_budget,
             active_skills,
             llm_history,
             ui_history,
@@ -1849,11 +1859,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             let (git, _) = git_status_brief(&sess.workspace);
             let task_md = tools::read_task_spec(&sess.workspace);
             let memory = fs::read_to_string(sess.workspace.join(".rs/memory.md")).unwrap_or_default();
-            let r_str = match &sess.reasoning {
-                Some(ReasoningSetting::Tokens(n)) => n.to_string(),
-                Some(ReasoningSetting::Tier(t)) => t.clone(),
-                None => String::new(),
-            };
+            let r_str = reasoning_to_string(&sess.reasoning);
+            let pr_str = reasoning_to_string(&sess.profile_reasoning);
             json!({
                 "name": sess.project_name,
                 "path": sess.workspace.display().to_string(),
@@ -1865,6 +1872,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "memory": memory,
                 "files": active_files,
                 "reasoning": r_str,
+                "profile_reasoning": pr_str,
                 "active_skills": sess.active_skills,
                 "history": sess.ui_history,
                 "last_stats": sess.last_stats
@@ -2107,6 +2115,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     sess.mcp_tools = loaded.mcp_tools.clone();
                     sess.ctx_override = loaded.ctx;
                     sess.reasoning = loaded.reasoning_budget.clone();
+                    sess.profile_reasoning = loaded.reasoning_budget.clone();
                     sess.hud_summary = loaded.hud_summary(true);
                     set_profile_max_tokens(loaded.ctx);
                     let cfg = WorkspaceConfig {
@@ -2817,6 +2826,7 @@ mod tests {
             ctx_override: None,
             hud_summary: String::new(),
             reasoning: None,
+            profile_reasoning: None,
             active_skills: Vec::new(),
             llm_history: Vec::new(),
             ui_history: vec![UiTurnItem { role: "user".into(), content: Some("hi".into()), ..Default::default() }],
@@ -3046,6 +3056,8 @@ mod tests {
         fs::write(tmp.join(".rs/config.json"), "{}").unwrap();
         fs::write(tmp.join("notes.txt"), "hi").unwrap();
 
+        assert_eq!(reasoning_to_string(&Some(ReasoningSetting::Tokens(200))), "200");
+        assert_eq!(reasoning_to_string(&None), "");
         assert!(is_protected_delete_path("", &tmp, &tmp));
         assert!(is_protected_delete_path(".rs/config.json", &tmp.join(".rs/config.json"), &tmp));
         assert!(is_protected_delete_path("./.rs/config.json", &tmp.join("./.rs/config.json"), &tmp));
