@@ -63,8 +63,14 @@
   .tele strong { color: var(--text); font-weight: 500; }
   .git-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
   .git-dot.dirty { background: var(--accent); }
-  .ctx-bar { width: 46px; height: 4px; background: color-mix(in srgb, var(--text) 16%, transparent); border-radius: 99px; overflow: hidden; flex-shrink: 0; }
-  .ctx-fill { display: block; height: 100%; background: var(--accent); border-radius: 99px; width: 0%; transition: width .2s, background .2s; }
+  #tb-ctx { position: relative; cursor: default; }
+  .ctx-ring { width: 14px; height: 14px; flex-shrink: 0; }
+  .ctx-ring .trk { stroke: color-mix(in srgb, var(--text) 16%, transparent); fill: none; }
+  .ctx-ring .arc { fill: none; stroke-linecap: round; transition: stroke-dashoffset .22s ease, stroke .2s, opacity .2s; }
+  .ctx-tip { position: absolute; right: 0; top: calc(100% + 8px); background: var(--panel); border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; font-size: 11px; line-height: 1.4; color: var(--text); white-space: nowrap; box-shadow: 0 10px 24px rgba(0,0,0,.35); opacity: 0; pointer-events: none; transform: translateY(-2px); transition: opacity .12s ease, transform .12s ease; z-index: 40; }
+  .ctx-tip .muted { font-size: 10.5px; }
+  .ctx-tip:empty { display: none; }
+  #tb-ctx:hover .ctx-tip { opacity: 1; transform: translateY(0); }
   .btn { background: var(--card); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; font-size: 12px; color: var(--text); display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
   .btn:hover { background: var(--hover); }
   .btn-primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
@@ -342,8 +348,12 @@
       <span class="tele" id="tb-stats" style="display:none;"></span>
       <span class="sep" id="tb-stats-sep" style="display:none;"></span>
       <span class="tele" id="tb-ctx">
-        <span id="tb-usage">ctx 8.2k</span>
-        <span class="ctx-bar"><span class="ctx-fill" id="tb-ctx-fill"></span></span>
+        <svg class="ctx-ring" viewBox="0 0 16 16" aria-hidden="true">
+          <circle class="trk" cx="8" cy="8" r="5.5" stroke-width="2.2"/>
+          <circle class="arc" id="tb-ctx-arc" cx="8" cy="8" r="5.5" stroke-width="2.2" stroke-dasharray="34.56" stroke-dashoffset="34.56" transform="rotate(-90 8 8)" style="opacity:0"/>
+        </svg>
+        <span id="tb-usage">8.2k</span>
+        <span class="ctx-tip" id="tb-ctx-tip"></span>
       </span>
       <button class="btn btn-sm btn-icon" id="btn-toggle-task" aria-label="Toggle workspace panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="10" y1="2.5" x2="10" y2="13.5"/></svg></button>
       <button class="btn btn-sm btn-icon" id="btn-close-app" aria-label="Close RS Rail"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button>
@@ -800,8 +810,12 @@ function renderAll() {
 
   $("sidebar-right").classList.toggle("hidden", STATE.ui_prefs?.show_right_panel === false);
   const ctxMax = STATE.provider.max_tokens || 8192;
-  const ctxLbl = ctxMax >= 1000 ? `${(ctxMax/1000).toFixed(1)}k` : ctxMax;
+  const ctxLbl = ctxMax >= 1000000 ? `${(ctxMax/1000000).toFixed(1)}M` : (ctxMax >= 1000 ? `${(ctxMax/1000).toFixed(1)}k` : ctxMax);
   const stPill = $("tb-stats");
+  const arc = $("tb-ctx-arc");
+  const tip = $("tb-ctx-tip");
+  const circ = 34.56;
+  $("tb-usage").textContent = ctxLbl;
   if (ap.last_stats) {
     const s = ap.last_stats;
     const used = (s.prompt_tokens || 0) + (s.completion_tokens || 0);
@@ -814,17 +828,19 @@ function renderAll() {
     stPill.textContent = `${chPart}${spdPart}`;
     stPill.style.display = "inline-flex";
     $("tb-stats-sep").style.display = "inline-block";
-    $("tb-usage").textContent = `${pct.toFixed(1)}% / ${ctxLbl}`;
-    const fill = $("tb-ctx-fill");
-    fill.style.width = `${pct}%`;
-    fill.style.background = pct > 85 ? "var(--err-text)" : (pct > 70 ? "var(--warn-text)" : "var(--accent)");
+    const visPct = used > 0 ? Math.max(pct, 2.5) : 0;
+    arc.style.strokeDashoffset = (circ * (1 - visPct / 100)).toFixed(2);
+    arc.style.stroke = pct > 85 ? "var(--err-text)" : (pct > 70 ? "var(--warn-text)" : "var(--accent)");
+    arc.style.opacity = used > 0 ? "1" : "0";
+    const meta = [`in ${(s.prompt_tokens || 0).toLocaleString()}`, `out ${(s.completion_tokens || 0).toLocaleString()}`];
+    if (s.cached_tokens) meta.push(`cached ${s.cached_tokens.toLocaleString()}`);
+    tip.innerHTML = `<div><strong>${pct.toFixed(1)}%</strong> · ${used.toLocaleString()} / ${ctxMax.toLocaleString()}</div><div class="muted">${meta.join(" · ")}</div>`;
   } else {
     stPill.style.display = "none";
     $("tb-stats-sep").style.display = "none";
-    $("tb-usage").textContent = `ctx ${ctxLbl}`;
-    const fill = $("tb-ctx-fill");
-    fill.style.width = "0%";
-    fill.style.background = "var(--accent)";
+    arc.style.strokeDashoffset = String(circ);
+    arc.style.opacity = "0";
+    tip.innerHTML = `<div><strong>0.0%</strong> · 0 / ${ctxMax.toLocaleString()}</div><div class="muted">Context budget ready</div>`;
   }
 
   // Projects list (filtered by visibility)
@@ -834,12 +850,13 @@ function renderAll() {
   const plist = $("proj-list");
   plist.innerHTML = "";
   const hc = $("proj-hover");
+  plist.onscroll = () => hc.classList.remove("open");
   const useBots = getAppearance().microBots !== false;
   if (!shownProjects.length) {
     plist.innerHTML = `<div class="muted" style="padding:10px 8px;display:flex;flex-direction:column;gap:6px;"><span>No visible projects.</span><button class="btn btn-sm" id="btn-empty-proj-mgr">Manage Projects</button></div>`;
     $("btn-empty-proj-mgr").onclick = () => openSettings("projects");
   }
-  shownProjects.forEach((p, idx) => {
+  shownProjects.forEach((p) => {
     const el = document.createElement("div");
     el.className = "proj-item" + (p.name === ap.name ? " active" : "");
     const dname = projDisplay(p.name);
@@ -1063,7 +1080,6 @@ function createEmpty() {
 }
 
 const THINK_CHEV = `<svg class="think-chev" width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3.5L10.5 8 6 12.5"/></svg>`;
-const THINK_STAR = `<svg class="think-star" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z"/><path d="M20 2v4"/><path d="M22 4h-4"/><circle cx="4" cy="20" r="2"/></svg>`;
 function thinkMeta(len, elapsed) {
   if (typeof elapsed === "number") return elapsed >= 10 ? `${Math.round(elapsed)}s` : `${elapsed.toFixed(1)}s`;
   return `${Math.max(1, Math.round(len / 4))}t`;
@@ -1144,8 +1160,9 @@ async function runLocalSlash(text) {
       const m = loadPinnedMap(); delete m[STATE.active_project.name]; savePinnedMap(m);
       for (const s of [...active]) await api("/api/settings/profile", { skill_toggle: s });
       await loadState();
-    } else if ((STATE?.skills || []).includes(arg)) {
-      await api("/api/settings/profile", { skill_toggle: arg }); await loadState();
+    } else {
+      const matchSk = (STATE?.skills || []).find((s) => s.toLowerCase() === arg);
+      if (matchSk) { await api("/api/settings/profile", { skill_toggle: matchSk }); await loadState(); }
     }
     return true;
   }

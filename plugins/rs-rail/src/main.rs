@@ -106,7 +106,9 @@ fn sanitize_project_labels(obj: &serde_json::Map<String, Value>) -> HashMap<Stri
                 }
             }
         }
-        out.insert(proj.clone(), labels);
+        if !labels.is_empty() {
+            out.insert(proj.clone(), labels);
+        }
     }
     out
 }
@@ -436,6 +438,22 @@ impl AppRuntime {
             generation: 0,
         }
     }
+}
+
+fn is_protected_delete_path(rel: &str, target: &Path, root: &Path) -> bool {
+    if rel.is_empty() || rel.split(['/', '\\']).any(|s| s == ".git" || s == ".env") {
+        return true;
+    }
+    let is_core_rs = |p: &Path| p == Path::new(".rs/config.json") || p == Path::new(".rs/memory.md");
+    if target.strip_prefix(root).is_ok_and(is_core_rs) {
+        return true;
+    }
+    if let (Ok(canon_t), Ok(canon_r)) = (target.canonicalize(), root.canonicalize()) {
+        if canon_t.strip_prefix(&canon_r).is_ok_and(is_core_rs) {
+            return true;
+        }
+    }
+    false
 }
 
 fn is_valid_slug(name: &str) -> bool {
@@ -1677,6 +1695,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         }
         body.extend_from_slice(&tmp[..n]);
     }
+    body.truncate(content_len);
 
     if method == "GET" && path == "/" {
         app.client_seq.fetch_add(1, Ordering::SeqCst);
@@ -1861,6 +1880,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             .collect();
         mcp_list.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
         let max_rounds = match get_max_rounds() { usize::MAX => 0, r => r };
+        let rail_cfg = RailConfig::load(&app.root.join("plugins/rs-rail/config.json"));
 
         return write_http_json(
             &mut stream,
@@ -1884,10 +1904,10 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "ui_prefs": {
                     "pad": state::get_pad(),
                     "show_thinking": state::get_show_thinking_summaries(),
-                    "show_right_panel": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).show_right_panel,
-                    "hidden_projects": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).hidden_projects,
-                    "project_labels": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).project_labels,
-                    "project_names": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).project_names
+                    "show_right_panel": rail_cfg.show_right_panel,
+                    "hidden_projects": rail_cfg.hidden_projects,
+                    "project_labels": rail_cfg.project_labels,
+                    "project_names": rail_cfg.project_names
                 }
             }),
         )
@@ -2005,6 +2025,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         };
         cfg.save(&proj_dir)?;
         set_last_project(&app.root, &name);
+        app.sessions.lock().await.remove(&name);
         *app.active_project.lock().await = name.clone();
         return write_http_json(&mut stream, 200, &json!({ "name": name })).await;
     }
@@ -2029,8 +2050,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         let proj_dir = app.root.join("projects").join(&active);
         let bnd = SecurityBoundary::new_headless(&proj_dir);
         let target = bnd.resolve_path(rel);
-        let protected_rs = rel == ".rs/config.json" || rel == ".rs/memory.md";
-        if rel.is_empty() || bnd.is_outside(&target) || protected_rs || rel.split('/').any(|s| s == ".git") {
+        if bnd.is_outside(&target) || is_protected_delete_path(rel, &target, &bnd.root) {
             return write_http_err(&mut stream, 403, "Forbidden path").await;
         }
         let Ok(meta) = fs::symlink_metadata(&target) else {
@@ -3015,6 +3035,32 @@ mod tests {
         assert_eq!(reloaded.hidden_projects, vec!["custom".to_string()]);
         assert_eq!(reloaded.project_labels.get("photocraft").unwrap(), &vec!["mcp".to_string()]);
         assert_eq!(reloaded.project_names.get("nemo").map(String::as_str), Some("Cloud API"));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_protected_delete_path_and_empty_labels_cleanup() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_prot_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join(".rs")).unwrap();
+        fs::write(tmp.join(".rs/config.json"), "{}").unwrap();
+        fs::write(tmp.join("notes.txt"), "hi").unwrap();
+
+        assert!(is_protected_delete_path("", &tmp, &tmp));
+        assert!(is_protected_delete_path(".rs/config.json", &tmp.join(".rs/config.json"), &tmp));
+        assert!(is_protected_delete_path("./.rs/config.json", &tmp.join("./.rs/config.json"), &tmp));
+        assert!(is_protected_delete_path(".rs//memory.md", &tmp.join(".rs//memory.md"), &tmp));
+        assert!(is_protected_delete_path(".git/HEAD", &tmp.join(".git/HEAD"), &tmp));
+        assert!(is_protected_delete_path(".env", &tmp.join(".env"), &tmp));
+        assert!(!is_protected_delete_path(".rs/session.json", &tmp.join(".rs/session.json"), &tmp));
+        assert!(!is_protected_delete_path("notes.txt", &tmp.join("notes.txt"), &tmp));
+
+        let mut raw = serde_json::Map::new();
+        raw.insert("demo".into(), json!([]));
+        raw.insert("nemo".into(), json!(["cloud"]));
+        let cleaned = sanitize_project_labels(&raw);
+        assert!(!cleaned.contains_key("demo"));
+        assert_eq!(cleaned.get("nemo").unwrap(), &vec!["cloud".to_string()]);
         let _ = fs::remove_dir_all(&tmp);
     }
 }
