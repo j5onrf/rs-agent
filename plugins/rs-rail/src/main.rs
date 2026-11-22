@@ -41,6 +41,8 @@ struct RailConfig {
     hidden_projects: Vec<String>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     project_labels: HashMap<String, Vec<String>>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    project_names: HashMap<String, String>,
 }
 
 impl Default for RailConfig {
@@ -50,6 +52,7 @@ impl Default for RailConfig {
             last_project: None,
             hidden_projects: Vec::new(),
             project_labels: HashMap::new(),
+            project_names: HashMap::new(),
         }
     }
 }
@@ -104,6 +107,22 @@ fn sanitize_project_labels(obj: &serde_json::Map<String, Value>) -> HashMap<Stri
             }
         }
         out.insert(proj.clone(), labels);
+    }
+    out
+}
+
+fn sanitize_project_names(obj: &serde_json::Map<String, Value>) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    for (proj, val) in obj {
+        if !is_valid_slug(proj) {
+            continue;
+        }
+        if let Some(raw) = val.as_str() {
+            let s = raw.trim();
+            if !s.is_empty() && s != proj && s.chars().count() <= 36 && !s.chars().any(|c| c.is_control()) {
+                out.insert(proj.clone(), s.to_string());
+            }
+        }
     }
     out
 }
@@ -1867,7 +1886,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     "show_thinking": state::get_show_thinking_summaries(),
                     "show_right_panel": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).show_right_panel,
                     "hidden_projects": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).hidden_projects,
-                    "project_labels": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).project_labels
+                    "project_labels": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).project_labels,
+                    "project_names": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).project_names
                 }
             }),
         )
@@ -2124,6 +2144,10 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             cfg.project_labels = sanitize_project_labels(obj);
             dirty_cfg = true;
         }
+        if let Some(obj) = payload.get("project_names").and_then(|v| v.as_object()) {
+            cfg.project_names = sanitize_project_names(obj);
+            dirty_cfg = true;
+        }
         if payload.get("auto_label").and_then(|v| v.as_bool()) == Some(true) {
             apply_auto_labels(&app.root, &mut cfg);
             dirty_cfg = true;
@@ -2134,7 +2158,12 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         return write_http_json(
             &mut stream,
             200,
-            &json!({ "ok": true, "hidden_projects": cfg.hidden_projects, "project_labels": cfg.project_labels }),
+            &json!({
+                "ok": true,
+                "hidden_projects": cfg.hidden_projects,
+                "project_labels": cfg.project_labels,
+                "project_names": cfg.project_names
+            }),
         )
         .await;
     }
@@ -2971,11 +3000,21 @@ mod tests {
         assert!(!cfg.project_labels.contains_key("chat"));
 
         cfg.hidden_projects = vec!["custom".into()];
+        let mut raw_names = serde_json::Map::new();
+        raw_names.insert("nemo".into(), json!("Cloud API"));
+        raw_names.insert("chat".into(), json!("chat")); // identical to slug -> omitted
+        raw_names.insert("../bad".into(), json!("nope"));
+        cfg.project_names = sanitize_project_names(&raw_names);
+        assert_eq!(cfg.project_names.get("nemo").map(String::as_str), Some("Cloud API"));
+        assert!(!cfg.project_names.contains_key("chat"));
+        assert!(!cfg.project_names.contains_key("../bad"));
+
         let cfg_p = tmp.join("config.json");
         cfg.save(&cfg_p).unwrap();
         let reloaded = RailConfig::load(&cfg_p);
         assert_eq!(reloaded.hidden_projects, vec!["custom".to_string()]);
         assert_eq!(reloaded.project_labels.get("photocraft").unwrap(), &vec!["mcp".to_string()]);
+        assert_eq!(reloaded.project_names.get("nemo").map(String::as_str), Some("Cloud API"));
         let _ = fs::remove_dir_all(&tmp);
     }
 }

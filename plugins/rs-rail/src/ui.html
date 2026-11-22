@@ -93,7 +93,7 @@
   .sidebar-right { width: 230px; min-width: 200px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   .sidebar-left.hidden, .sidebar-right.hidden { display: none; }
   .sec-head { padding: 10px 12px 6px; font-size: 12px; font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; align-items: center; }
-  .rs-head { padding: 8px 12px 6px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .rs-head { padding: 8px 10px 6px; font-size: 11px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--dim); display: flex; justify-content: space-between; align-items: center; gap: 6px; }
   .proj-list { flex: 1; overflow-y: auto; padding: 6px 6px 8px; }
   .sb-foot { padding: 6px 8px 8px; display: flex; align-items: center; }
   .sb-foot .btn-icon { background: transparent; border-color: transparent; color: var(--muted); opacity: 0; transition: opacity .15s, background .12s, color .12s; }
@@ -120,6 +120,8 @@
   .proj-tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); }
   .proj-tag button, .lbl-chip button { background: transparent; border: none; padding: 0 1px; cursor: pointer; color: var(--dim); font-size: 10px; line-height: 1; }
   .proj-tag button:hover, .lbl-chip button:hover { color: var(--text); }
+  .proj-ren { background: transparent; border: none; padding: 0 3px; cursor: pointer; color: var(--dim); font-size: 11px; line-height: 1; }
+  .proj-ren:hover { color: var(--text); }
   .lbl-chip button.arm { color: var(--err-text); background: var(--del-bg); border-radius: 4px; padding: 1px 4px; }
   .tag-inp { width: 96px; background: var(--bg); border: 1px solid var(--accent); border-radius: 999px; padding: 1px 8px; font-size: 11px; color: var(--text); outline: none; }
   .lbl-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
@@ -329,8 +331,8 @@
 <div class="app">
   <header class="topbar">
     <div class="tb-left">
-      <button type="button" class="brand" id="btn-brand-settings" title="Settings (Ctrl+,)"><svg width="16" height="16" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M49 24 L72 47 L50 69 L24 69"/></svg><span>RS Rail</span></button>
-      <button class="btn btn-sm btn-icon" id="btn-toggle-proj" title="Toggle Projects Sidebar (Ctrl+B)" aria-label="Toggle sidebar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg></button>
+      <button type="button" class="brand" id="btn-brand-settings"><svg width="16" height="16" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M49 24 L72 47 L50 69 L24 69"/></svg><span>RS Rail</span></button>
+      <button class="btn btn-sm btn-icon" id="btn-toggle-proj" aria-label="Toggle sidebar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg></button>
       <span class="sep"></span>
       <span class="tele" id="tb-profile">—</span>
       <span class="sep" id="tb-git-sep" style="display:none;"></span>
@@ -343,8 +345,8 @@
         <span id="tb-usage">ctx 8.2k</span>
         <span class="ctx-bar"><span class="ctx-fill" id="tb-ctx-fill"></span></span>
       </span>
-      <button class="btn btn-sm btn-icon" id="btn-toggle-task" title="Toggle Workspace Panel (Files, TASK, Memory, Export)" aria-label="Toggle workspace panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="10" y1="2.5" x2="10" y2="13.5"/></svg></button>
-      <button class="btn btn-sm btn-icon" id="btn-close-app" title="Close RS Rail" aria-label="Close RS Rail"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button>
+      <button class="btn btn-sm btn-icon" id="btn-toggle-task" aria-label="Toggle workspace panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="10" y1="2.5" x2="10" y2="13.5"/></svg></button>
+      <button class="btn btn-sm btn-icon" id="btn-close-app" aria-label="Close RS Rail"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button>
     </div>
   </header>
 
@@ -352,14 +354,14 @@
     <aside class="sidebar-left" id="sidebar-left">
       <div class="sec-head">
         <div class="rs-tabs">
-          <button class="rs-tab active" id="btn-projects-nav" title="Manage projects &amp; labels">Projects</button>
+          <button class="rs-tab active" id="btn-projects-nav">Projects</button>
           <button class="rs-tab" id="btn-profiles-nav">Profiles</button>
         </div>
-        <button class="btn btn-sm btn-icon" id="btn-new-proj" title="New Workspace" aria-label="New Workspace"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3.5" x2="8" y2="12.5"/><line x1="3.5" y1="8" x2="12.5" y2="8"/></svg></button>
+        <button class="btn btn-sm btn-icon" id="btn-new-proj" aria-label="New Workspace"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3.5" x2="8" y2="12.5"/><line x1="3.5" y1="8" x2="12.5" y2="8"/></svg></button>
       </div>
       <div class="proj-list" id="proj-list"></div>
       <div class="sb-foot">
-        <button class="btn btn-sm btn-icon" id="btn-settings" title="Settings (Ctrl+,)" aria-label="Settings"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="5.5" cy="4.5" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10.5" cy="8" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="6.5" cy="11.5" r="1.5" fill="var(--panel)"/></svg></button>
+        <button class="btn btn-sm btn-icon" id="btn-settings" aria-label="Settings"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="5.5" cy="4.5" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10.5" cy="8" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="6.5" cy="11.5" r="1.5" fill="var(--panel)"/></svg></button>
       </div>
     </aside>
 
@@ -379,17 +381,17 @@
           <textarea id="msg-input" rows="1" placeholder="Message... (/ commands, Enter to send)"></textarea>
           <div class="comp-bar">
             <div class="comp-left">
-              <button type="button" class="micro-pill" id="btn-model-pill" title="Open Providers">—</button>
+              <button type="button" class="micro-pill" id="btn-model-pill">—</button>
               <div class="pop-wrap">
-                <button type="button" class="micro-pill muted" id="btn-reasoning-pill" title="Reasoning setting" aria-haspopup="menu" aria-expanded="false"><span id="reasoning-val">Default</span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg></button>
+                <button type="button" class="micro-pill muted" id="btn-reasoning-pill" aria-haspopup="menu" aria-expanded="false"><span id="reasoning-val">Default</span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg></button>
                 <div class="pop" id="pop-reasoning" role="menu"></div>
               </div>
-              <button type="button" class="micro-pill muted" id="btn-img" title="Attach image (or paste)" aria-label="Attach image" style="display:none;padding:0 8px;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="5.7" cy="6" r="1"/><path d="M2.5 11.5l3.2-3.2 2.4 2.4 2.1-2.1 3.3 2.9"/></svg></button>
+              <button type="button" class="micro-pill muted" id="btn-img" aria-label="Attach image" style="display:none;padding:0 8px;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="5.7" cy="6" r="1"/><path d="M2.5 11.5l3.2-3.2 2.4 2.4 2.1-2.1 3.3 2.9"/></svg></button>
               <div id="skills-bar"></div>
             </div>
             <div class="comp-right">
               <button type="button" class="btn-send-circle" id="btn-send" aria-label="Send message"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 12.5V3.5"/><path d="M4 7.5L8 3.5l4 4"/></svg></button>
-              <button type="button" class="btn-send-circle stop" id="btn-stop" title="Stop generation" aria-label="Stop generation" style="display:none;"><svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><rect x="1.5" y="1.5" width="9" height="9" rx="2"/></svg></button>
+              <button type="button" class="btn-send-circle stop" id="btn-stop" aria-label="Stop generation" style="display:none;"><svg width="11" height="11" viewBox="0 0 12 12" fill="currentColor"><rect x="1.5" y="1.5" width="9" height="9" rx="2"/></svg></button>
             </div>
           </div>
         </div>
@@ -399,8 +401,8 @@
     <aside class="sidebar-right" id="sidebar-right">
       <div class="rs-top">
         <div class="rs-head">
-          <span>Files (<span id="files-count">0</span>)</span>
-          <div style="display:flex;gap:5px;align-items:center;"><button class="btn btn-sm" id="btn-reset" style="display:none;">Reset</button><button class="btn btn-sm" id="btn-export-md" title="Save session to .rs/transcripts/">Export .md</button></div>
+          <span style="white-space:nowrap;flex-shrink:0;">Files (<span id="files-count">0</span>)</span>
+          <div style="display:flex;gap:5px;align-items:center;"><button class="btn btn-sm" id="btn-reset" style="display:none;">Reset</button><button class="btn btn-sm" id="btn-export-md">Export .md</button></div>
         </div>
         <div class="file-list" id="file-list"></div>
       </div>
@@ -773,15 +775,15 @@ function botSvg(name) {
   return `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">${rects.join("")}</svg>`;
 }
 
+const projDisplay = (name) => (STATE?.ui_prefs?.project_names?.[name] || name);
+
 function renderAll() {
   if (!STATE) return;
   const ap = STATE.active_project;
-  const normId = (s) => String(s || "").split("/").pop().toLowerCase().replace(/[-_]/g, "");
-  const headLabel = !ap.profile_name
-    ? `${ap.name} · missing profile`
-    : (normId(ap.profile_name) !== normId(ap.name) ? `${ap.name} · ${ap.profile_name}` : ap.name);
-  $("tb-profile").innerHTML = `<strong>${esc(headLabel)}</strong> · ${esc(ap.hud_summary)}`;
-  $("tb-profile").title = ap.profile_name ? `Project: ${ap.name}\nProfile: ${ap.profile_name}` : `Project: ${ap.name}\nProfile file missing`;
+  const dispName = projDisplay(ap.name);
+  $("tb-profile").innerHTML = `<strong>${esc(dispName)}</strong> · ${esc(ap.hud_summary)}`;
+  const projTip = dispName !== ap.name ? `${dispName} (${ap.name})` : ap.name;
+  $("tb-profile").title = `Project: ${projTip}\nProfile: ${ap.profile_name || "missing"}`;
   const gitLabel = (ap.git || "").replace(/^git:\s*/i, "").trim();
   const showGit = !!gitLabel && gitLabel !== "[none]";
   $("tb-git-sep").style.display = showGit ? "inline-block" : "none";
@@ -840,13 +842,12 @@ function renderAll() {
   shownProjects.forEach((p, idx) => {
     const el = document.createElement("div");
     el.className = "proj-item" + (p.name === ap.name ? " active" : "");
-    const badgeInner = useBots
-      ? botSvg(p.name)
-      : esc(p.name.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || p.name.slice(0, 2));
+    const dname = projDisplay(p.name);
+    const badgeInner = useBots ? botSvg(p.name) : esc(dname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || dname.slice(0, 2));
     const delBtn = p.file_count > 0
       ? `<button class="proj-del" title="Delete ${p.file_count} file(s)"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11"/><path d="M6 2.5h4"/><path d="M4.5 4.5l.7 9h5.6l.7-9"/></svg></button>`
       : "";
-    el.innerHTML = `<div class="proj-left"><span class="proj-badge">${badgeInner}</span><span class="proj-name">${esc(p.name)}</span></div><div class="proj-acts">${delBtn}<span class="proj-dot ${p.dirty ? "dirty" : ""}"></span></div>`;
+    el.innerHTML = `<div class="proj-left"><span class="proj-badge">${badgeInner}</span><span class="proj-name">${esc(dname)}</span></div><div class="proj-acts">${delBtn}<span class="proj-dot ${p.dirty ? "dirty" : ""}"></span></div>`;
     el.onclick = () => { hc.classList.remove("open"); loadState(p.name); };
     const db = el.querySelector(".proj-del");
     if (db) {
@@ -862,7 +863,7 @@ function renderAll() {
       const r = el.getBoundingClientRect();
       const filesTxt = p.file_count ? `${p.file_count} file(s)` : "empty";
       const gitRow = p.has_git ? `<div class="ph-row"><span>Git</span><span>${p.dirty ? "modified" : "clean"}</span></div>` : "";
-      hc.innerHTML = `<div class="ph-top"><span>${esc(p.name)}</span></div><div class="ph-row"><span>Profile</span><span>${esc(p.profile_name)}</span></div><div class="ph-row"><span>Workspace</span><span>${filesTxt}</span></div>${gitRow}`;
+      hc.innerHTML = `<div class="ph-top"><span>${esc(dname)}</span></div><div class="ph-row"><span>Profile</span><span>${esc(p.profile_name)}</span></div><div class="ph-row"><span>Workspace</span><span>${filesTxt}</span></div>${gitRow}`;
       hc.style.left = `${r.right + 8}px`;
       hc.style.top = `${Math.min(r.top, window.innerHeight - 110)}px`;
       hc.classList.add("open");
@@ -979,7 +980,7 @@ function renderAll() {
   applyAppearance();
   const msgInp = $("msg-input");
   if (msgInp && (!msgInp.value || msgInp.value.startsWith("/task "))) {
-    msgInp.placeholder = `Message ${ap.name}... (/ commands, Enter to send)`;
+    msgInp.placeholder = `Message ${dispName}... (/ commands, Enter to send)`;
   }
   updateSendReady();
   $("stream").classList.toggle("chat-mode", !ap.is_agent);
@@ -1057,7 +1058,7 @@ function createEmpty() {
     : userFiles > 0
       ? `${userFiles} file(s) · ${esc(ap.profile_name)} · ${esc(ap.hud_summary)}`
       : `${esc(ap.profile_name)} · ${esc(ap.hud_summary)} · <code>/</code> for commands`;
-  d.innerHTML = `<div style="font-size:16px;color:var(--text);font-weight:600;margin-bottom:6px;">What should we build in ${esc(ap.name)}?</div><div>${sub}</div>`;
+  d.innerHTML = `<div style="font-size:16px;color:var(--text);font-weight:600;margin-bottom:6px;">What should we build in ${esc(projDisplay(ap.name))}?</div><div>${sub}</div>`;
   return d;
 }
 
@@ -1375,11 +1376,13 @@ function renderModalTab() {
     const allLabels = Array.from(new Set(Object.values(labelsMap).flat())).sort();
     const shownCount = STATE.projects.filter((p) => !hiddenSet.has(p.name)).length;
 
-    const saveProjPrefs = async (nextHidden, nextLabels) => {
+    const namesMap = STATE.ui_prefs?.project_names || {};
+    const saveProjPrefs = async (nextHidden, nextLabels, nextNames = namesMap) => {
       const hiddenArr = Array.from(nextHidden);
-      const res = await api("/api/settings/ui", { hidden_projects: hiddenArr, project_labels: nextLabels });
+      const res = await api("/api/settings/ui", { hidden_projects: hiddenArr, project_labels: nextLabels, project_names: nextNames });
       STATE.ui_prefs.hidden_projects = res.hidden_projects || hiddenArr;
       STATE.ui_prefs.project_labels = res.project_labels || nextLabels;
+      STATE.ui_prefs.project_names = res.project_names || nextNames;
       const curHidden = new Set(STATE.ui_prefs.hidden_projects);
       if (curHidden.has(STATE.active_project.name)) {
         const next = STATE.projects.find((p) => p.name === "chat" && !curHidden.has("chat"))
@@ -1465,13 +1468,40 @@ function renderModalTab() {
     for (const p of STATE.projects) {
       const isVis = !hiddenSet.has(p.name);
       const pLabels = labelsMap[p.name] || [];
+      const dname = projDisplay(p.name);
+      const subMeta = dname !== p.name ? `${p.name} · ${p.profile_name} · ${p.file_count} file(s)` : `${p.profile_name} · ${p.file_count} file(s)`;
       const row = document.createElement("div");
       row.className = "setting-row";
       row.innerHTML = `<div style="min-width:0;flex:1;">
-        <div><strong>${esc(p.name)}</strong> <span class="muted">${esc(p.profile_name)} · ${p.file_count} file(s)</span></div>
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><strong class="proj-disp">${esc(dname)}</strong><button type="button" class="proj-ren">✎</button> <span class="muted">${esc(subMeta)}</span></div>
         <div class="proj-tags"></div>
       </div>
-      <button class="switch ${isVis ? "on" : ""}" title="${isVis ? "Hide from sidebar" : "Show in sidebar"}"></button>`;
+      <button class="switch ${isVis ? "on" : ""}"></button>`;
+
+      const renBtn = row.querySelector(".proj-ren");
+      const dispEl = row.querySelector(".proj-disp");
+      renBtn.onclick = () => {
+        const inp = document.createElement("input");
+        inp.className = "tag-inp";
+        inp.style.width = "140px";
+        inp.value = dname;
+        renBtn.style.display = "none";
+        dispEl.replaceWith(inp);
+        inp.focus();
+        inp.select();
+        let done = false;
+        const commit = async () => {
+          if (done) return;
+          done = true;
+          const v = inp.value.trim();
+          const nextNames = structuredClone(namesMap);
+          if (!v || v === p.name) delete nextNames[p.name];
+          else nextNames[p.name] = v;
+          await saveProjPrefs(hiddenSet, labelsMap, nextNames);
+        };
+        inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { done = true; renderModalTab(); } };
+        inp.onblur = commit;
+      };
 
       const tagsBox = row.querySelector(".proj-tags");
       for (const l of pLabels) {

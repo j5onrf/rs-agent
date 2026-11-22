@@ -51,7 +51,7 @@
 #   ├── profiles/gem4.md                 - Google Gemini 4 Hydrogen High-Speed Systems & Coding Engineer
 #   ├── profiles/groot/groot.md          - Groot-19B-A3B Autonomous Systems Engineer
 #   ├── profiles/groot/groot2.md         - Groot-19B-A3B Autonomous Systems Engineer
-#   ├── profiles/inkling.md              - Inkling-2-Mini 26B-A3.4B Autonomous Code & MCP Systems Agent
+#   ├── profiles/inkling2.md             - Inkling-2-Mini 26B-A3.4B Autonomous Systems Agent
 #   ├── profiles/lfm3.md                 - Liquid AI LFM3-1.7B Ultra-Fast Edge Systems Engineer
 #   ├── profiles/lingtiny.md             - Ling-3.0-tiny Autonomous Systems Engineer
 #   ├── profiles/nemo.md                 - NVIDIA Nemotron Ultra & Lightning Autonomous Systems Architect
@@ -62,6 +62,7 @@
 #   ├── projects/flint/math_demo.py      - def is_prime(n):
 #   ├── projects/gem35/math_demo.py      - def is_prime(n):
 #   ├── projects/groot/math_demo.py      - def is_prime(n):
+#   ├── projects/inkling2/math_demo.py   - def is_prime(n):
 #   ├── projects/lfm3/math_demo.py       - def is_prime(n):
 #   ├── projects/ling-tiny/hello_test.py - print("hello world")
 #   ├── projects/ling-tiny/math_demo.py  - #!/usr/bin/env python3
@@ -111,11 +112,11 @@
 
 ### `plugins/rs-rail/src/main.rs`
 ```rust
-  L042: impl Default for RailConfig {
-    L043: fn default() -> Self;
+  L048: impl Default for RailConfig {
+    L049: fn default() -> Self;
   }
-  L2411: async fn main() -> Result<()>;
-  L2431: mod tests;
+  L2620: async fn main() -> Result<()>;
+  L2640: mod tests;
 ```
 
 ### `plugins/t3code/src/main.rs`
@@ -293,21 +294,21 @@
   L121: impl Profile {
     L122: pub fn parse(raw_content: &str) -> Self;
     L228: pub fn hud_summary(&self, is_agent: bool) -> String;
-    L271: pub fn profile_dirs() -> Vec<PathBuf>;
-    L280: pub fn load(profile_name: &str) -> Option<Self>;
-    L351: pub fn list_available() -> Vec<String>;
-    L409: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
-    L436: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
-    L478: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
-    L521: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
-    L754: pub fn ensure_model_workspace(provider: &crate :: config :: ProviderConfig) -> Option<String>;
+    L268: pub fn profile_dirs() -> Vec<PathBuf>;
+    L277: pub fn load(profile_name: &str) -> Option<Self>;
+    L348: pub fn list_available() -> Vec<String>;
+    L406: pub fn find_workspace_candidates(ws_name: &str, available: &[String]) -> Vec<String>;
+    L433: pub fn find_model_candidates(model_name: &str, available: &[String]) -> Vec<String>;
+    L475: pub fn resolve_for_workspace(ws_name: &str, model_name: &str, base_url: Option<&str>) -> String;
+    L518: pub fn select_interactive(target_workspace: &Path, current_profile: &str) -> Option<String>;
+    L751: pub fn ensure_model_workspace(provider: &crate :: config :: ProviderConfig) -> Option<String>;
   }
-  L802: pub fn model_slug(raw: &str) -> String;
-  L878: pub fn pick_short_alias(slug: &str, used_aliases: &HashSet<String>, check_path: bool) -> Option<String>;
-  L892: pub fn build_auto_profile_content(model: &str, is_local: bool) -> String;
-  L997: pub fn ensure_workspace_in_root(root: &Path, raw_model: &str, is_local: bool, check_path: bool ,) -> Option<String>;
-  L1105: pub fn build_system_prompt(profile: &Profile, workspace: &Path, is_agent: bool, active_skills: &[String]) -> String;
-  L1135: mod tests;
+  L799: pub fn model_slug(raw: &str) -> String;
+  L875: pub fn pick_short_alias(slug: &str, used_aliases: &HashSet<String>, check_path: bool) -> Option<String>;
+  L889: pub fn build_auto_profile_content(model: &str, is_local: bool) -> String;
+  L994: pub fn ensure_workspace_in_root(root: &Path, raw_model: &str, is_local: bool, check_path: bool ,) -> Option<String>;
+  L1102: pub fn build_system_prompt(profile: &Profile, workspace: &Path, is_agent: bool, active_skills: &[String]) -> String;
+  L1132: mod tests;
 ```
 
 ### `src/security.rs`
