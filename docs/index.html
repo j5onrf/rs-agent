@@ -160,12 +160,13 @@
   .think summary::-webkit-details-marker { display: none; }
   .think-body { margin: 5px 0 3px 5px; padding-left: 10px; border-left: 1px solid var(--border); color: var(--muted); font-size: 11.5px; line-height: 1.45; }
   .ans-row { display: flex; align-items: flex-start; gap: 8px; line-height: 1.5; font-size: 12.5px; }
-  .bullet { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); margin-top: 6px; flex-shrink: 0; }
+  .bullet { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); margin-top: calc((1.5em - 6px) / 2); flex-shrink: 0; }
   .stream.chat-mode .ans-row .bullet { display: none; }
   .t-card { border: 1px solid var(--border); background: var(--panel); border-radius: 6px; overflow: hidden; font-family: var(--mono); font-size: 11.5px; }
   .t-head { padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; }
   .t-head:hover { background: var(--hover); }
-  .t-title { display: flex; align-items: center; gap: 7px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .t-title { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .t-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .t-title .bullet { margin-top: 0; }
   .t-sum { color: var(--dim); padding: 0 10px 6px 23px; font-size: 11px; }
   .t-diff { border-top: 1px solid var(--border); background: var(--bg); padding: 4px 10px; color: var(--add-text); background: var(--add-bg); border-left: 2px solid var(--add-text); }
@@ -492,9 +493,9 @@ function renderDemo() {
     wrap.innerHTML = `
       <div class="msg-u">create a small python script called hello_test.py that prints hello world</div>
       <details class="think"><summary><span>1 Step 1.1s ›</span></summary><div class="think-body">The user wants me to create a simple Python script called hello_test.py that prints "hello world". I'll use write_file to create it.</div></details>
-      <div class="t-card"><div class="t-head"><span><span class="bullet" style="display:inline-block;margin-right:6px;vertical-align:middle;"></span><strong>Write</strong> <span style="color:var(--muted)">(projects/${activeProj}/hello_test.py)</span></span><span style="color:var(--muted)">0.0s</span></div><div class="t-sum">⎿ Updated projects/${activeProj}/hello_test.py (+1 -0)</div><div class="t-diff">1 +  print("hello world")</div></div>
+      <div class="t-card"><div class="t-head"><span class="t-title"><span class="bullet"></span><span class="t-label"><strong>Write</strong> <span style="color:var(--muted)">(projects/${activeProj}/hello_test.py)</span></span></span><span style="color:var(--muted)">0.0s</span></div><div class="t-sum">⎿ Updated projects/${activeProj}/hello_test.py (+1 -0)</div><div class="t-diff">1 +  print("hello world")</div></div>
       <details class="think"><summary><span>2 Step 0.9s ›</span></summary><div class="think-body">Running the script to verify stdout.</div></details>
-      <div class="t-card" onclick="this.classList.toggle('open')"><div class="t-head"><span><span class="bullet" style="display:inline-block;margin-right:6px;vertical-align:middle;"></span><strong>Bash</strong> <span style="color:var(--muted)">(python3 projects/${activeProj}/hello_test.py)</span></span><span style="color:var(--muted)">0.0s</span></div><div class="t-sum">⎿ hello world</div><pre class="t-raw">hello world
+      <div class="t-card" onclick="this.classList.toggle('open')"><div class="t-head"><span class="t-title"><span class="bullet"></span><span class="t-label"><strong>Bash</strong> <span style="color:var(--muted)">(python3 projects/${activeProj}/hello_test.py)</span></span></span><span style="color:var(--muted)">0.0s</span></div><div class="t-sum">⎿ hello world</div><pre class="t-raw">hello world
 exit code 0</pre></div>
       <div class="ans-row"><span class="bullet"></span><div>Task complete: Created hello_test.py that prints "hello world".</div></div>`;
   }

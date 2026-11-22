@@ -61,7 +61,11 @@
 
 ## <img alt="rs-rail" src="assets/rs-rail.svg" width="26" height="26" /> RS Rail (Desktop & Web)
 
-**rs-rail** is a native web and desktop UI in a single Rust binary with `ui.html` compiled in, running on `http://127.0.0.1:24243` and built directly on `rs-agent`.
+**rs-rail** is a native web and desktop UI in a single Rust binary with `ui.html` compiled in, running on `http://127.0.0.1:24243` and built directly on `rs-agent` ([**Live Demo**](https://j5onrf.github.io/rs-agent/)).
+
+| **Interactive Demo** · [j5onrf.github.io/rs-agent](https://j5onrf.github.io/rs-agent/) |
+| :--- |
+| [<img alt="RS Rail — Local-First Desktop & Web UI" src="assets/rail.png" />](https://j5onrf.github.io/rs-agent/) |
 
 | Feature | Mechanism | Behavior |
 | :--- | :--- | :--- |
@@ -206,9 +210,9 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 | Rank | Model | Par Eff | Agent Index |
 | :---: | :--- | :---: | :---: |
 | **1** | **Inkling-2-Mini** | **185.7%** | **100.0 (A+)** |
-| **1** | **Flint-40B-A2.5B** | **185.7%** | **100.0 (A+)** |
-| **2** | **Groot-19B-A3B** *(MTP)* | **162.5%** | **100.0 (A+)** |
-| **3** | **Sage-A1.5-35B** | **111.1%** | **100.0 (A+)** |
+| **2** | **Flint-40B-A2.5B** | **185.7%** | **100.0 (A+)** |
+| **3** | **Groot-19B-A3B** *(MTP)* | **162.5%** | **100.0 (A+)** |
+| **4** | **Sage-A1.5-35B** | **111.1%** | **100.0 (A+)** |
 | **—** | **Ling-3.0-tiny** *(SLM)* | **162.5%** | **100.0 (A+)** |
 | **—** | **LFM3-1.7B** *(SLM)* | **173.3%** | **100.0 (A+)** |
 ---
@@ -292,3 +296,4 @@ AI_MAX_AGENT_ROUNDS="10"
 <div align="center">
   <a href="LICENSE">MIT License</a>
 </div>
+
