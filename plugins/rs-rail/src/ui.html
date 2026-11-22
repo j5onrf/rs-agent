@@ -96,6 +96,7 @@
   .tok-s { color: var(--syn-str); }
   .tok-n { color: var(--syn-num); }
   .tok-c { color: var(--syn-cmt); font-style: italic; }
+  body.no-syn .tok-k, body.no-syn .tok-s, body.no-syn .tok-n, body.no-syn .tok-c { color: inherit; font-style: normal; }
 
   /* Main 3-pane body */
   .main { flex: 1; display: flex; min-height: 0; }
@@ -338,7 +339,13 @@
   .theme-del:hover, .theme-del.arm { color: var(--err-text); background: var(--del-bg); }
   .file-view-pre { flex: 1; margin: 0; padding: 12px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; overflow: auto; font-family: var(--mono); font-size: var(--code-size); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
   .muted { color: var(--muted); font-size: 12px; }
-  .empty-state { margin: auto; text-align: center; color: var(--dim); max-width: 420px; line-height: 1.6; }
+  .center.is-empty { overflow-y: auto; }
+  .center.is-empty .stream { flex: 0 0 auto; overflow: visible; margin-top: auto; padding: 24px 24px 20px; scrollbar-gutter: auto; }
+  .center.is-empty .composer-wrap { margin-bottom: auto; padding: 0 24px 38px; }
+  .center.is-empty .composer { max-width: 720px; }
+  .empty-state { margin: 0 auto; text-align: center; color: var(--muted); max-width: 560px; line-height: 1.55; }
+  .empty-title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); margin-bottom: 6px; }
+  .empty-sub { font-size: 12.5px; color: var(--muted); opacity: 0.85; }
 </style>
 </head>
 <body>
@@ -373,7 +380,7 @@
       </div>
       <div class="proj-list" id="proj-list"></div>
       <div class="sb-foot">
-        <button class="btn btn-sm btn-icon" id="btn-settings" aria-label="Settings"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2.5" y1="4.5" x2="13.5" y2="4.5"/><circle cx="5.5" cy="4.5" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="8" x2="13.5" y2="8"/><circle cx="10.5" cy="8" r="1.5" fill="var(--panel)"/><line x1="2.5" y1="11.5" x2="13.5" y2="11.5"/><circle cx="6.5" cy="11.5" r="1.5" fill="var(--panel)"/></svg></button>
+        <button class="btn btn-sm btn-icon" id="btn-settings" aria-label="Settings"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
       </div>
     </aside>
 
@@ -521,6 +528,7 @@ const DEFAULT_APPEARANCE = {
   codeFont: "JetBrains Mono",
   codeSize: 12,
   ligatures: false,
+  syntaxHighlight: true,
   promptBar: "pills",
   composerSize: "default",
   ambientLight: false,
@@ -617,6 +625,7 @@ function applyAppearance(next) {
   root.setProperty("--code-size", `${cfg.codeSize}px`);
   root.setProperty("--ligatures", cfg.ligatures ? "normal" : "none");
   document.body.classList.toggle("theme-dark", !isLight);
+  document.body.classList.toggle("no-syn", cfg.syntaxHighlight === false);
   document.body.classList.toggle("prompt-ghost", cfg.promptBar === "ghost");
   document.body.classList.toggle("comp-compact", cfg.composerSize === "compact");
   document.body.classList.toggle("ambient-light", !!cfg.ambientLight);
@@ -1010,6 +1019,7 @@ function renderAll() {
 function renderHistory() {
   const stream = $("stream");
   const msgs = STATE.active_project.history || [];
+  document.querySelector(".center").classList.toggle("is-empty", !msgs.length);
   if (!msgs.length) {
     stream.innerHTML = "";
     stream.appendChild(createEmpty());
@@ -1064,20 +1074,21 @@ function createEmpty() {
   const ap = STATE?.active_project;
   const model = STATE?.provider?.model || "";
   if (!ap) {
-    d.innerHTML = `<div style="font-size:16px;color:var(--text);font-weight:600;margin-bottom:6px;">Ready</div><div>Loading workspace...</div>`;
+    d.innerHTML = `<div class="empty-title">Ready</div><div class="empty-sub">Loading workspace...</div>`;
     return d;
   }
+  const hud = String(ap.hud_summary || "").split(" · ").filter(Boolean).join("   ");
   if (!ap.is_agent) {
-    d.innerHTML = `<div style="font-size:16px;color:var(--text);font-weight:600;margin-bottom:6px;">Ready in chat</div><div>${esc(model)} · pure conversation · <code>/</code> for commands</div>`;
+    d.innerHTML = `<div class="empty-title">What should we explore in ${esc(projDisplay(ap.name))}?</div><div class="empty-sub">${esc(model)}   pure conversation   <code>/</code> for commands</div>`;
     return d;
   }
   const userFiles = (ap.files || []).filter((f) => !f.startsWith(".rs/")).length;
   const sub = ap.task_md
-    ? `TASK.md loaded · ${esc(ap.hud_summary)} · <code>/task</code> to run`
+    ? `TASK.md loaded   ${esc(hud)}   <code>/task</code> to run`
     : userFiles > 0
-      ? `${userFiles} file(s) · ${esc(ap.profile_name)} · ${esc(ap.hud_summary)}`
-      : `${esc(ap.profile_name)} · ${esc(ap.hud_summary)} · <code>/</code> for commands`;
-  d.innerHTML = `<div style="font-size:16px;color:var(--text);font-weight:600;margin-bottom:6px;">What should we build in ${esc(projDisplay(ap.name))}?</div><div>${sub}</div>`;
+      ? `${userFiles} file(s)   ${esc(ap.profile_name)}   ${esc(hud)}`
+      : `${esc(ap.profile_name)}   ${esc(hud)}   <code>/</code> for commands`;
+  d.innerHTML = `<div class="empty-title">What should we build in ${esc(projDisplay(ap.name))}?</div><div class="empty-sub">${sub}</div>`;
   return d;
 }
 
@@ -1228,6 +1239,7 @@ async function sendMessage(overrideText, overrideImgs) {
 
   const stream = $("stream");
   if ($("empty-state")) stream.innerHTML = "";
+  document.querySelector(".center").classList.remove("is-empty");
   let wrap = stream.querySelector(".turn-wrap");
   if (!wrap) { wrap = document.createElement("div"); wrap.className = "turn-wrap"; stream.appendChild(wrap); }
 
@@ -1862,6 +1874,17 @@ function renderModalTab() {
     ligRow.innerHTML = `<div><strong>Code Ligatures</strong><div class="muted">Render <code>=&gt;</code>, <code>!=</code>, <code>::</code> ligatures in monospace</div></div><button class="btn btn-sm">${ap.ligatures ? "On" : "Off"}</button>`;
     ligRow.querySelector("button").onclick = () => { applyAppearance({ ligatures: !getAppearance().ligatures }); renderModalTab(); };
     pane.appendChild(ligRow);
+    const synOn = ap.syntaxHighlight !== false;
+    const synRow = document.createElement("div");
+    synRow.className = "setting-row";
+    synRow.innerHTML = `<div><strong>Syntax Highlighting</strong><div class="muted">Colorize keywords, strings, numbers, and comments in code</div></div>
+      <div style="display:flex;gap:4px;" class="rs-tabs">
+        <button class="rs-tab ${synOn ? "active" : ""}" id="btn-syn-on">On</button>
+        <button class="rs-tab ${!synOn ? "active" : ""}" id="btn-syn-off">Off</button>
+      </div>`;
+    pane.appendChild(synRow);
+    $("btn-syn-on").onclick = () => { applyAppearance({ syntaxHighlight: true }); renderModalTab(); };
+    $("btn-syn-off").onclick = () => { applyAppearance({ syntaxHighlight: false }); renderModalTab(); };
 
     const barRow = document.createElement("div");
     barRow.className = "setting-row";

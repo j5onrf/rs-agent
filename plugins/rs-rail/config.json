@@ -1,6 +1,6 @@
 {
-  "show_right_panel": true,
-  "last_project": "flint",
+  "show_right_panel": false,
+  "last_project": "chat",
   "project_names": {
     "chat": "chatbot"
   }
