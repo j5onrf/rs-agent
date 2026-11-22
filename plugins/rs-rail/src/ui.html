@@ -116,6 +116,16 @@
   .proj-del:hover { color: var(--err-text); background: var(--del-bg); }
   .proj-hover { position: fixed; z-index: 60; pointer-events: none; background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; min-width: 210px; max-width: 260px; box-shadow: 0 12px 30px rgba(0,0,0,.5); display: none; flex-direction: column; gap: 5px; font-size: 11.5px; }
   .proj-hover.open { display: flex; }
+  .proj-tags { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 4px; }
+  .proj-tag { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 999px; font-size: 11px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); }
+  .proj-tag button, .lbl-chip button { background: transparent; border: none; padding: 0 1px; cursor: pointer; color: var(--dim); font-size: 10px; line-height: 1; }
+  .proj-tag button:hover, .lbl-chip button:hover { color: var(--text); }
+  .lbl-chip button.arm { color: var(--err-text); background: var(--del-bg); border-radius: 4px; padding: 1px 4px; }
+  .tag-inp { width: 96px; background: var(--bg); border: 1px solid var(--accent); border-radius: 999px; padding: 1px 8px; font-size: 11px; color: var(--text); outline: none; }
+  .lbl-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .lbl-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; font-size: 11.5px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
+  .lbl-name { cursor: pointer; }
+  .lbl-name:hover { color: var(--accent); }
   .ph-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 600; color: var(--text); }
   .ph-kbd { font-size: 10px; color: var(--dim); border: 1px solid var(--border); background: var(--card); border-radius: 4px; padding: 1px 5px; }
   .ph-row { color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
@@ -342,7 +352,7 @@
     <aside class="sidebar-left" id="sidebar-left">
       <div class="sec-head">
         <div class="rs-tabs">
-          <span class="rs-tab active" style="cursor:default;">Projects</span>
+          <button class="rs-tab active" id="btn-projects-nav" title="Manage projects &amp; labels">Projects</button>
           <button class="rs-tab" id="btn-profiles-nav">Profiles</button>
         </div>
         <button class="btn btn-sm btn-icon" id="btn-new-proj" title="New Workspace" aria-label="New Workspace"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="8" y1="3.5" x2="8" y2="12.5"/><line x1="3.5" y1="8" x2="12.5" y2="8"/></svg></button>
@@ -429,6 +439,7 @@
         <div class="nav-group">AGENT</div>
         <button class="nav-btn active" data-tab="providers">Providers & Models</button>
         <button class="nav-btn" data-tab="profiles">Profiles</button>
+        <button class="nav-btn" data-tab="projects">Projects</button>
         <button class="nav-btn" data-tab="skills">Skills</button>
         <button class="nav-btn" data-tab="mcp">MCP / Plugins</button>
         <div class="nav-group">INTERFACE</div>
@@ -814,12 +825,19 @@ function renderAll() {
     fill.style.background = "var(--accent)";
   }
 
-  // Projects list
+  // Projects list (filtered by visibility)
+  const hiddenSet = new Set(STATE.ui_prefs?.hidden_projects || []);
+  const shownProjects = STATE.projects.filter((p) => !hiddenSet.has(p.name));
+
   const plist = $("proj-list");
   plist.innerHTML = "";
   const hc = $("proj-hover");
   const useBots = getAppearance().microBots !== false;
-  STATE.projects.forEach((p, idx) => {
+  if (!shownProjects.length) {
+    plist.innerHTML = `<div class="muted" style="padding:10px 8px;display:flex;flex-direction:column;gap:6px;"><span>No visible projects.</span><button class="btn btn-sm" id="btn-empty-proj-mgr">Manage Projects</button></div>`;
+    $("btn-empty-proj-mgr").onclick = () => openSettings("projects");
+  }
+  shownProjects.forEach((p, idx) => {
     const el = document.createElement("div");
     el.className = "proj-item" + (p.name === ap.name ? " active" : "");
     const badgeInner = useBots
@@ -856,10 +874,10 @@ function renderAll() {
   const standardReasons = [
     ["", "Default reasoning"],
     ["0", "Off (0)"],
-    ["250", "t250"],
-    ["350", "t350"],
-    ["500", "t500"],
-    ["1000", "t1000"],
+    ["250", "250t"],
+    ["350", "350t"],
+    ["500", "500t"],
+    ["1000", "1000t"],
     ["low", "low"],
     ["medium", "medium"],
     ["high", "high"],
@@ -868,10 +886,10 @@ function renderAll() {
   const curR = ap.reasoning || "";
   const rList = [...standardReasons];
   if (curR && !rList.some(([v]) => v === curR)) {
-    rList.splice(2, 0, [curR, /^\d+$/.test(curR) ? `t${curR}` : curR]);
+    rList.splice(2, 0, [curR, /^\d+$/.test(curR) ? `${curR}t` : curR]);
   }
   const activePair = rList.find(([v]) => v === curR);
-  $("reasoning-val").textContent = activePair ? (/^\d+$/.test(activePair[0]) ? `t${activePair[0]}` : (activePair[0] === "0" ? "Off" : (activePair[0] === "" ? "Default" : activePair[1]))) : (curR ? `t${curR}` : "Default");
+  $("reasoning-val").textContent = activePair ? (/^\d+$/.test(activePair[0]) ? `${activePair[0]}t` : (activePair[0] === "0" ? "Off" : (activePair[0] === "" ? "Default" : activePair[1]))) : (curR ? `${curR}t` : "Default");
 
   const popR = $("pop-reasoning");
   popR.innerHTML = "";
@@ -1351,6 +1369,157 @@ function renderModalTab() {
     pane.appendChild(gov);
     $("gov-tok").onchange = async (e) => { await api("/api/settings/provider", { max_tokens: +e.target.value }); await loadState(); };
     $("gov-rnd").onchange = async (e) => { await api("/api/settings/provider", { max_rounds: +e.target.value }); await loadState(); };
+  } else if (ACTIVE_TAB === "projects") {
+    const hiddenSet = new Set(STATE.ui_prefs?.hidden_projects || []);
+    const labelsMap = STATE.ui_prefs?.project_labels || {};
+    const allLabels = Array.from(new Set(Object.values(labelsMap).flat())).sort();
+    const shownCount = STATE.projects.filter((p) => !hiddenSet.has(p.name)).length;
+
+    const saveProjPrefs = async (nextHidden, nextLabels) => {
+      const hiddenArr = Array.from(nextHidden);
+      const res = await api("/api/settings/ui", { hidden_projects: hiddenArr, project_labels: nextLabels });
+      STATE.ui_prefs.hidden_projects = res.hidden_projects || hiddenArr;
+      STATE.ui_prefs.project_labels = res.project_labels || nextLabels;
+      const curHidden = new Set(STATE.ui_prefs.hidden_projects);
+      if (curHidden.has(STATE.active_project.name)) {
+        const next = STATE.projects.find((p) => p.name === "chat" && !curHidden.has("chat"))
+          || STATE.projects.find((p) => !curHidden.has(p.name));
+        if (next) { await loadState(next.name); return; }
+      }
+      renderAll();
+    };
+
+    const head = document.createElement("div");
+    head.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;";
+    head.innerHTML = `<div><div style="font-weight:600">Projects (${shownCount}/${STATE.projects.length} shown)</div><div class="muted">Filter sidebar with labels or toggle workspace visibility.</div></div>
+      <div style="display:flex;gap:6px;">
+        <button class="btn btn-sm" id="btn-proj-auto" title="Categorize unconfigured projects from profile frontmatter">Auto-Label</button>
+        <button class="btn btn-sm" id="btn-proj-show-all">Show All</button>
+        <button class="btn btn-sm" id="btn-proj-hide-all" title="Hide all except chat">Hide All</button>
+      </div>`;
+    pane.appendChild(head);
+
+    $("btn-proj-auto").onclick = async () => {
+      const res = await api("/api/settings/ui", { auto_label: true });
+      STATE.ui_prefs.project_labels = res.project_labels || {};
+      renderAll();
+    };
+    $("btn-proj-show-all").onclick = () => saveProjPrefs(new Set(), labelsMap);
+    $("btn-proj-hide-all").onclick = () => saveProjPrefs(new Set(STATE.projects.map((p) => p.name).filter((n) => n !== "chat")), labelsMap);
+
+    const dl = document.createElement("datalist");
+    dl.id = "proj-labels-dl";
+    dl.innerHTML = allLabels.map((l) => `<option value="${esc(l)}"></option>`).join("");
+    pane.appendChild(dl);
+
+    if (allLabels.length) {
+      const lbar = document.createElement("div");
+      lbar.className = "lbl-bar";
+      for (const lbl of allLabels) {
+        const chip = document.createElement("span");
+        chip.className = "lbl-chip";
+        chip.innerHTML = `<span class="lbl-name" title="Show only '${esc(lbl)}' in sidebar">${esc(lbl)}</span><button class="lbl-ren" title="Rename label">✎</button><button class="lbl-del" title="Remove label from all projects">×</button>`;
+        chip.querySelector(".lbl-name").onclick = async () => {
+          const onlyOther = STATE.projects.filter((p) => (p.name === "chat" ? hiddenSet.has("chat") : !(labelsMap[p.name] || []).includes(lbl))).map((p) => p.name);
+          await saveProjPrefs(new Set(onlyOther), labelsMap);
+        };
+        chip.querySelector(".lbl-ren").onclick = () => {
+          const inp = document.createElement("input");
+          inp.className = "tag-inp";
+          inp.value = lbl;
+          chip.replaceWith(inp);
+          inp.focus();
+          inp.select();
+          const commit = async () => {
+            const nextName = inp.value.trim();
+            if (!nextName || nextName === lbl) { renderModalTab(); return; }
+            const nextMap = structuredClone(labelsMap);
+            for (const k of Object.keys(nextMap)) {
+              nextMap[k] = Array.from(new Set((nextMap[k] || []).map((x) => x === lbl ? nextName : x)));
+            }
+            await saveProjPrefs(hiddenSet, nextMap);
+          };
+          inp.onkeydown = (e) => { if (e.key === "Enter") commit(); else if (e.key === "Escape") renderModalTab(); };
+          inp.onblur = commit;
+        };
+        const ldel = chip.querySelector(".lbl-del");
+        ldel.onclick = async () => {
+          if (!ldel.classList.contains("arm")) {
+            ldel.classList.add("arm");
+            ldel.textContent = "del?";
+            setTimeout(() => { ldel.classList.remove("arm"); ldel.textContent = "×"; }, 2200);
+            return;
+          }
+          const nextMap = structuredClone(labelsMap);
+          for (const k of Object.keys(nextMap)) {
+            nextMap[k] = (nextMap[k] || []).filter((x) => x !== lbl);
+            if (!nextMap[k].length) delete nextMap[k];
+          }
+          await saveProjPrefs(hiddenSet, nextMap);
+        };
+        lbar.appendChild(chip);
+      }
+      pane.appendChild(lbar);
+    }
+
+    for (const p of STATE.projects) {
+      const isVis = !hiddenSet.has(p.name);
+      const pLabels = labelsMap[p.name] || [];
+      const row = document.createElement("div");
+      row.className = "setting-row";
+      row.innerHTML = `<div style="min-width:0;flex:1;">
+        <div><strong>${esc(p.name)}</strong> <span class="muted">${esc(p.profile_name)} · ${p.file_count} file(s)</span></div>
+        <div class="proj-tags"></div>
+      </div>
+      <button class="switch ${isVis ? "on" : ""}" title="${isVis ? "Hide from sidebar" : "Show in sidebar"}"></button>`;
+
+      const tagsBox = row.querySelector(".proj-tags");
+      for (const l of pLabels) {
+        const tag = document.createElement("span");
+        tag.className = "proj-tag";
+        tag.innerHTML = `<span>${esc(l)}</span><button title="Remove label">×</button>`;
+        tag.querySelector("button").onclick = async () => {
+          const nextMap = structuredClone(labelsMap);
+          nextMap[p.name] = pLabels.filter((x) => x !== l);
+          if (!nextMap[p.name].length) delete nextMap[p.name];
+          await saveProjPrefs(hiddenSet, nextMap);
+        };
+        tagsBox.appendChild(tag);
+      }
+
+      const addBtn = document.createElement("button");
+      addBtn.className = "btn btn-sm";
+      addBtn.style.cssText = "padding:1px 7px;border-radius:999px;font-size:10.5px;";
+      addBtn.textContent = "+ tag";
+      addBtn.onclick = () => {
+        const inp = document.createElement("input");
+        inp.className = "tag-inp";
+        inp.placeholder = "label...";
+        inp.setAttribute("list", "proj-labels-dl");
+        addBtn.replaceWith(inp);
+        inp.focus();
+        let done = false;
+        const commit = async () => {
+          if (done) return;
+          done = true;
+          const v = inp.value.trim();
+          if (!v || pLabels.includes(v)) { renderModalTab(); return; }
+          const nextMap = structuredClone(labelsMap);
+          nextMap[p.name] = [...pLabels, v].slice(0, 8);
+          await saveProjPrefs(hiddenSet, nextMap);
+        };
+        inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { done = true; renderModalTab(); } };
+        inp.onblur = commit;
+      };
+      tagsBox.appendChild(addBtn);
+
+      row.querySelector(".switch").onclick = async () => {
+        const nextHidden = new Set(hiddenSet);
+        if (isVis) nextHidden.add(p.name); else nextHidden.delete(p.name);
+        await saveProjPrefs(nextHidden, labelsMap);
+      };
+      pane.appendChild(row);
+    }
   } else if (ACTIVE_TAB === "profiles") {
     const locked = !STATE.active_project.is_agent;
     pane.innerHTML = `<div style="font-weight:600">Workspace Profile</div><div class="muted">${locked ? "Chat mode is locked to the <code>chat</code> profile. Switch to an agent project to change profiles." : "Select which profile in <code>profiles/*.md</code> drives the active project."}</div>`;
@@ -1751,7 +1920,11 @@ document.addEventListener("keydown", (e) => {
   }
   if ((e.ctrlKey || e.metaKey) && e.key === ",") { e.preventDefault(); openSettings(); }
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") { e.preventDefault(); toggleLeft(); }
-  if ((e.ctrlKey || e.metaKey) && /^[1-9]$/.test(e.key) && STATE?.projects?.[+e.key - 1]) { e.preventDefault(); loadState(STATE.projects[+e.key - 1].name); }
+  if ((e.ctrlKey || e.metaKey) && /^[1-9]$/.test(e.key) && STATE?.projects) {
+    const hs = new Set(STATE.ui_prefs?.hidden_projects || []);
+    const vis = STATE.projects.filter((p) => !hs.has(p.name));
+    if (vis[+e.key - 1]) { e.preventDefault(); loadState(vis[+e.key - 1].name); }
+  }
 });
 
 $("btn-img").onclick = () => $("img-file").click();
@@ -1836,6 +2009,7 @@ $("btn-export-md").onclick = async () => {
 };
 $("btn-settings").onclick = () => openSettings();
 $("btn-brand-settings").onclick = () => openSettings();
+$("btn-projects-nav").onclick = () => openSettings("projects");
 $("btn-profiles-nav").onclick = () => openSettings("profiles");
 $("btn-close-app").onclick = async () => {
   try { await api("/api/shutdown", {}); } catch {}

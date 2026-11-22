@@ -1,4 +1,42 @@
 {
   "show_right_panel": true,
-  "last_project": "inkling2"
+  "last_project": "inkling2",
+  "hidden_projects": [
+    "chat",
+    "gem35",
+    "nemo",
+    "tokenlab"
+  ],
+  "project_labels": {
+    "tokenlab": [
+      "cloud"
+    ],
+    "flint": [
+      "local"
+    ],
+    "qwen38": [
+      "local"
+    ],
+    "sage": [
+      "local"
+    ],
+    "gem35": [
+      "cloud"
+    ],
+    "ling-tiny": [
+      "local"
+    ],
+    "lfm3": [
+      "local"
+    ],
+    "groot": [
+      "local"
+    ],
+    "nemo": [
+      "cloud"
+    ],
+    "inkling2": [
+      "local"
+    ]
+  }
 }

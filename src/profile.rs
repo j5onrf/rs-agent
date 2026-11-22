@@ -238,7 +238,7 @@ impl Profile {
         }
         if let Some(ref rb) = self.reasoning_budget {
             let v = match rb {
-                ReasoningSetting::Tokens(n) => format!("t{}", n),
+                ReasoningSetting::Tokens(n) => format!("{}t", n),
                 ReasoningSetting::Tier(t) => t.clone(),
             };
             parts.push(v);
@@ -1161,7 +1161,7 @@ mod tests {
     #[test]
     fn test_hud_summary_formats_frontmatter() {
         let ling = Profile::parse("---\nadapters: true\nreasoning_budget: 350\n---\nhi");
-        assert_eq!(ling.hud_summary(true), "t350 · adp");
+        assert_eq!(ling.hud_summary(true), "350t · adp");
 
         let gem = Profile::parse("---\ncore4: true\nreasoning_budget: xhigh\nmemory: true\ndelegate: true\nmcp: photocraft\n---\nhi");
         assert_eq!(gem.hud_summary(true), "core4 · xhigh · mem · del · mcp:photocraft");

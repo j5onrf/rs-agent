@@ -37,11 +37,20 @@ struct RailConfig {
     show_right_panel: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     last_project: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    hidden_projects: Vec<String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    project_labels: HashMap<String, Vec<String>>,
 }
 
 impl Default for RailConfig {
     fn default() -> Self {
-        Self { show_right_panel: true, last_project: None }
+        Self {
+            show_right_panel: true,
+            last_project: None,
+            hidden_projects: Vec::new(),
+            project_labels: HashMap::new(),
+        }
     }
 }
 
@@ -56,6 +65,157 @@ impl RailConfig {
     fn save(&self, path: &Path) -> Result<()> {
         atomic_write(path, &serde_json::to_string_pretty(self)?)
     }
+}
+
+fn sanitize_label(raw: &str) -> Option<String> {
+    let s = raw.trim();
+    if s.is_empty() || s.len() > 24 || s.chars().any(|c| c.is_control()) {
+        return None;
+    }
+    Some(s.to_string())
+}
+
+fn sanitize_hidden_projects(raw: &[Value]) -> Vec<String> {
+    let mut out: Vec<String> = raw
+        .iter()
+        .filter_map(|v| v.as_str())
+        .filter(|s| is_valid_slug(s))
+        .map(ToString::to_string)
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
+fn sanitize_project_labels(obj: &serde_json::Map<String, Value>) -> HashMap<String, Vec<String>> {
+    let mut out = HashMap::new();
+    for (proj, val) in obj {
+        if !is_valid_slug(proj) {
+            continue;
+        }
+        let mut labels = Vec::new();
+        if let Some(arr) = val.as_array() {
+            for item in arr {
+                if let Some(clean) = item.as_str().and_then(sanitize_label) {
+                    if !labels.contains(&clean) && labels.len() < 8 {
+                        labels.push(clean);
+                    }
+                }
+            }
+        }
+        out.insert(proj.clone(), labels);
+    }
+    out
+}
+
+fn find_profile_text_in(profiles_dir: &Path, profile_name: &str) -> Option<String> {
+    let direct = profiles_dir.join(format!("{profile_name}.md"));
+    if direct.is_file() {
+        return fs::read_to_string(&direct).ok();
+    }
+    let stem = profile_name.split('/').next_back().unwrap_or(profile_name);
+    let stem_norm = stem.replace(['-', '_'], "").to_ascii_lowercase();
+    if let Ok(rd) = fs::read_dir(profiles_dir) {
+        for ent in rd.flatten() {
+            let p = ent.path();
+            if p.is_dir() && !ent.file_name().to_string_lossy().starts_with('.') {
+                let sub = p.join(format!("{stem}.md"));
+                if sub.is_file() {
+                    return fs::read_to_string(&sub).ok();
+                }
+            } else if p.extension().and_then(|e| e.to_str()) == Some("md") {
+                if let Some(s) = p.file_stem().and_then(|x| x.to_str()) {
+                    if s.replace(['-', '_'], "").to_ascii_lowercase() == stem_norm {
+                        return fs::read_to_string(&p).ok();
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn derive_auto_labels_in(root: &Path, project: &str, prof_name: &str) -> Vec<String> {
+    if project == "chat" {
+        return Vec::new();
+    }
+    let Some(raw) = find_profile_text_in(&root.join("profiles"), prof_name) else {
+        return Vec::new();
+    };
+    let mut in_fm = false;
+    for line in raw.lines() {
+        let t = line.trim();
+        if t == "---" {
+            if !in_fm {
+                in_fm = true;
+                continue;
+            }
+            break;
+        }
+        if in_fm {
+            if let Some((k, v)) = t.split_once(':') {
+                if matches!(k.trim(), "label" | "labels") {
+                    let clean = strip_inline_comment(v.trim()).trim_matches(['[', ']']);
+                    let mut list = Vec::new();
+                    for item in clean.split(',') {
+                        if let Some(lbl) = sanitize_label(item.trim_matches(['"', '\'', ' '])) {
+                            if !list.contains(&lbl) && list.len() < 8 {
+                                list.push(lbl);
+                            }
+                        }
+                    }
+                    if !list.is_empty() {
+                        return list;
+                    }
+                }
+            }
+        }
+    }
+    let prof = Profile::parse(&raw);
+    if !prof.mcp_servers.is_empty() {
+        vec!["mcp".into()]
+    } else {
+        match prof.tier {
+            ToolTier::PureBash => vec!["purebash".into()],
+            ToolTier::Core4 => vec!["cloud".into()],
+            ToolTier::Smol => vec!["local".into()],
+        }
+    }
+}
+
+fn apply_auto_labels(root: &Path, cfg: &mut RailConfig) -> usize {
+    let mut added = 0;
+    let Ok(rd) = fs::read_dir(root.join("projects")) else {
+        return 0;
+    };
+    for ent in rd.flatten() {
+        let p = ent.path();
+        if !p.is_dir() {
+            continue;
+        }
+        let Some(name) = p.file_name().and_then(|n| n.to_str()).map(ToString::to_string) else {
+            continue;
+        };
+        if name.starts_with('.') || name == "chat" {
+            continue;
+        }
+        let allow_refresh = cfg
+            .project_labels
+            .get(&name)
+            .map(|cur| !cur.is_empty() && cur.iter().all(|l| matches!(l.as_str(), "mcp" | "purebash" | "cloud" | "local")))
+            .unwrap_or(true);
+        if !allow_refresh {
+            continue;
+        }
+        let ws_cfg = WorkspaceConfig::load_or_default(&p);
+        let prof_name = if ws_cfg.profile_name == "chat" { name.as_str() } else { ws_cfg.profile_name.as_str() };
+        let labels = derive_auto_labels_in(root, &name, prof_name);
+        if !labels.is_empty() && cfg.project_labels.get(&name) != Some(&labels) {
+            cfg.project_labels.insert(name, labels);
+            added += 1;
+        }
+    }
+    added
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -150,9 +310,10 @@ impl AppRuntime {
     }
 
     fn new_in(root: PathBuf) -> Self {
-        let initial = RailConfig::load(&root.join("plugins/rs-rail/config.json"))
+        let rcfg = RailConfig::load(&root.join("plugins/rs-rail/config.json"));
+        let initial = rcfg
             .last_project
-            .filter(|p| is_valid_slug(p) && root.join("projects").join(p).is_dir())
+            .filter(|p| is_valid_slug(p) && !rcfg.hidden_projects.contains(p) && root.join("projects").join(p).is_dir())
             .unwrap_or_else(|| "chat".into());
         let http = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(12))
@@ -1704,7 +1865,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "ui_prefs": {
                     "pad": state::get_pad(),
                     "show_thinking": state::get_show_thinking_summaries(),
-                    "show_right_panel": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).show_right_panel
+                    "show_right_panel": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).show_right_panel,
+                    "hidden_projects": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).hidden_projects,
+                    "project_labels": RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).project_labels
                 }
             }),
         )
@@ -1946,13 +2109,34 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         if let Some(show) = payload.get("show_thinking").and_then(|v| v.as_bool()) {
             state::set_show_thinking_summaries(Some(show));
         }
+        let cfg_path = app.root.join("plugins/rs-rail/config.json");
+        let mut cfg = RailConfig::load(&cfg_path);
+        let mut dirty_cfg = false;
         if let Some(show_rp) = payload.get("show_right_panel").and_then(|v| v.as_bool()) {
-            let cfg_path = app.root.join("plugins/rs-rail/config.json");
-            let mut cfg = RailConfig::load(&cfg_path);
             cfg.show_right_panel = show_rp;
+            dirty_cfg = true;
+        }
+        if let Some(arr) = payload.get("hidden_projects").and_then(|v| v.as_array()) {
+            cfg.hidden_projects = sanitize_hidden_projects(arr);
+            dirty_cfg = true;
+        }
+        if let Some(obj) = payload.get("project_labels").and_then(|v| v.as_object()) {
+            cfg.project_labels = sanitize_project_labels(obj);
+            dirty_cfg = true;
+        }
+        if payload.get("auto_label").and_then(|v| v.as_bool()) == Some(true) {
+            apply_auto_labels(&app.root, &mut cfg);
+            dirty_cfg = true;
+        }
+        if dirty_cfg {
             cfg.save(&cfg_path)?;
         }
-        return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
+        return write_http_json(
+            &mut stream,
+            200,
+            &json!({ "ok": true, "hidden_projects": cfg.hidden_projects, "project_labels": cfg.project_labels }),
+        )
+        .await;
     }
 
     if method == "POST" && path == "/api/settings/mcp" {
@@ -2565,7 +2749,7 @@ mod tests {
 
         let rcfg_path = tmp.join("rail_cfg.json");
         assert!(RailConfig::load(&rcfg_path).show_right_panel);
-        RailConfig { show_right_panel: false, last_project: Some("ling-tiny".into()) }.save(&rcfg_path).unwrap();
+        RailConfig { show_right_panel: false, last_project: Some("ling-tiny".into()), ..Default::default() }.save(&rcfg_path).unwrap();
         let loaded_rcfg = RailConfig::load(&rcfg_path);
         assert!(!loaded_rcfg.show_right_panel);
         assert_eq!(loaded_rcfg.last_project.as_deref(), Some("ling-tiny"));
@@ -2754,6 +2938,44 @@ mod tests {
         let (lbl, dirty) = git_status_brief(&tmp.join("projects/nogit"));
         assert_eq!(lbl, "");
         assert!(!dirty);
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_auto_labels_and_rail_config_persist_respects_manual_overrides() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_labels_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("profiles/artcraft")).unwrap();
+        fs::create_dir_all(tmp.join("projects/photocraft")).unwrap();
+        fs::create_dir_all(tmp.join("projects/nemo")).unwrap();
+        fs::create_dir_all(tmp.join("projects/custom")).unwrap();
+        fs::create_dir_all(tmp.join("projects/chat")).unwrap();
+
+        fs::write(tmp.join("profiles/artcraft/photocraft.md"), "---\nmcp: photocraft\n---\nhi").unwrap();
+        fs::write(tmp.join("profiles/nemo.md"), "---\ncore4: true\n---\nhi").unwrap();
+        fs::write(tmp.join("profiles/custom.md"), "---\nlabels: [\"mcp-work\", \"rust\"]\n---\nhi").unwrap();
+
+        WorkspaceConfig { profile_name: "artcraft/photocraft".into(), is_agent: true, tier: ToolTier::Smol, adapters: true, delegate: false }
+            .save(tmp.join("projects/photocraft")).unwrap();
+        WorkspaceConfig { profile_name: "nemo".into(), is_agent: true, tier: ToolTier::Core4, adapters: false, delegate: false }
+            .save(tmp.join("projects/nemo")).unwrap();
+
+        let mut cfg = RailConfig::default();
+        cfg.project_labels.insert("nemo".into(), vec!["my-cloud".into()]); // manual override must stick
+        cfg.project_labels.insert("photocraft".into(), vec!["local".into()]); // stale auto-tag refreshes on profile change
+        let added = apply_auto_labels(&tmp, &mut cfg);
+        assert_eq!(added, 2);
+        assert_eq!(cfg.project_labels.get("photocraft").unwrap(), &vec!["mcp".to_string()]);
+        assert_eq!(cfg.project_labels.get("custom").unwrap(), &vec!["mcp-work".to_string(), "rust".to_string()]);
+        assert_eq!(cfg.project_labels.get("nemo").unwrap(), &vec!["my-cloud".to_string()]);
+        assert!(!cfg.project_labels.contains_key("chat"));
+
+        cfg.hidden_projects = vec!["custom".into()];
+        let cfg_p = tmp.join("config.json");
+        cfg.save(&cfg_p).unwrap();
+        let reloaded = RailConfig::load(&cfg_p);
+        assert_eq!(reloaded.hidden_projects, vec!["custom".to_string()]);
+        assert_eq!(reloaded.project_labels.get("photocraft").unwrap(), &vec!["mcp".to_string()]);
         let _ = fs::remove_dir_all(&tmp);
     }
 }
