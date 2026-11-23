@@ -35,6 +35,8 @@ fn default_true() -> bool {
 struct RailConfig {
     #[serde(default = "default_true")]
     show_right_panel: bool,
+    #[serde(default = "default_true")]
+    bot_mode: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     last_project: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -45,17 +47,24 @@ struct RailConfig {
     project_names: HashMap<String, String>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     project_bots: HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    project_providers: HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    project_collabs: HashMap<String, Vec<String>>,
 }
 
 impl Default for RailConfig {
     fn default() -> Self {
         Self {
             show_right_panel: true,
+            bot_mode: true,
             last_project: None,
             hidden_projects: Vec::new(),
             project_labels: HashMap::new(),
             project_names: HashMap::new(),
             project_bots: HashMap::new(),
+            project_providers: HashMap::new(),
+            project_collabs: HashMap::new(),
         }
     }
 }
@@ -190,6 +199,89 @@ fn sanitize_project_bots(
         }
     }
     Ok(out)
+}
+
+fn is_valid_provider_slot(slot: &str) -> bool {
+    matches!(slot, "DEFAULT" | "LOCAL" | "CUSTOM")
+        || DIRECT_PROVIDERS.iter().any(|&(pfx, _, _, _)| pfx == slot)
+        || slot.strip_prefix("CUSTOM").and_then(|n| n.parse::<u8>().ok()).is_some_and(|n| (1..=9).contains(&n))
+}
+
+fn effective_project_provider(
+    root: &Path,
+    cfg: &RailConfig,
+    project: &str,
+    prof_name: &str,
+) -> Option<String> {
+    match cfg.project_providers.get(project).map(String::as_str) {
+        Some("DEFAULT") => None,
+        Some(s) if !s.is_empty() => Some(s.to_string()),
+        _ => find_profile_text_in(&root.join("profiles"), prof_name)
+            .as_deref()
+            .and_then(parse_profile_provider_raw),
+    }
+}
+
+fn sanitize_project_providers(
+    obj: &serde_json::Map<String, Value>,
+    root: &Path,
+) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    for (proj, val) in obj {
+        if !is_valid_slug(proj) {
+            continue;
+        }
+        let raw = val.as_str().unwrap_or("").trim().to_ascii_uppercase();
+        if raw.is_empty() || raw == "DEFAULT" {
+            let proj_dir = root.join("projects").join(proj);
+            let prof = WorkspaceConfig::load_or_default(&proj_dir).profile_name;
+            let has_fm = find_profile_text_in(&root.join("profiles"), &prof)
+                .as_deref()
+                .and_then(parse_profile_provider_raw)
+                .is_some();
+            if has_fm {
+                out.insert(proj.clone(), "DEFAULT".into());
+            }
+        } else if is_valid_provider_slot(&raw) {
+            out.insert(proj.clone(), raw);
+        }
+    }
+    out
+}
+
+fn sanitize_project_collabs(
+    obj: &serde_json::Map<String, Value>,
+    root: &Path,
+) -> HashMap<String, Vec<String>> {
+    let mut out = HashMap::new();
+    let projects_dir = root.join("projects");
+    for (proj, val) in obj {
+        if !is_valid_slug(proj) {
+            continue;
+        }
+        let mut list = Vec::new();
+        if let Some(arr) = val.as_array() {
+            for item in arr {
+                if let Some(s) = item.as_str().map(str::trim) {
+                    if is_valid_slug(s) && s != proj && projects_dir.join(s).is_dir() && !list.contains(&s.to_string()) && list.len() < 8 {
+                        list.push(s.to_string());
+                    }
+                }
+            }
+        }
+        if !list.is_empty() {
+            out.insert(proj.clone(), list);
+        } else {
+            let proj_dir = projects_dir.join(proj);
+            let prof = WorkspaceConfig::load_or_default(&proj_dir).profile_name;
+            let has_fm = find_profile_text_in(&root.join("profiles"), &prof)
+                .is_some_and(|r| !parse_profile_collab_raw(&r, proj).0.is_empty());
+            if has_fm {
+                out.insert(proj.clone(), Vec::new());
+            }
+        }
+    }
+    out
 }
 
 fn find_profile_text_in(profiles_dir: &Path, profile_name: &str) -> Option<String> {
@@ -1561,13 +1653,9 @@ fn clean_project_dir(proj_dir: &Path) -> Result<usize> {
     Ok(removed)
 }
 
-fn export_session_markdown(sess: &SessionState) -> Result<String> {
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let filename = format!("chat_{ts}.md");
-    let file_path = sess.workspace.join(".rs/transcripts").join(&filename);
+fn export_session_markdown(sess: &SessionState) -> Result<(String, String)> {
+    let filename = "chat.md";
+    let file_path = sess.workspace.join(".rs/transcripts").join(filename);
     let mut md = format!("# rs-rail Transcript — {}\n\n", sess.project_name);
     for item in &sess.ui_history {
         match item.role.as_str() {
@@ -1598,7 +1686,7 @@ fn export_session_markdown(sess: &SessionState) -> Result<String> {
         }
     }
     atomic_write(&file_path, &md)?;
-    Ok(format!(".rs/transcripts/{filename}"))
+    Ok((format!(".rs/transcripts/{filename}"), md))
 }
 
 fn ui_items_from_messages(msgs: &[ChatMessage]) -> Vec<UiTurnItem> {
@@ -1809,13 +1897,15 @@ fn parse_profile_provider_raw(raw: &str) -> Option<String> {
 }
 
 fn resolve_collaborators(root: &Path, active_project: &str, prof_name: &str) -> (Vec<String>, String) {
-    let Some(raw) = find_profile_text_in(&root.join("profiles"), prof_name) else {
-        return (Vec::new(), "last_turn".into());
-    };
-    let (raw_collabs, mode) = parse_profile_collab_raw(&raw, active_project);
-    let collabs = raw_collabs
+    let cfg = RailConfig::load(&root.join("plugins/rs-rail/config.json"));
+    let (fm_collabs, mode) = find_profile_text_in(&root.join("profiles"), prof_name)
+        .as_deref()
+        .map(|r| parse_profile_collab_raw(r, active_project))
+        .unwrap_or_else(|| (Vec::new(), "last_turn".into()));
+    let source = cfg.project_collabs.get(active_project).cloned().unwrap_or(fm_collabs);
+    let collabs = source
         .into_iter()
-        .filter(|s| root.join("projects").join(s).is_dir())
+        .filter(|s| s != active_project && root.join("projects").join(s).is_dir())
         .collect();
     (collabs, mode)
 }
@@ -2130,8 +2220,9 @@ async fn run_peer_call(
             }
         }
     }
+    let rail_cfg = RailConfig::load(&root.join("plugins/rs-rail/config.json"));
     let target_raw = find_profile_text_in(&root.join("profiles"), &target_cfg.profile_name);
-    let target_provider_slot = target_raw.as_deref().and_then(parse_profile_provider_raw);
+    let target_provider_slot = effective_project_provider(root, &rail_cfg, target_project, &target_cfg.profile_name);
     let target_prof = target_raw
         .as_deref()
         .map(Profile::parse)
@@ -2483,6 +2574,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         }
 
         let active_name = app.active_project.lock().await.clone();
+        let rail_cfg = RailConfig::load(&app.root.join("plugins/rs-rail/config.json"));
         let mut proj_entries = Vec::new();
         let mut active_files = Vec::new();
         if let Ok(rd) = fs::read_dir(app.root.join("projects")) {
@@ -2510,10 +2602,12 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 if name == active_name {
                     active_files = files;
                 }
+                let peer_prov = effective_project_provider(&app.root, &rail_cfg, &name, &prof).unwrap_or_default();
                 proj_entries.push(json!({
                     "name": name,
                     "profile_name": prof,
                     "hud_summary": hud,
+                    "peer_provider": peer_prov,
                     "has_git": has_git,
                     "dirty": dirty,
                     "file_count": file_count
@@ -2545,6 +2639,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "files": active_files,
                 "reasoning": r_str,
                 "profile_reasoning": pr_str,
+                "collaborators": if rail_cfg.bot_mode { resolve_collaborators(&app.root, &sess.project_name, &sess.profile_name).0 } else { Vec::new() },
                 "active_skills": sess.active_skills,
                 "history": sess.ui_history,
                 "last_stats": sess.last_stats
@@ -2560,7 +2655,6 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             .collect();
         mcp_list.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
         let max_rounds = match get_max_rounds() { usize::MAX => 0, r => r };
-        let rail_cfg = RailConfig::load(&app.root.join("plugins/rs-rail/config.json"));
 
         return write_http_json(
             &mut stream,
@@ -2585,10 +2679,13 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     "pad": state::get_pad(),
                     "show_thinking": state::get_show_thinking_summaries(),
                     "show_right_panel": rail_cfg.show_right_panel,
+                    "bot_mode": rail_cfg.bot_mode,
                     "hidden_projects": rail_cfg.hidden_projects,
                     "project_labels": rail_cfg.project_labels,
                     "project_names": rail_cfg.project_names,
-                    "project_bots": rail_cfg.project_bots
+                    "project_bots": rail_cfg.project_bots,
+                    "project_providers": rail_cfg.project_providers,
+                    "project_collabs": rail_cfg.project_collabs
                 }
             }),
         )
@@ -2667,8 +2764,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         let Some(sess) = lock.get(&active) else {
             return write_http_err(&mut stream, 404, "Session not found").await;
         };
-        let rel = export_session_markdown(sess)?;
-        return write_http_json(&mut stream, 200, &json!({ "ok": true, "path": rel })).await;
+        let (rel, content) = export_session_markdown(sess)?;
+        return write_http_json(&mut stream, 200, &json!({ "ok": true, "path": rel, "content": content })).await;
     }
 
     if method == "POST" && path == "/api/memory" {
@@ -2838,6 +2935,10 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             cfg.show_right_panel = show_rp;
             dirty_cfg = true;
         }
+        if let Some(bm) = payload.get("bot_mode").and_then(|v| v.as_bool()) {
+            cfg.bot_mode = bm;
+            dirty_cfg = true;
+        }
         if let Some(arr) = payload.get("hidden_projects").and_then(|v| v.as_array()) {
             cfg.hidden_projects = sanitize_hidden_projects(arr);
             dirty_cfg = true;
@@ -2859,6 +2960,14 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 Err(msg) => return write_http_err(&mut stream, 409, &msg).await,
             }
         }
+        if let Some(obj) = payload.get("project_providers").and_then(|v| v.as_object()) {
+            cfg.project_providers = sanitize_project_providers(obj, &app.root);
+            dirty_cfg = true;
+        }
+        if let Some(obj) = payload.get("project_collabs").and_then(|v| v.as_object()) {
+            cfg.project_collabs = sanitize_project_collabs(obj, &app.root);
+            dirty_cfg = true;
+        }
         if payload.get("auto_label").and_then(|v| v.as_bool()) == Some(true) {
             apply_auto_labels(&app.root, &mut cfg);
             dirty_cfg = true;
@@ -2874,7 +2983,10 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "hidden_projects": cfg.hidden_projects,
                 "project_labels": cfg.project_labels,
                 "project_names": cfg.project_names,
-                "project_bots": cfg.project_bots
+                "project_bots": cfg.project_bots,
+                "project_providers": cfg.project_providers,
+                "project_collabs": cfg.project_collabs,
+                "bot_mode": cfg.bot_mode
             }),
         )
         .await;
@@ -2916,6 +3028,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         let prompt = payload.get("prompt").and_then(|v| v.as_str()).unwrap_or("").trim();
         if prompt.is_empty() {
             return write_http_err(&mut stream, 400, "Empty prompt").await;
+        }
+        if !RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).bot_mode {
+            return write_http_err(&mut stream, 403, "Bot mode is disabled").await;
         }
         let active = app.active_project.lock().await.clone();
         if let Err((status, msg)) = validate_peer_target(&app.root, &active, target) {
@@ -3108,7 +3223,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             history.push(build_user_chat_message(&effective_prompt, &images));
             let client = LlmClient::new(provider);
             let boundary = SecurityBoundary::new_headless(&workspace);
-            let (collabs, collab_mode) = if is_agent {
+            let bot_mode = RailConfig::load(&app_clone.root.join("plugins/rs-rail/config.json")).bot_mode;
+            let (collabs, collab_mode) = if is_agent && bot_mode {
                 resolve_collaborators(&app_clone.root, &active, &profile_name)
             } else {
                 (Vec::new(), "last_turn".to_string())
@@ -3693,8 +3809,9 @@ mod tests {
             cancel_flag: Arc::new(AtomicBool::new(false)),
             generation: 0,
         };
-        let rel = export_session_markdown(&sess).unwrap();
-        assert!(rel.starts_with(".rs/transcripts/chat_"));
+        let (rel, md) = export_session_markdown(&sess).unwrap();
+        assert_eq!(rel, ".rs/transcripts/chat.md");
+        assert!(md.contains("# rs-rail Transcript"));
         assert!(tmp.join(&rel).is_file());
         let _ = fs::remove_dir_all(&tmp);
     }
@@ -4076,6 +4193,60 @@ mod tests {
         assert_eq!(profile_tagline_in(&tmp, "role_only").as_deref(), Some("NVIDIA Nemotron Systems Architect"));
         assert_eq!(profile_tagline_in(&tmp, "plain").as_deref(), Some("Conversational Assistant"));
         assert_eq!(profile_tagline_in(&tmp, "explicit").as_deref(), Some("Fast cloud reviewer"));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+    #[test]
+    fn test_rail_config_project_providers_and_collabs_override_frontmatter() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_botcfg_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("profiles")).unwrap();
+        fs::create_dir_all(tmp.join("projects/surogate37")).unwrap();
+        fs::create_dir_all(tmp.join("projects/gem35")).unwrap();
+        fs::create_dir_all(tmp.join("projects/flint")).unwrap();
+        fs::create_dir_all(tmp.join("plugins/rs-rail")).unwrap();
+
+        fs::write(tmp.join("profiles/gem35.md"), "---\nprovider: GEMINI\n---\nROLE: Reviewer.").unwrap();
+        fs::write(tmp.join("profiles/surogate37.md"), "---\ncollaborators: [gem35]\n---\nROLE: Coder.").unwrap();
+        WorkspaceConfig { profile_name: "gem35".into(), is_agent: true, tier: ToolTier::Core4, adapters: false, delegate: false }
+            .save(tmp.join("projects/gem35")).unwrap();
+        WorkspaceConfig { profile_name: "surogate37".into(), is_agent: true, tier: ToolTier::Smol, adapters: true, delegate: false }
+            .save(tmp.join("projects/surogate37")).unwrap();
+
+        let mut prov_map = serde_json::Map::new();
+        prov_map.insert("gem35".into(), json!("DEFAULT"));
+        prov_map.insert("flint".into(), json!("custom2"));
+        prov_map.insert("bad".into(), json!("INVALID_SLOT"));
+        let mut col_map = serde_json::Map::new();
+        col_map.insert("surogate37".into(), json!([]));
+        col_map.insert("flint".into(), json!(["gem35", "flint", "nope"]));
+
+        let mut cfg = RailConfig::default();
+        cfg.project_providers = sanitize_project_providers(&prov_map, &tmp);
+        cfg.project_collabs = sanitize_project_collabs(&col_map, &tmp);
+        cfg.save(&tmp.join("plugins/rs-rail/config.json")).unwrap();
+
+        let reloaded = RailConfig::load(&tmp.join("plugins/rs-rail/config.json"));
+        assert_eq!(effective_project_provider(&tmp, &reloaded, "gem35", "gem35"), None);
+        assert_eq!(effective_project_provider(&tmp, &reloaded, "flint", "flint").as_deref(), Some("CUSTOM2"));
+        assert_eq!(resolve_collaborators(&tmp, "surogate37", "surogate37").0, Vec::<String>::new());
+        assert_eq!(resolve_collaborators(&tmp, "flint", "flint").0, vec!["gem35".to_string()]);
+        let _ = fs::remove_dir_all(&tmp);
+    }
+    #[test]
+    fn test_rail_config_bot_mode_defaults_true_and_persists_false() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_botmode_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("profiles")).unwrap();
+        fs::create_dir_all(tmp.join("projects/surogate37")).unwrap();
+        fs::create_dir_all(tmp.join("projects/gem35")).unwrap();
+        fs::create_dir_all(tmp.join("plugins/rs-rail")).unwrap();
+
+        let p = tmp.join("plugins/rs-rail/config.json");
+        assert!(RailConfig::load(&p).bot_mode);
+        let mut cfg = RailConfig::default();
+        cfg.bot_mode = false;
+        cfg.save(&p).unwrap();
+        assert!(!RailConfig::load(&p).bot_mode);
         let _ = fs::remove_dir_all(&tmp);
     }
 }

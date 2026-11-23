@@ -163,6 +163,9 @@
   .bot-opt:hover:not(:disabled) { background: var(--hover); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
   .bot-opt.active { border-color: var(--accent); background: var(--accent-bg); }
   .bot-opt:disabled { opacity: 0.28; cursor: not-allowed; }
+  .collab-chip { height: 26px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: .12s; }
+  .collab-chip:hover { background: var(--hover); color: var(--text); }
+  .collab-chip.on { border-color: var(--accent); background: var(--accent-bg); color: var(--accent); }
   .rs-tab.active { background: var(--card); border-color: var(--border); color: var(--text); }
   .rs-pane { flex: 1; display: none; flex-direction: column; min-height: 0; }
   .rs-pane.open { display: flex; }
@@ -454,9 +457,9 @@
             <button class="rs-tab active" id="rs-tab-task">TASK.md</button>
             <button class="rs-tab" id="rs-tab-mem">Memory</button>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;min-width:0;">
-            <span class="rs-note" id="rs-note"></span>
-            <button class="btn btn-sm" id="btn-run-task">Run</button>
+          <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+            <button class="btn btn-sm" id="btn-quick-call" style="display:none;" title="Add /call to prompt">/call</button>
+            <button class="btn btn-sm" id="btn-run-task">/task</button>
             <button class="btn btn-sm" id="btn-save-mem" style="display:none;">Save</button>
           </div>
         </div>
@@ -533,7 +536,7 @@
           <span id="mb-cur" style="width:34px;height:34px;border-radius:8px;background:var(--card);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;"></span>
           <div>
             <div style="font-weight:600;font-size:12.5px;" id="mb-proj">—</div>
-            <div class="muted">Pick a unique micro-bot</div>
+            <div class="muted" id="mb-sub">Pick a unique micro-bot</div>
           </div>
         </div>
         <div style="display:flex;gap:6px;">
@@ -542,6 +545,13 @@
         </div>
       </div>
       <div class="bot-grid" id="mb-grid"></div>
+      <div id="mb-collab-sec" style="display:none;flex-direction:column;gap:6px;border-top:1px solid var(--border);padding-top:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
+          <span style="font-weight:600;font-size:12px;">Can auto-call</span>
+          <span class="muted">Sibling bots available via call_bot</span>
+        </div>
+        <div id="mb-collabs" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -588,7 +598,10 @@
   <div class="modal">
     <div class="modal-head">
       <span id="mf-title" style="font-family:var(--mono);font-size:12px;">file</span>
-      <button class="btn btn-sm" id="btn-close-file">✕</button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <button class="btn btn-sm" id="btn-copy-file">Copy</button>
+        <button class="btn btn-sm" id="btn-close-file">✕</button>
+      </div>
     </div>
     <div class="modal-pane" style="padding:12px;">
       <pre class="file-view-pre" id="mf-body"></pre>
@@ -643,6 +656,11 @@ function allThemes() {
 
 const BRAND_GRAD_DEFS = `<defs><linearGradient id="brandGrad" gradientUnits="userSpaceOnUse" x1="3" y1="3" x2="13" y2="13"><stop offset="0%" stop-color="var(--text)"/><stop offset="100%" stop-color="var(--accent)"/></linearGradient></defs>`;
 
+function isBotMode(cfg) {
+  const b = (cfg || getAppearance()).microBots;
+  return b !== "none" && b !== false && b !== "letters";
+}
+
 function renderBrandLogo(cfg) {
   const btn = $("btn-brand-settings");
   if (!btn) return;
@@ -654,8 +672,8 @@ function renderBrandLogo(cfg) {
   btn.classList.toggle("clickable", canPick);
   btn.tabIndex = canPick ? 0 : -1;
   if (canPick) {
-    btn.title = "Change Micro-Bot";
-    btn.setAttribute("aria-label", "Change Micro-Bot");
+    btn.title = "Bot Setup & Micro-Bot";
+    btn.setAttribute("aria-label", "Bot Setup & Micro-Bot");
   } else {
     btn.removeAttribute("title");
     btn.removeAttribute("aria-label");
@@ -930,7 +948,7 @@ function renderAll() {
   const ap = STATE.active_project;
   const dispName = projDisplay(ap.name);
   $("msg-input").placeholder = ap.is_agent
-    ? `Ask ${dispName}... (/ commands, /call peer)`
+    ? (isBotMode() ? `Ask ${dispName}... (/ commands, /call peer)` : `Ask ${dispName}... (/ commands, Enter to send)`)
     : `Message ${dispName}... (/ commands, Enter to send)`;
   const hudParts = String(ap.hud_summary || "").split(" · ").filter(Boolean);
   $("tb-profile").innerHTML = `<strong>${esc(dispName)}</strong>${hudParts.map(t => `<span>${esc(t)}</span>`).join("")}`;
@@ -1004,7 +1022,7 @@ function renderAll() {
     el.className = "proj-item" + (p.name === ap.name ? " active" : "");
     const dname = projDisplay(p.name);
     const badgeHtml = badgeMode === "none" ? "" : `<span class="proj-badge">${badgeMode === "bots" ? botSvg(p.name) : esc(dname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || dname.slice(0, 2))}</span>`;
-    const callBtn = p.name !== ap.name
+    const callBtn = isBotMode() && p.name !== ap.name
       ? `<button type="button" class="proj-call" title="Call ${esc(dname)}"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5h11v7.5h-6l-3 2.5V11H2.5z"/></svg></button>`
       : "";
     const delBtn = p.file_count > 0
@@ -1146,9 +1164,11 @@ function renderAll() {
   }
 
   $("task-body").textContent = ap.task_md || "";
+  const inMem = $("rs-tab-mem").classList.contains("active");
   const rt = $("btn-run-task");
   rt.disabled = !ap.is_agent;
   rt.textContent = !ap.is_agent ? "Chat" : (ap.task_md ? "Run" : "/task");
+  $("btn-quick-call").style.display = isBotMode() && ap.is_agent && !inMem ? "inline-flex" : "none";
 
   const memEl = $("mem-input");
   if (document.activeElement !== memEl) memEl.value = ap.memory || "";
@@ -1325,8 +1345,24 @@ async function runLocalSlash(text) {
   if (low === "/ms" || low === "/model") { openSettings("providers"); return true; }
   if (low === "/tk" || low === "/think") { await api("/api/settings/ui", { show_thinking: STATE?.ui_prefs?.show_thinking === false }); await loadState(); return true; }
   if (low === "/s" || low === "/skill") { openSettings("skills"); return true; }
-  if (low === "/call") { openCallModal(); return true; }
-  if (low.startsWith("/call ")) { openCallModal(text.slice(6).trim()); return true; }
+  if (low === "/call" || low.startsWith("/call ") || low.startsWith("/call:")) {
+    if (!isBotMode()) return true;
+    const raw = text.slice(5).trim();
+    if (!raw) { openCallModal(); return true; }
+    const m = raw.match(/^@?([a-zA-Z0-9_-]+)(?::\s*|\s+)([\s\S]*)$/);
+    const targetToken = m ? m[1].toLowerCase() : raw.replace(/^@/, "").replace(/:$/, "").trim().toLowerCase();
+    const promptText = m ? m[2].trim() : "";
+    const ap = STATE?.active_project;
+    const siblings = (STATE?.projects || []).filter((p) => p.name !== ap?.name);
+    const matched = siblings.find((p) => p.name.toLowerCase() === targetToken)
+      || siblings.find((p) => p.name.toLowerCase().startsWith(targetToken));
+    if (matched && promptText) {
+      await executePeerCall(matched.name, "last_turn", promptText);
+    } else {
+      openCallModal(matched ? matched.name : targetToken, promptText);
+    }
+    return true;
+  }
   if (low === "/export") {
     const res = await api("/api/export", {});
     $("sidebar-right").classList.remove("hidden");
@@ -1677,7 +1713,14 @@ function renderModalTab() {
       pane.appendChild(lbar);
     }
 
+    const provOpts = [
+      ["", "Active (Default)"],
+      ["LOCAL", "Local (:8080)"],
+      ...(STATE.providers || []).map((s) => [s.id, s.name]),
+    ];
     for (const p of STATE.projects) {
+      const curProv = p.peer_provider || "";
+      const opts = provOpts.some(([id]) => id === curProv) ? provOpts : [...provOpts, [curProv, curProv]];
       const isVis = !hiddenSet.has(p.name);
       const pLabels = labelsMap[p.name] || [];
       const dname = projDisplay(p.name);
@@ -1688,7 +1731,12 @@ function renderModalTab() {
         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><strong class="proj-disp">${esc(dname)}</strong><button type="button" class="proj-ren">✎</button> <span class="muted">${esc(subMeta)}</span></div>
         <div class="proj-tags"></div>
       </div>
-      <button class="switch ${isVis ? "on" : ""}"></button>`;
+      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+        ${isBotMode() ? `<select class="comp-select proj-prov" title="Peer provider used when calling this bot" style="max-width:148px;font-size:11px;">
+          ${opts.map(([id, lbl]) => `<option value="${esc(id)}" ${curProv === id ? "selected" : ""}>${esc(lbl)}</option>`).join("")}
+        </select>` : ""}
+        <button class="switch ${isVis ? "on" : ""}"></button>
+      </div>`;
 
       const renBtn = row.querySelector(".proj-ren");
       const dispEl = row.querySelector(".proj-disp");
@@ -1755,6 +1803,15 @@ function renderModalTab() {
       };
       tagsBox.appendChild(addBtn);
 
+      const provSel = row.querySelector(".proj-prov");
+      if (provSel) provSel.onchange = async (e) => {
+        const nextProvs = structuredClone(STATE.ui_prefs?.project_providers || {});
+        const v = e.target.value;
+        nextProvs[p.name] = v || "DEFAULT";
+        const res = await api("/api/settings/ui", { project_providers: nextProvs });
+        STATE.ui_prefs.project_providers = res.project_providers || {};
+        await loadState();
+      };
       row.querySelector(".switch").onclick = async () => {
         const nextHidden = new Set(hiddenSet);
         if (isVis) nextHidden.add(p.name); else nextHidden.delete(p.name);
@@ -1796,7 +1853,7 @@ function renderModalTab() {
     $("modal-skills-filter").oninput = (e) => { skillFilter = e.target.value; drawSkillsList(); };
   } else if (ACTIVE_TAB === "commands") {
     pane.innerHTML = `<div style="font-weight:600">Slash Commands</div><div class="muted">Type <code>/</code> in the composer or run an action below.</div>`;
-    for (const c of SLASH_CMDS) {
+    for (const c of SLASH_CMDS.filter((x) => isBotMode() || x.cmd !== "/call")) {
       const row = document.createElement("div");
       row.className = "setting-row";
       row.innerHTML = `<div><strong style="font-family:var(--mono)">${esc(c.cmd)}</strong><div class="muted">${esc(c.desc)}</div></div><button class="btn btn-sm">Run</button>`;
@@ -2063,16 +2120,24 @@ function renderModalTab() {
     const botRow = document.createElement("div");
     botRow.className = "setting-row";
     const badgeMode = ap.microBots === "none" ? "none" : (ap.microBots === false || ap.microBots === "letters" ? "letters" : "bots");
-    botRow.innerHTML = `<div><strong>Project Badges</strong><div class="muted">Micro-bot icons, 2-letter monograms, or hidden</div></div>
+    botRow.innerHTML = `<div><strong>Micro-Bot Mode</strong><div class="muted">Enable peer bots (/call, auto-call) or use letters / none</div></div>
       <div style="display:flex;gap:4px;" class="rs-tabs">
         <button class="rs-tab ${badgeMode === "bots" ? "active" : ""}" id="btn-bots-on">Micro-Bots</button>
         <button class="rs-tab ${badgeMode === "letters" ? "active" : ""}" id="btn-bots-off">Letters</button>
         <button class="rs-tab ${badgeMode === "none" ? "active" : ""}" id="btn-bots-none">None</button>
       </div>`;
     pane.appendChild(botRow);
-    $("btn-bots-on").onclick = () => { applyAppearance({ microBots: true }); renderAll(); };
-    $("btn-bots-off").onclick = () => { applyAppearance({ microBots: false }); renderAll(); };
-    $("btn-bots-none").onclick = () => { applyAppearance({ microBots: "none" }); renderAll(); };
+    const setBotMode = async (microBots, bot_mode) => {
+      applyAppearance({ microBots });
+      try {
+        const res = await api("/api/settings/ui", { bot_mode });
+        if (STATE?.ui_prefs) STATE.ui_prefs.bot_mode = res.bot_mode;
+      } catch {}
+      await loadState();
+    };
+    $("btn-bots-on").onclick = () => setBotMode(true, true);
+    $("btn-bots-off").onclick = () => setBotMode(false, false);
+    $("btn-bots-none").onclick = () => setBotMode("none", false);
 
     const r = document.createElement("div");
     r.className = "setting-row";
@@ -2094,7 +2159,7 @@ function updateAutocomplete() {
   const val = $("msg-input").value;
   if (!val.startsWith("/") || /\s/.test(val)) { closeAc(); return; }
   const q = val.slice(1).toLowerCase();
-  acItems = SLASH_CMDS.filter((c) => c.cmd.slice(1).startsWith(q));
+  acItems = SLASH_CMDS.filter((c) => (isBotMode() || c.cmd !== "/call") && c.cmd.slice(1).startsWith(q));
   if (!acItems.length) { closeAc(); return; }
   closeReasoningPop();
   if (acHl >= acItems.length) acHl = 0;
@@ -2182,11 +2247,13 @@ $("rs-tab-task").onclick = () => {
   $("rs-tab-task").classList.add("active"); $("rs-tab-mem").classList.remove("active");
   $("rs-pane-task").classList.add("open"); $("rs-pane-mem").classList.remove("open");
   $("btn-run-task").style.display = "inline-flex"; $("btn-save-mem").style.display = "none";
+  $("btn-quick-call").style.display = isBotMode() && STATE?.active_project?.is_agent ? "inline-flex" : "none";
 };
 $("rs-tab-mem").onclick = () => {
   $("rs-tab-mem").classList.add("active"); $("rs-tab-task").classList.remove("active");
   $("rs-pane-mem").classList.add("open"); $("rs-pane-task").classList.remove("open");
   $("btn-save-mem").style.display = "inline-flex"; $("btn-run-task").style.display = "none";
+  $("btn-quick-call").style.display = "none";
 };
 function resizeInput() {
   const el = document.getElementById("msg-input");
@@ -2195,6 +2262,17 @@ function resizeInput() {
   el.style.height = "auto";
   el.style.height = el.value ? `${Math.min(Math.max(el.scrollHeight, minH), 180)}px` : "";
 }
+
+$("btn-quick-call").onclick = () => {
+  const inp = $("msg-input");
+  if (!inp.value.startsWith("/call")) {
+    inp.value = "/call " + inp.value;
+  }
+  resizeInput();
+  updateSendReady();
+  inp.focus();
+  inp.setSelectionRange(inp.value.length, inp.value.length);
+};
 
 $("btn-run-task").onclick = () => {
   const ap = STATE?.active_project;
@@ -2213,15 +2291,19 @@ $("btn-run-task").onclick = () => {
 $("btn-save-mem").onclick = async () => {
   try {
     await api("/api/memory", { content: $("mem-input").value });
-    setRsNote("Memory saved ✓");
+    const b = $("btn-save-mem");
+    b.textContent = "Saved ✓";
+    setTimeout(() => { b.textContent = "Save"; }, 1500);
     await loadState();
-  } catch (err) { setRsNote(err.message); }
+  } catch (err) { alert(err.message); }
 };
 $("btn-export-md").onclick = async () => {
   try {
     const res = await api("/api/export", {});
-    setRsNote(`Saved ${res.path}`);
-  } catch (err) { setRsNote(err.message); }
+    $("mf-title").textContent = res.path;
+    $("mf-body").textContent = res.content || "";
+    $("modal-file").classList.add("open");
+  } catch (err) { alert(err.message); }
 };
 $("btn-settings").onclick = () => openSettings();
 let botPage = 0;
@@ -2251,6 +2333,8 @@ function buildBotCandidates(curMask, defMask, taken, page) {
 function renderBotPicker() {
   const ap = STATE?.active_project;
   if (!ap) return;
+  const badgeRaw = getAppearance().microBots;
+  const showIcons = badgeRaw !== "none" && badgeRaw !== false && badgeRaw !== "letters";
   const taken = new Map();
   for (const p of STATE.projects || []) {
     if (p.name !== ap.name) taken.set(projectBotMask(p.name), p.name);
@@ -2261,35 +2345,69 @@ function renderBotPicker() {
   const fill = isMono ? "currentColor" : "url(#brandGrad)";
   const defs = isMono ? "" : BRAND_GRAD_DEFS;
   $("mb-proj").textContent = projDisplay(ap.name);
+  $("mb-sub").textContent = showIcons ? "Pick a unique micro-bot" : "Bot configuration";
   $("mb-cur").innerHTML = botSvgFromMask(curMask, 22, fill, defs);
+
   const rb = $("btn-bot-reset");
-  rb.style.display = curMask !== defMask ? "inline-flex" : "none";
+  const sb = $("btn-bot-shuffle");
+  const grid = $("mb-grid");
+  grid.style.display = showIcons ? "grid" : "none";
+  sb.style.display = showIcons ? "inline-flex" : "none";
+  rb.style.display = showIcons && curMask !== defMask ? "inline-flex" : "none";
   rb.disabled = taken.has(defMask);
   rb.title = taken.has(defMask) ? `Default used by ${taken.get(defMask)}` : "Restore default micro-bot";
 
-  const grid = $("mb-grid");
   grid.innerHTML = "";
-  for (const m of buildBotCandidates(curMask, defMask, taken, botPage)) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "bot-opt" + (m === curMask ? " active" : "");
-    b.innerHTML = botSvgFromMask(m, 22, m === curMask ? fill : "currentColor", m === curMask ? defs : "");
-    const owner = taken.get(m);
-    if (owner) {
-      b.disabled = true;
-      b.title = `Used by ${owner}`;
-    } else {
-      b.onclick = async () => {
-        const nextBots = { ...(STATE.ui_prefs?.project_bots || {}) };
-        if (m === defMask) delete nextBots[ap.name];
-        else nextBots[ap.name] = `b:${m.toString(16).padStart(4, "0")}`;
-        const res = await api("/api/settings/ui", { project_bots: nextBots });
-        STATE.ui_prefs.project_bots = res.project_bots || nextBots;
-        renderAll();
+  if (showIcons) {
+    for (const m of buildBotCandidates(curMask, defMask, taken, botPage)) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "bot-opt" + (m === curMask ? " active" : "");
+      b.innerHTML = botSvgFromMask(m, 22, m === curMask ? fill : "currentColor", m === curMask ? defs : "");
+      const owner = taken.get(m);
+      if (owner) {
+        b.disabled = true;
+        b.title = `Used by ${owner}`;
+      } else {
+        b.onclick = async () => {
+          const nextBots = { ...(STATE.ui_prefs?.project_bots || {}) };
+          if (m === defMask) delete nextBots[ap.name];
+          else nextBots[ap.name] = `b:${m.toString(16).padStart(4, "0")}`;
+          const res = await api("/api/settings/ui", { project_bots: nextBots });
+          STATE.ui_prefs.project_bots = res.project_bots || nextBots;
+          renderAll();
+          renderBotPicker();
+        };
+      }
+      grid.appendChild(b);
+    }
+  }
+
+  const siblings = (STATE.projects || []).filter((p) => p.name !== ap.name);
+  const csec = $("mb-collab-sec");
+  const cbox = $("mb-collabs");
+  csec.style.display = ap.is_agent && siblings.length ? "flex" : "none";
+  cbox.innerHTML = "";
+  if (ap.is_agent && siblings.length) {
+    const activeCollabs = new Set(ap.collaborators || []);
+    for (const p of siblings) {
+      const on = activeCollabs.has(p.name);
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "collab-chip" + (on ? " on" : "");
+      chip.innerHTML = `${botSvg(p.name, 12)}<span>${esc(projDisplay(p.name))}</span>`;
+      chip.onclick = async () => {
+        const nextSet = new Set(activeCollabs);
+        if (on) nextSet.delete(p.name); else nextSet.add(p.name);
+        const nextMap = structuredClone(STATE.ui_prefs?.project_collabs || {});
+        nextMap[ap.name] = Array.from(nextSet);
+        const res = await api("/api/settings/ui", { project_collabs: nextMap });
+        STATE.ui_prefs.project_collabs = res.project_collabs || {};
+        ap.collaborators = nextMap[ap.name];
         renderBotPicker();
       };
+      cbox.appendChild(chip);
     }
-    grid.appendChild(b);
   }
 }
 function openBotPicker() {
@@ -2310,9 +2428,7 @@ $("btn-bot-reset").onclick = async () => {
   renderBotPicker();
 };
 $("btn-brand-settings").onclick = () => {
-  const bRaw = getAppearance().microBots;
-  const isBots = bRaw !== "none" && bRaw !== false && bRaw !== "letters";
-  if (isBots && STATE?.active_project) openBotPicker();
+  if (STATE?.active_project && isBotMode()) openBotPicker();
 };
 $("btn-projects-nav").onclick = () => openSettings("projects");
 $("btn-profiles-nav").onclick = () => openSettings("profiles");
@@ -2324,6 +2440,13 @@ $("btn-close-app").onclick = async () => {
 $("btn-model-pill").onclick = () => openSettings("providers");
 $("btn-close-settings").onclick = () => $("modal-settings").classList.remove("open");
 $("btn-close-file").onclick = () => $("modal-file").classList.remove("open");
+$("btn-copy-file").onclick = async () => {
+  const text = $("mf-body").textContent || "";
+  await navigator.clipboard.writeText(text);
+  const b = $("btn-copy-file");
+  b.textContent = "Copied!";
+  setTimeout(() => { b.textContent = "Copy"; }, 1500);
+};
 document.querySelectorAll(".modal-backdrop").forEach((m) => {
   let downOnBg = false;
   m.addEventListener("mousedown", (e) => { downOnBg = e.target === m; });
@@ -2390,7 +2513,7 @@ function renderCallModal() {
   const tbtn = $("call-target-btn");
   if (tgt) {
     tbtn.disabled = false;
-    tbtn.innerHTML = `${botSvg(tgt.name, 18)}<span class="call-meta"><span class="call-name">${esc(projDisplay(tgt.name))}</span><span class="call-sub">${esc(tgt.profile_name || "chat")}${tgt.hud_summary ? " · " + esc(tgt.hud_summary) : ""}</span></span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg>`;
+    tbtn.innerHTML = `${botSvg(tgt.name, 18)}<span class="call-meta"><span class="call-name">${esc(projDisplay(tgt.name))}</span><span class="call-sub">${esc(tgt.profile_name || "chat")}${tgt.hud_summary ? " · " + esc(tgt.hud_summary) : ""}${tgt.peer_provider ? " · " + esc(tgt.peer_provider) : ""}</span></span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg>`;
   } else {
     tbtn.disabled = true;
     tbtn.innerHTML = `<span class="call-meta"><span class="call-name">No sibling bots</span><span class="call-sub">Create another project first</span></span>`;
@@ -2404,7 +2527,7 @@ function renderCallModal() {
     const opt = document.createElement("button");
     opt.type = "button";
     opt.className = "call-target-opt" + (tgt && tgt.name === p.name ? " active" : "");
-    opt.innerHTML = `<span style="display:flex;align-items:center;gap:8px;min-width:0;">${botSvg(p.name, 15)}<span style="min-width:0;display:flex;flex-direction:column;"><span class="call-name">${esc(projDisplay(p.name))}</span><span class="call-sub">${esc(p.profile_name || "chat")}${p.hud_summary ? " · " + esc(p.hud_summary) : ""}</span></span></span><span class="muted">${tgt && tgt.name === p.name ? "✓" : ""}</span>`;
+    opt.innerHTML = `<span style="display:flex;align-items:center;gap:8px;min-width:0;">${botSvg(p.name, 15)}<span style="min-width:0;display:flex;flex-direction:column;"><span class="call-name">${esc(projDisplay(p.name))}</span><span class="call-sub">${esc(p.profile_name || "chat")}${p.hud_summary ? " · " + esc(p.hud_summary) : ""}${p.peer_provider ? " · " + esc(p.peer_provider) : ""}</span></span></span><span class="muted">${tgt && tgt.name === p.name ? "✓" : ""}</span>`;
     opt.onclick = () => {
       callTarget = p.name;
       callPickerOpen = false;
@@ -2423,7 +2546,7 @@ function renderCallModal() {
   if (!tgt) $("call-err").textContent = "Create another project workspace first to consult a peer bot.";
 }
 
-function openCallModal(prefTarget) {
+function openCallModal(prefTarget, prefPrompt) {
   if (STREAMING || !STATE?.active_project) return;
   const ap = STATE.active_project;
   const siblings = (STATE.projects || []).filter((p) => p.name !== ap.name);
@@ -2435,6 +2558,7 @@ function openCallModal(prefTarget) {
   callMode = "last_turn";
   callPickerOpen = !matched && siblings.length > 1;
   $("call-err").textContent = "";
+  if (typeof prefPrompt === "string") $("call-prompt").value = prefPrompt;
   renderCallModal();
   $("modal-call").classList.add("open");
   $("call-prompt").focus();
@@ -2498,7 +2622,13 @@ $("call-prompt").addEventListener("keydown", (e) => {
 const params = new URLSearchParams(location.search);
 const liveEs = new EventSource("/api/live");
 window.addEventListener("pagehide", () => liveEs.close());
-loadState(params.get("project") || "");
+loadState(params.get("project") || "").then(() => {
+  if (STATE?.ui_prefs && STATE.ui_prefs.bot_mode !== isBotMode()) {
+    api("/api/settings/ui", { bot_mode: isBotMode() })
+      .then((r) => { if (STATE?.ui_prefs) STATE.ui_prefs.bot_mode = r.bot_mode; })
+      .catch(() => {});
+  }
+});
 
 let lastThemeSig = "", lastThemeSync = 0;
 async function syncThemes(force) {
