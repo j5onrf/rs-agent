@@ -287,7 +287,9 @@
   .comp-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; min-height: 30px; }
   .comp-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   #skills-bar { display: contents; }
-  #btn-model-pill { display: inline-block; max-width: min(320px, 100%); overflow: hidden; text-overflow: ellipsis; line-height: 24px; }
+  #btn-model-pill { max-width: min(340px, 100%); gap: 1.5ch; overflow: hidden; }
+  .mp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 500; }
+  .mp-ext { color: var(--muted); flex-shrink: 0; }
   .micro-pill { height: 26px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 0 10px; font: inherit; font-size: 12px; color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; user-select: none; transition: background .12s, border-color .12s, color .12s; }
   .micro-pill:hover, .micro-pill.open { background: var(--hover); }
   .micro-pill.muted { color: var(--muted); }
@@ -939,7 +941,15 @@ function renderAll() {
     $("tb-git-txt").innerHTML = gitLabel.split(" · ").filter(Boolean).map(t => `<span>${esc(t)}</span>`).join("");
     $("tb-git-dot").classList.toggle("dirty", gitLabel.includes("modified"));
   }
-  $("btn-model-pill").textContent = `${STATE.provider.model} · ${STATE.provider.endpoint}`;
+  const shortEndpoint = (ep) => {
+    const raw = String(ep || "").trim().toLowerCase().replace(/:\d+$/, "");
+    if (!raw || raw.startsWith("local") || raw.startsWith("127.0.0.1")) return "local";
+    if (raw.includes("googleapis.com")) return "gemini";
+    return (raw.replace(/^(api|inference|llm|chat|v1|www)\./, "").split(".")[0] || raw);
+  };
+  const mp = $("btn-model-pill");
+  mp.innerHTML = `<span class="mp-name">${esc(STATE.provider.model)}</span><span class="mp-ext">${esc(shortEndpoint(STATE.provider.endpoint))}</span>`;
+  mp.title = `${STATE.provider.model} · ${STATE.provider.endpoint}`;
   $("btn-img").style.display = STATE.provider.is_local ? "none" : "inline-flex";
   disarmReset();
   $("btn-reset").style.display = (ap.history && ap.history.length) ? "inline-flex" : "none";
@@ -1206,22 +1216,24 @@ function createEmpty() {
   d.id = "empty-state";
   d.className = "empty-state";
   const ap = STATE?.active_project;
-  const model = STATE?.provider?.model || "";
   if (!ap) {
     d.innerHTML = `<div class="empty-title">Ready</div><div class="empty-sub">Loading workspace...</div>`;
     return d;
   }
-  const hud = String(ap.hud_summary || "").split(" · ").filter(Boolean).join("   ");
+  const tagline = ap.tagline ? esc(ap.tagline) : "";
   if (!ap.is_agent) {
-    d.innerHTML = `<div class="empty-title">What should we explore in ${esc(projDisplay(ap.name))}?</div><div class="empty-sub">${esc(model)}   pure conversation   <code>/</code> for commands</div>`;
+    const sub = tagline || `Pure conversation · <code>/</code> for commands`;
+    d.innerHTML = `<div class="empty-title">What should we explore in ${esc(projDisplay(ap.name))}?</div><div class="empty-sub">${sub}</div>`;
     return d;
   }
-  const userFiles = (ap.files || []).filter((f) => !f.startsWith(".rs/")).length;
-  const sub = ap.task_md
-    ? `TASK.md loaded   ${esc(hud)}   <code>/task</code> to run`
-    : userFiles > 0
-      ? `${userFiles} file(s)   ${esc(ap.profile_name)}   ${esc(hud)}`
-      : `${esc(ap.profile_name)}   ${esc(hud)}   <code>/</code> for commands`;
+  let sub;
+  if (ap.task_md) {
+    const taskLine = ap.task_md.split(/\r?\n/).map((l) => l.replace(/^#+\s*/, "").trim()).find(Boolean) || "";
+    const taskBrief = taskLine.length > 64 ? taskLine.slice(0, 61) + "..." : taskLine;
+    sub = `${taskBrief ? esc(taskBrief) + " · " : ""}<code>/task</code> to run`;
+  } else {
+    sub = tagline || `<code>/</code> for commands`;
+  }
   d.innerHTML = `<div class="empty-title">What should we build in ${esc(projDisplay(ap.name))}?</div><div class="empty-sub">${sub}</div>`;
   return d;
 }

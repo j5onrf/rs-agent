@@ -219,6 +219,78 @@ fn find_profile_text_in(profiles_dir: &Path, profile_name: &str) -> Option<Strin
     None
 }
 
+fn clean_tagline_clip(s: &str) -> String {
+    let first = s
+        .split_once(". ")
+        .filter(|(head, _)| head.chars().count() >= 16)
+        .map(|(head, _)| head)
+        .unwrap_or(s)
+        .trim()
+        .trim_end_matches('.');
+    if first.chars().count() <= 80 {
+        return first.to_string();
+    }
+    let prefix: String = first.chars().take(77).collect();
+    let clipped = prefix.rsplit_once(' ').map(|(a, _)| a).unwrap_or(&prefix);
+    format!("{clipped}...")
+}
+
+fn extract_profile_tagline(raw: &str) -> String {
+    let mut state = 0u8; // 0 = start, 1 = frontmatter, 2 = body
+    let mut body_lines = Vec::new();
+    for line in raw.lines() {
+        let t = line.trim();
+        if state == 0 {
+            if t == "---" {
+                state = 1;
+                continue;
+            }
+            state = 2;
+        } else if state == 1 {
+            if t == "---" {
+                state = 2;
+                continue;
+            }
+            if let Some((k, v)) = t.split_once(':') {
+                if matches!(k.trim(), "tagline" | "description") {
+                    let clean = strip_inline_comment(v.trim()).trim_matches(['"', '\'', ' ']);
+                    if !clean.is_empty() {
+                        return clean_tagline_clip(clean);
+                    }
+                }
+            }
+            continue;
+        }
+        body_lines.push(t);
+    }
+
+    let mut first_prose = None;
+    for t in body_lines {
+        if t.is_empty() || t.starts_with("```") || t.starts_with("<!--") || (t.starts_with('[') && t.ends_with(']')) {
+            continue;
+        }
+        if let Some(rest) = t.strip_prefix("ROLE:").or_else(|| t.strip_prefix("Role:")) {
+            let clean = rest.trim();
+            if !clean.is_empty() {
+                return clean_tagline_clip(clean);
+            }
+        }
+        if first_prose.is_none() {
+            let clean = t.trim_start_matches(['#', '-', '*', ' ']).trim();
+            if !clean.is_empty() && !clean.ends_with(':') {
+                first_prose = Some(clean);
+            }
+        }
+    }
+    first_prose.map(clean_tagline_clip).unwrap_or_default()
+}
+
+fn extract_profile_tagline_in(profiles_dir: &Path, prof_name: &str) -> String {
+    find_profile_text_in(profiles_dir, prof_name)
+        .map(|raw| extract_profile_tagline(&raw))
+        .unwrap_or_default()
+}
+
 fn derive_auto_labels_in(root: &Path, project: &str, prof_name: &str) -> Vec<String> {
     if project == "chat" {
         return Vec::new();
@@ -2494,12 +2566,14 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             let memory = fs::read_to_string(sess.workspace.join(".rs/memory.md")).unwrap_or_default();
             let r_str = reasoning_to_string(&sess.reasoning);
             let pr_str = reasoning_to_string(&sess.profile_reasoning);
+            let tagline = extract_profile_tagline_in(&app.root.join("profiles"), &sess.profile_name);
             json!({
                 "name": sess.project_name,
                 "path": sess.workspace.display().to_string(),
                 "profile_name": sess.profile_name,
                 "is_agent": sess.is_agent,
                 "hud_summary": sess.hud_summary,
+                "tagline": tagline,
                 "git": git,
                 "task_md": task_md,
                 "memory": memory,
@@ -4001,5 +4075,16 @@ mod tests {
             Some("GEMINI")
         );
         assert_eq!(parse_profile_provider_raw("---\ncore4: true\n---\nROLE: Coder."), None);
+    }
+    #[test]
+    fn test_extract_profile_tagline_prefers_frontmatter_then_role() {
+        let with_fm = "---\ntagline: \"Fast cloud coder\"\n---\nROLE: Ignored fallback.";
+        assert_eq!(extract_profile_tagline(with_fm), "Fast cloud coder");
+
+        let with_role = "---\ncore4: true\n---\n\nROLE: Pragmatic Rust systems engineer. Keep diffs small.";
+        assert_eq!(extract_profile_tagline(with_role), "Pragmatic Rust systems engineer");
+
+        let plain = "# Conversational Assistant\nExplore ideas cleanly.";
+        assert_eq!(extract_profile_tagline(plain), "Conversational Assistant");
     }
 }
