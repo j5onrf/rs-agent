@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="promptGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="var(--text, #ececef)"/>
+      <stop offset="100%" stop-color="var(--accent, #1a73e8)"/>
+    </linearGradient>
+  </defs>
+  <path d="M 7.2 3.5 L 12.7 8 L 7.2 12.5 L 3.7 12.5" stroke="url(#promptGrad)"/>
+</svg>
