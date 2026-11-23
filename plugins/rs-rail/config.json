@@ -1,6 +1,38 @@
 {
-  "show_right_panel": false,
+  "show_right_panel": true,
   "last_project": "chat",
+  "project_labels": {
+    "lfm3": [
+      "local"
+    ],
+    "qwen38": [
+      "local"
+    ],
+    "sage": [
+      "local"
+    ],
+    "inkling2": [
+      "local"
+    ],
+    "groot": [
+      "local"
+    ],
+    "flint": [
+      "local"
+    ],
+    "gem35": [
+      "cloud"
+    ],
+    "nemo": [
+      "cloud"
+    ],
+    "tokenlab": [
+      "cloud"
+    ],
+    "ling-tiny": [
+      "local"
+    ]
+  },
   "project_names": {
     "chat": "chatbot"
   }

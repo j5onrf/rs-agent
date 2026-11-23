@@ -24,7 +24,7 @@
 | Tier | Tested Models | Workload |
 | :--- | :--- | :--- |
 | **Sub-27B**<br />*(SLM)* | `Raon-1-nano` · `LFM3-1.7B` · `Ling-3.0-tiny*` · `MiniCPM5-2B` · `Qwen3.5-2B+` · `MiniCPM-V-4.7-1B` · `LFM2.5-24B-A2B` | Tool calling, fast refactoring, single-turn edits |
-| **27B+**<br />*(LLM)* | `Inkling-2-Mini*` · `Groot-19B-A3B` · `Clover-35B-A3B` · `Sage-A1.5-35B` · `Flint-40B-A2.5B` · `Qwen3.8-35B-D` · `KAT-Coder-V2.5` · `Ornith-1.5-35B` · `Tiel-Coder-35B` · `Qwen3.8-27B` · `Qwen4.0-27B` · `Qwen3.8-Flash` · `DeepSeek-V4.1` | Deep reasoning, complex logic, multi-turn loops |
+| **27B+**<br />*(LLM)* | `Inkling-2-Mini*` · `Surogate3.7-35B-A3B` · `Groot-19B-A3B` · `Clover-35B-A3B` · `Sage-A1.5-35B` · `Flint-40B-A2.5B` · `Qwen3.8-35B-D` · `Ornith-1.5-35B` · `Qwen3.8-27B` · `Qwen4.0-27B` · `Qwen3.8-Flash` · `DeepSeek-V4.1` | Deep reasoning, complex logic, multi-turn loops |
 
 *\* Primary edge baselines • Auto-discovers local models on `http://127.0.0.1:8080`*
 
@@ -69,7 +69,7 @@
 
 | **Next Version preview** |
 | :--- |
-| [<img alt="RS Rail — Local-First Desktop & Web UI" src="assets/rs-rail-next.png" />](https://j5onrf.github.io/rs-agent/) |
+| <img alt="RS Rail — Local-First Desktop & Web UI" src="assets/rs-rail-next.png" /> |
 
 | Feature | Mechanism | Behavior |
 | :--- | :--- | :--- |
@@ -214,11 +214,13 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 | Rank | Model | Par Eff | Agent Index |
 | :---: | :--- | :---: | :---: |
 | **1** | **Inkling-2-Mini** | **185.7%** | **100.0 (A+)** |
-| **2** | **Flint-40B-A2.5B** | **185.7%** | **100.0 (A+)** |
-| **3** | **Groot-19B-A3B** *(MTP)* | **162.5%** | **100.0 (A+)** |
-| **4** | **Sage-A1.5-35B** | **111.1%** | **100.0 (A+)** |
+| **2** | **Surogate3.7-35B-A3B** *(MTP)* | **185.7%** | **100.0 (A+)** |
+| **3** | **Flint-40B-A2.5B** | **185.7%** | **100.0 (A+)** |
+| **4** | **Groot-19B-A3B** *(MTP)* | **162.5%** | **100.0 (A+)** |
+| **5** | **Sage-A1.5-35B** | **111.1%** | **100.0 (A+)** |
 | **—** | **Ling-3.0-tiny** *(SLM)* | **162.5%** | **100.0 (A+)** |
 | **—** | **LFM3-1.7B** *(SLM)* | **173.3%** | **100.0 (A+)** |
+
 ---
 
 ## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Developer Tools (`tools/`)
