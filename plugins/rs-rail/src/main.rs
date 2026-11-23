@@ -31,6 +31,12 @@ fn default_true() -> bool {
     true
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+struct ActionItem {
+    cmd: String,
+    desc: String,
+}
+
 #[derive(Serialize, Deserialize)]
 struct RailConfig {
     #[serde(default = "default_true")]
@@ -51,6 +57,8 @@ struct RailConfig {
     project_providers: HashMap<String, String>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     project_collabs: HashMap<String, Vec<String>>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    project_actions: HashMap<String, Vec<ActionItem>>,
 }
 
 impl Default for RailConfig {
@@ -65,6 +73,7 @@ impl Default for RailConfig {
             project_bots: HashMap::new(),
             project_providers: HashMap::new(),
             project_collabs: HashMap::new(),
+            project_actions: HashMap::new(),
         }
     }
 }
@@ -199,6 +208,34 @@ fn sanitize_project_bots(
         }
     }
     Ok(out)
+}
+
+fn sanitize_project_actions(obj: &serde_json::Map<String, Value>) -> HashMap<String, Vec<ActionItem>> {
+    let mut out = HashMap::new();
+    for (proj, val) in obj {
+        if !is_valid_slug(proj) {
+            continue;
+        }
+        let mut list = Vec::new();
+        if let Some(arr) = val.as_array() {
+            for item in arr {
+                if let (Some(cmd), Some(desc)) = (
+                    item.get("cmd").and_then(|v| v.as_str()),
+                    item.get("desc").and_then(|v| v.as_str()),
+                ) {
+                    let c = cmd.trim();
+                    let d = desc.trim();
+                    if !c.is_empty() && c.len() <= 120 && d.len() <= 60 && list.len() < 16 {
+                        list.push(ActionItem { cmd: c.to_string(), desc: d.to_string() });
+                    }
+                }
+            }
+        }
+        if !list.is_empty() {
+            out.insert(proj.clone(), list);
+        }
+    }
+    out
 }
 
 fn is_valid_provider_slot(slot: &str) -> bool {
@@ -2685,7 +2722,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     "project_names": rail_cfg.project_names,
                     "project_bots": rail_cfg.project_bots,
                     "project_providers": rail_cfg.project_providers,
-                    "project_collabs": rail_cfg.project_collabs
+                    "project_collabs": rail_cfg.project_collabs,
+                    "project_actions": rail_cfg.project_actions
                 }
             }),
         )
@@ -2968,6 +3006,10 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             cfg.project_collabs = sanitize_project_collabs(obj, &app.root);
             dirty_cfg = true;
         }
+        if let Some(obj) = payload.get("project_actions").and_then(|v| v.as_object()) {
+            cfg.project_actions = sanitize_project_actions(obj);
+            dirty_cfg = true;
+        }
         if payload.get("auto_label").and_then(|v| v.as_bool()) == Some(true) {
             apply_auto_labels(&app.root, &mut cfg);
             dirty_cfg = true;
@@ -2986,6 +3028,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "project_bots": cfg.project_bots,
                 "project_providers": cfg.project_providers,
                 "project_collabs": cfg.project_collabs,
+                "project_actions": cfg.project_actions,
                 "bot_mode": cfg.bot_mode
             }),
         )
@@ -4248,5 +4291,19 @@ mod tests {
         cfg.save(&p).unwrap();
         assert!(!RailConfig::load(&p).bot_mode);
         let _ = fs::remove_dir_all(&tmp);
+    }
+    #[test]
+    fn test_sanitize_project_actions_bounds_and_slugs() {
+        let mut map = serde_json::Map::new();
+        map.insert("surogate37".into(), json!([
+            { "cmd": "/call gem35", "desc": "Ask Gemini" },
+            { "cmd": "", "desc": "empty" },
+            { "cmd": "cargo check", "desc": "Verify build" }
+        ]));
+        map.insert("../bad".into(), json!([]));
+        let clean = sanitize_project_actions(&map);
+        assert_eq!(clean.get("surogate37").unwrap().len(), 2);
+        assert_eq!(clean.get("surogate37").unwrap()[0].cmd, "/call gem35");
+        assert!(!clean.contains_key("../bad"));
     }
 }
