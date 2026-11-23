@@ -1,24 +1,9 @@
 {
   "show_right_panel": true,
-  "last_project": "nemo",
+  "last_project": "surogate37",
   "project_labels": {
-    "sage": [
-      "local"
-    ],
-    "qwen38": [
-      "local"
-    ],
-    "ling-tiny": [
-      "local"
-    ],
     "inkling2": [
       "local"
-    ],
-    "surogate37": [
-      "local"
-    ],
-    "gem35": [
-      "cloud"
     ],
     "nemo": [
       "cloud"
@@ -32,7 +17,22 @@
     "groot": [
       "local"
     ],
+    "qwen38": [
+      "local"
+    ],
+    "sage": [
+      "local"
+    ],
+    "ling-tiny": [
+      "local"
+    ],
+    "gem35": [
+      "cloud"
+    ],
     "lfm3": [
+      "local"
+    ],
+    "surogate37": [
       "local"
     ]
   },
@@ -40,6 +40,6 @@
     "chat": "chatbot"
   },
   "project_bots": {
-    "surogate37": "b:257d"
+    "surogate37": "b:1395"
   }
 }

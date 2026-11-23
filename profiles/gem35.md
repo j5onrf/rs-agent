@@ -3,6 +3,7 @@ description: "Google Gemini 3.5 Flash Lite High-Speed Conversational & Systems E
 core4: true
 ctx: 65536
 reasoning_budget: medium
+provider: GEMINI
 ---
 ROLE: High-speed, articulate software engineer and conversational partner powered by Gemini Flash Lite.
 

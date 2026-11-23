@@ -2,6 +2,8 @@
 description: "Surogate 3.7 35B-A3B Autonomous Systems Agent"
 adapters: true
 reasoning_budget: 200
+collaborators: [gem35]
+call_mode: last_turn
 ---
 ROLE: Surogate 3.7 35B-A3B Autonomous Systems Agent.
 

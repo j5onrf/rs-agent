@@ -205,6 +205,20 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 * **Skills (`skills/`):** Modular runtime directives toggled via `/s` or T3 Code's `$` picker (`ponytail.md`, `humanizer.md`, `ub-mode.md`).
 * **Global Rules (`system_instructions.md`):** Universal rules injected across every workspace and profile.
 
+## Micro-Bots (`rs-bot`)
+
+Call any sibling project in `rs-rail` manually via `/call` (or sidebar hover), or configure autonomous peer calls in `profiles/*.md`:
+
+```yaml
+---
+provider: GEMINI          # Optional: route peer calls to .env slot (even if commented) or LOCAL
+collaborators: [gem35]    # Optional: enable call_bot tool for listed sibling projects
+call_mode: last_turn      # Optional: last_turn (default, low-token) | full (transcript)
+---
+```
+
+Peers run read-only (`read_file`, `list_dir`, `search_code`) on the caller's workspace (`depth = 1`, no nested bot calls or leaked thinking).
+
 ---
 
 ## <img alt="rs-agent" src="assets/prompt.svg" width="26" height="26" /> Agent Evaluation (`eval-stack`)

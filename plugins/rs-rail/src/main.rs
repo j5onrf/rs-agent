@@ -219,76 +219,67 @@ fn find_profile_text_in(profiles_dir: &Path, profile_name: &str) -> Option<Strin
     None
 }
 
-fn clean_tagline_clip(s: &str) -> String {
-    let first = s
+fn split_frontmatter(raw: &str) -> (Vec<(&str, &str)>, &str) {
+    let mut lines = raw.split_inclusive('\n');
+    let Some(first) = lines.next() else {
+        return (Vec::new(), raw);
+    };
+    if first.trim() != "---" {
+        return (Vec::new(), raw);
+    }
+    let mut kv = Vec::new();
+    let mut consumed = first.len();
+    for line in lines {
+        consumed += line.len();
+        let t = line.trim();
+        if t == "---" {
+            return (kv, &raw[consumed..]);
+        }
+        if let Some((k, v)) = t.split_once(':') {
+            kv.push((k.trim(), strip_inline_comment(v.trim())));
+        }
+    }
+    (Vec::new(), raw)
+}
+
+fn profile_tagline_in(profiles_dir: &Path, prof_name: &str) -> Option<String> {
+    let raw = find_profile_text_in(profiles_dir, prof_name)?;
+    let (fm, body) = split_frontmatter(&raw);
+    let picked = fm
+        .into_iter()
+        .find_map(|(k, v)| {
+            matches!(k, "tagline" | "description")
+                .then(|| v.trim_matches(['"', '\'', ' ']))
+                .filter(|s| !s.is_empty())
+        })
+        .or_else(|| {
+            body.lines().find_map(|l| {
+                let t = l.trim();
+                t.strip_prefix("ROLE:")
+                    .or_else(|| t.strip_prefix("Role:"))
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+            })
+        })
+        .or_else(|| {
+            body.lines().find_map(|l| {
+                let t = l.trim().trim_start_matches(['#', '-', '*', ' ']).trim();
+                (!t.is_empty()
+                    && !t.starts_with("```")
+                    && !t.starts_with("<!--")
+                    && !(t.starts_with('[') && t.ends_with(']'))
+                    && !t.ends_with(':'))
+                .then_some(t)
+            })
+        })?;
+    let first = picked
         .split_once(". ")
         .filter(|(head, _)| head.chars().count() >= 16)
         .map(|(head, _)| head)
-        .unwrap_or(s)
+        .unwrap_or(picked)
         .trim()
         .trim_end_matches('.');
-    if first.chars().count() <= 80 {
-        return first.to_string();
-    }
-    let prefix: String = first.chars().take(77).collect();
-    let clipped = prefix.rsplit_once(' ').map(|(a, _)| a).unwrap_or(&prefix);
-    format!("{clipped}...")
-}
-
-fn extract_profile_tagline(raw: &str) -> String {
-    let mut state = 0u8; // 0 = start, 1 = frontmatter, 2 = body
-    let mut body_lines = Vec::new();
-    for line in raw.lines() {
-        let t = line.trim();
-        if state == 0 {
-            if t == "---" {
-                state = 1;
-                continue;
-            }
-            state = 2;
-        } else if state == 1 {
-            if t == "---" {
-                state = 2;
-                continue;
-            }
-            if let Some((k, v)) = t.split_once(':') {
-                if matches!(k.trim(), "tagline" | "description") {
-                    let clean = strip_inline_comment(v.trim()).trim_matches(['"', '\'', ' ']);
-                    if !clean.is_empty() {
-                        return clean_tagline_clip(clean);
-                    }
-                }
-            }
-            continue;
-        }
-        body_lines.push(t);
-    }
-
-    let mut first_prose = None;
-    for t in body_lines {
-        if t.is_empty() || t.starts_with("```") || t.starts_with("<!--") || (t.starts_with('[') && t.ends_with(']')) {
-            continue;
-        }
-        if let Some(rest) = t.strip_prefix("ROLE:").or_else(|| t.strip_prefix("Role:")) {
-            let clean = rest.trim();
-            if !clean.is_empty() {
-                return clean_tagline_clip(clean);
-            }
-        }
-        if first_prose.is_none() {
-            let clean = t.trim_start_matches(['#', '-', '*', ' ']).trim();
-            if !clean.is_empty() && !clean.ends_with(':') {
-                first_prose = Some(clean);
-            }
-        }
-    }
-    first_prose.map(clean_tagline_clip).unwrap_or_default()
-}
-
-fn extract_profile_tagline_in(profiles_dir: &Path, prof_name: &str) -> String {
-    find_profile_text_in(profiles_dir, prof_name)
-        .map(|raw| extract_profile_tagline(&raw))
-        .unwrap_or_default()
+    Some(truncate_chars(first, 84))
 }
 
 fn derive_auto_labels_in(root: &Path, project: &str, prof_name: &str) -> Vec<String> {
@@ -298,32 +289,19 @@ fn derive_auto_labels_in(root: &Path, project: &str, prof_name: &str) -> Vec<Str
     let Some(raw) = find_profile_text_in(&root.join("profiles"), prof_name) else {
         return Vec::new();
     };
-    let mut in_fm = false;
-    for line in raw.lines() {
-        let t = line.trim();
-        if t == "---" {
-            if !in_fm {
-                in_fm = true;
-                continue;
-            }
-            break;
-        }
-        if in_fm {
-            if let Some((k, v)) = t.split_once(':') {
-                if matches!(k.trim(), "label" | "labels") {
-                    let clean = strip_inline_comment(v.trim()).trim_matches(['[', ']']);
-                    let mut list = Vec::new();
-                    for item in clean.split(',') {
-                        if let Some(lbl) = sanitize_label(item.trim_matches(['"', '\'', ' '])) {
-                            if !list.contains(&lbl) && list.len() < 8 {
-                                list.push(lbl);
-                            }
-                        }
-                    }
-                    if !list.is_empty() {
-                        return list;
+    let (fm, _) = split_frontmatter(&raw);
+    for (k, v) in fm {
+        if matches!(k, "label" | "labels") {
+            let mut list = Vec::new();
+            for item in v.trim_matches(['[', ']']).split(',') {
+                if let Some(lbl) = sanitize_label(item.trim_matches(['"', '\'', ' '])) {
+                    if !list.contains(&lbl) && list.len() < 8 {
+                        list.push(lbl);
                     }
                 }
+            }
+            if !list.is_empty() {
+                return list;
             }
         }
     }
@@ -750,20 +728,22 @@ fn is_valid_slot_val(val: &str) -> bool {
     !val.is_empty() && !val.contains("your-key-here") && !val.contains("your_key_here")
 }
 
+const DIRECT_PROVIDERS: &[(&str, &str, &str, &str)] = &[
+    ("GEMINI", "Google Gemini", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "gemini-3.5-flash-lite"),
+    ("GOOGLE", "Google AI", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "gemini-3.5-flash-lite"),
+    ("OPENROUTER", "OpenRouter", "https://openrouter.ai/api/v1/chat/completions", "openrouter/free"),
+    ("OPENAI", "OpenAI", "https://api.openai.com/v1/chat/completions", "gpt-4o"),
+    ("ANTHROPIC", "Anthropic", "https://api.anthropic.com/v1/chat/completions", "claude-3-5-sonnet-20241022"),
+    ("DEEPSEEK", "DeepSeek", "https://api.deepseek.com/chat/completions", "deepseek-chat"),
+    ("GROQ", "Groq", "https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile"),
+];
+
 fn read_env_slots(env_path: &Path) -> (Vec<EnvSlotView>, usize, usize) {
     let raw = fs::read_to_string(env_path).unwrap_or_default();
     let lines: Vec<&str> = raw.lines().collect();
     let mut slots = Vec::new();
 
-    for &(pfx, name, def_m) in &[
-        ("GEMINI", "Google Gemini", "gemini-3.5-flash-lite"),
-        ("GOOGLE", "Google AI", "gemini-3.5-flash-lite"),
-        ("OPENROUTER", "OpenRouter", "openrouter/free"),
-        ("OPENAI", "OpenAI", "gpt-4o"),
-        ("ANTHROPIC", "Anthropic", "claude-3-5-sonnet-20241022"),
-        ("DEEPSEEK", "DeepSeek", "deepseek-chat"),
-        ("GROQ", "Groq", "llama-3.3-70b-versatile"),
-    ] {
+    for &(pfx, name, _, def_m) in DIRECT_PROVIDERS {
         let kv = format!("{pfx}_API_KEY");
         let mv = format!("{pfx}_MODEL");
         let mut found = false;
@@ -1797,36 +1777,22 @@ fn strip_json_fence(raw: &str) -> String {
 }
 
 fn parse_profile_collab_raw(raw: &str, active_project: &str) -> (Vec<String>, String) {
+    let (fm, _) = split_frontmatter(raw);
     let mut collabs = Vec::new();
     let mut mode = "last_turn".to_string();
-    let mut in_fm = false;
-    for line in raw.lines() {
-        let t = line.trim();
-        if t == "---" {
-            if !in_fm {
-                in_fm = true;
-                continue;
+    for (key, val) in fm {
+        let clean = val.trim_matches(['[', ']', '"', '\'']);
+        if matches!(key, "collaborator" | "collaborators") {
+            for item in clean.split(',') {
+                let slug = item.trim().trim_matches(['"', '\'']).to_ascii_lowercase();
+                if is_valid_slug(&slug) && slug != active_project && !collabs.contains(&slug) && collabs.len() < 8 {
+                    collabs.push(slug);
+                }
             }
-            break;
-        }
-        if !in_fm {
-            continue;
-        }
-        if let Some((k, v)) = t.split_once(':') {
-            let key = k.trim();
-            let clean = strip_inline_comment(v.trim()).trim_matches(['[', ']', '"', '\'']);
-            if matches!(key, "collaborator" | "collaborators") {
-                for item in clean.split(',') {
-                    let slug = item.trim().trim_matches(['"', '\'']).to_ascii_lowercase();
-                    if is_valid_slug(&slug) && slug != active_project && !collabs.contains(&slug) && collabs.len() < 8 {
-                        collabs.push(slug);
-                    }
-                }
-            } else if key == "call_mode" {
-                let m = clean.trim().to_ascii_lowercase();
-                if m == "full" || m == "last_turn" {
-                    mode = m;
-                }
+        } else if key == "call_mode" {
+            let m = clean.trim().to_ascii_lowercase();
+            if m == "full" || m == "last_turn" {
+                mode = m;
             }
         }
     }
@@ -1834,28 +1800,12 @@ fn parse_profile_collab_raw(raw: &str, active_project: &str) -> (Vec<String>, St
 }
 
 fn parse_profile_provider_raw(raw: &str) -> Option<String> {
-    let mut in_fm = false;
-    for line in raw.lines() {
-        let t = line.trim();
-        if t == "---" {
-            if !in_fm {
-                in_fm = true;
-                continue;
-            }
-            break;
-        }
-        if in_fm {
-            if let Some((k, v)) = t.split_once(':') {
-                if k.trim() == "provider" {
-                    let clean = strip_inline_comment(v.trim()).trim_matches(['"', '\'', ' ']);
-                    if !clean.is_empty() {
-                        return Some(clean.to_ascii_uppercase());
-                    }
-                }
-            }
-        }
-    }
-    None
+    split_frontmatter(raw).0.into_iter().find_map(|(k, v)| {
+        (k == "provider")
+            .then(|| v.trim_matches(['"', '\'', ' ']))
+            .filter(|s| !s.is_empty())
+            .map(|s| s.to_ascii_uppercase())
+    })
 }
 
 fn resolve_collaborators(root: &Path, active_project: &str, prof_name: &str) -> (Vec<String>, String) {
@@ -1921,16 +1871,7 @@ fn resolve_slot_provider_from_env(
     }
 
     let lines: Vec<&str> = env_content.lines().collect();
-    const DIRECT: &[(&str, &str, &str)] = &[
-        ("GEMINI", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "gemini-3.5-flash-lite"),
-        ("GOOGLE", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "gemini-3.5-flash-lite"),
-        ("OPENROUTER", "https://openrouter.ai/api/v1/chat/completions", "openrouter/free"),
-        ("OPENAI", "https://api.openai.com/v1/chat/completions", "gpt-4o"),
-        ("ANTHROPIC", "https://api.anthropic.com/v1/chat/completions", "claude-3-5-sonnet-20241022"),
-        ("DEEPSEEK", "https://api.deepseek.com/chat/completions", "deepseek-chat"),
-        ("GROQ", "https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile"),
-    ];
-    if let Some(&(_, def_url, def_model)) = DIRECT.iter().find(|&&(pfx, _, _)| pfx == s) {
+    if let Some(&(_, _, def_url, def_model)) = DIRECT_PROVIDERS.iter().find(|&&(pfx, _, _, _)| pfx == s) {
         let api_key = find_env_slot_val(&lines, &format!("{s}_API_KEY"), true)
             .ok_or_else(|| format!("No valid {s}_API_KEY found in .env"))?;
         let raw_model = find_env_slot_val(&lines, &format!("{s}_MODEL"), false).unwrap_or_else(|| def_model.into());
@@ -2003,12 +1944,10 @@ fn chat_msg_text(m: &ChatMessage) -> String {
 }
 
 fn truncate_chars(s: &str, max_chars: usize) -> String {
-    if s.chars().count() <= max_chars {
-        return s.to_string();
+    match s.char_indices().nth(max_chars) {
+        Some((idx, _)) => format!("{}...[truncated]", &s[..idx]),
+        None => s.to_string(),
     }
-    let mut out: String = s.chars().take(max_chars).collect();
-    out.push_str("...[truncated]");
-    out
 }
 
 fn condense_for_caller(s: &str, max_chars: usize) -> String {
@@ -2137,10 +2076,29 @@ fn validate_peer_target(root: &Path, caller: &str, target: &str) -> std::result:
     Ok(dir)
 }
 
+fn short_provider_tag(base_url: &str) -> String {
+    if is_local_endpoint(base_url) {
+        return "local".into();
+    }
+    let ep = format_endpoint(base_url).to_ascii_lowercase();
+    if ep.contains("googleapis.com") {
+        return "gemini".into();
+    }
+    ep.trim_start_matches("api.")
+        .trim_start_matches("www.")
+        .split('.')
+        .next()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("cloud")
+        .to_string()
+}
+
 struct PeerCallOutput {
     synthesis: String,
     elapsed_s: f64,
     trace: Vec<String>,
+    provider_tag: String,
+    model_info: String,
 }
 
 async fn run_peer_call(
@@ -2172,10 +2130,13 @@ async fn run_peer_call(
             }
         }
     }
-    let target_prof = Profile::load(&target_cfg.profile_name).unwrap_or_else(|| Profile::parse("ROLE: Assistant."));
-    let target_provider_slot = find_profile_text_in(&root.join("profiles"), &target_cfg.profile_name)
+    let target_raw = find_profile_text_in(&root.join("profiles"), &target_cfg.profile_name);
+    let target_provider_slot = target_raw.as_deref().and_then(parse_profile_provider_raw);
+    let target_prof = target_raw
         .as_deref()
-        .and_then(parse_profile_provider_raw);
+        .map(Profile::parse)
+        .or_else(|| Profile::load(&target_cfg.profile_name))
+        .unwrap_or_else(|| Profile::parse("ROLE: Assistant."));
     let target_saved = state::load_workspace_session(&target_dir);
     let target_reasoning = match target_saved.reasoning {
         Some(ref r) if r.is_empty() => None,
@@ -2213,6 +2174,8 @@ async fn run_peer_call(
         };
 
         let provider = resolve_peer_provider(target_provider_slot.as_deref()).await?;
+        let provider_tag = short_provider_tag(&provider.base_url);
+        let model_info = format!("{} ({})", provider.model, format_endpoint(&provider.base_url));
         let client = LlmClient::new(provider);
         let boundary = SecurityBoundary::new_headless(caller_workspace);
         let max_rounds = if target_is_agent { get_max_rounds().min(8).max(2) } else { 1 };
@@ -2246,6 +2209,8 @@ async fn run_peer_call(
                     synthesis,
                     elapsed_s: t0.elapsed().as_secs_f64(),
                     trace,
+                    provider_tag: provider_tag.clone(),
+                    model_info: model_info.clone(),
                 });
             };
 
@@ -2566,7 +2531,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             let memory = fs::read_to_string(sess.workspace.join(".rs/memory.md")).unwrap_or_default();
             let r_str = reasoning_to_string(&sess.reasoning);
             let pr_str = reasoning_to_string(&sess.profile_reasoning);
-            let tagline = extract_profile_tagline_in(&app.root.join("profiles"), &sess.profile_name);
+            let tagline = profile_tagline_in(&app.root.join("profiles"), &sess.profile_name);
             json!({
                 "name": sess.project_name,
                 "path": sess.workspace.display().to_string(),
@@ -2980,7 +2945,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             prompt,
             None,
             &history,
-            cancel_flag,
+            cancel_flag.clone(),
         )
         .await
         {
@@ -2991,13 +2956,17 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     brief: Some(prompt.into()),
                     ok: Some(true),
                     summary: Some(if out.trace.is_empty() {
-                        mode.replace('_', " ")
+                        format!("{} · {}", mode.replace('_', " "), out.provider_tag)
                     } else {
-                        format!("{} · {} read(s)", mode.replace('_', " "), out.trace.len())
+                        format!("{} · {} · {} read(s)", mode.replace('_', " "), out.provider_tag, out.trace.len())
                     }),
                     content: Some(out.synthesis.clone()),
                     elapsed_s: Some(out.elapsed_s),
-                    raw: if out.trace.is_empty() { None } else { Some(out.trace.join("\n")) },
+                    raw: Some(if out.trace.is_empty() {
+                        format!("Model: {}", out.model_info)
+                    } else {
+                        format!("Model: {}\n{}", out.model_info, out.trace.join("\n"))
+                    }),
                     ..Default::default()
                 };
                 {
@@ -3023,6 +2992,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     }
                 }
                 write_http_json(&mut stream, 200, &json!({ "ok": true, "item": item })).await
+            }
+            Err(_) if cancel_flag.load(Ordering::SeqCst) => {
+                write_http_json(&mut stream, 200, &json!({ "ok": false, "cancelled": true })).await
             }
             Err(e) => write_http_err(&mut stream, 500, &e).await,
         };
@@ -3331,7 +3303,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     if fn_name == "call_bot" {
                         let clean_args = strip_json_fence(raw_args);
                         let parsed: Value = serde_json::from_str(&clean_args).unwrap_or_else(|_| json!({}));
-                        let target = parsed.get("target").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+                        let target = parsed.get("target").and_then(|v| v.as_str()).unwrap_or("").trim().to_ascii_lowercase();
                         let task = parsed.get("task").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
                         let extra_ctx = parsed
                             .get("context")
@@ -3363,11 +3335,15 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                                 {
                                     Ok(out) => {
                                         let sum = if out.trace.is_empty() {
-                                            format!("auto · {}", collab_mode.replace('_', " "))
+                                            format!("auto · {}", out.provider_tag)
                                         } else {
-                                            format!("auto · {} read(s)", out.trace.len())
+                                            format!("auto · {} · {} read(s)", out.provider_tag, out.trace.len())
                                         };
-                                        let raw_tr = if out.trace.is_empty() { None } else { Some(out.trace.join("\n")) };
+                                        let raw_tr = Some(if out.trace.is_empty() {
+                                            format!("Model: {}", out.model_info)
+                                        } else {
+                                            format!("Model: {}\n{}", out.model_info, out.trace.join("\n"))
+                                        });
                                         let resp = out.synthesis.clone();
                                         (true, sum, out.synthesis, out.elapsed_s, raw_tr, resp)
                                     }
@@ -4077,14 +4053,29 @@ mod tests {
         assert_eq!(parse_profile_provider_raw("---\ncore4: true\n---\nROLE: Coder."), None);
     }
     #[test]
-    fn test_extract_profile_tagline_prefers_frontmatter_then_role() {
-        let with_fm = "---\ntagline: \"Fast cloud coder\"\n---\nROLE: Ignored fallback.";
-        assert_eq!(extract_profile_tagline(with_fm), "Fast cloud coder");
+    fn test_split_frontmatter_and_truncate_chars_utf8() {
+        let crlf = "---\r\ntagline: \"Hello\" # note\r\n---\r\nBody line";
+        let (fm, body) = split_frontmatter(crlf);
+        assert_eq!(fm, vec![("tagline", "\"Hello\"")]);
+        assert_eq!(body, "Body line");
 
-        let with_role = "---\ncore4: true\n---\n\nROLE: Pragmatic Rust systems engineer. Keep diffs small.";
-        assert_eq!(extract_profile_tagline(with_role), "Pragmatic Rust systems engineer");
+        assert_eq!(split_frontmatter("---\nunclosed: true").0.len(), 0);
+        assert_eq!(truncate_chars("αβγδε", 3), "αβγ...[truncated]");
+        assert_eq!(truncate_chars("αβγ", 3), "αβγ");
+    }
+    #[test]
+    fn test_profile_tagline_in_uses_existing_role_and_body() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_tag_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
 
-        let plain = "# Conversational Assistant\nExplore ideas cleanly.";
-        assert_eq!(extract_profile_tagline(plain), "Conversational Assistant");
+        fs::write(tmp.join("role_only.md"), "---\ncore4: true\n---\n\nROLE: NVIDIA Nemotron Systems Architect. Keep it lean.").unwrap();
+        fs::write(tmp.join("plain.md"), "# Conversational Assistant\nExplore ideas.").unwrap();
+        fs::write(tmp.join("explicit.md"), "---\ntagline: \"Fast cloud reviewer\"\n---\nROLE: Ignored.").unwrap();
+
+        assert_eq!(profile_tagline_in(&tmp, "role_only").as_deref(), Some("NVIDIA Nemotron Systems Architect"));
+        assert_eq!(profile_tagline_in(&tmp, "plain").as_deref(), Some("Conversational Assistant"));
+        assert_eq!(profile_tagline_in(&tmp, "explicit").as_deref(), Some("Fast cloud reviewer"));
+        let _ = fs::remove_dir_all(&tmp);
     }
 }
