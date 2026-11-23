@@ -43,6 +43,8 @@ struct RailConfig {
     project_labels: HashMap<String, Vec<String>>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     project_names: HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    project_bots: HashMap<String, String>,
 }
 
 impl Default for RailConfig {
@@ -53,6 +55,7 @@ impl Default for RailConfig {
             hidden_projects: Vec::new(),
             project_labels: HashMap::new(),
             project_names: HashMap::new(),
+            project_bots: HashMap::new(),
         }
     }
 }
@@ -127,6 +130,66 @@ fn sanitize_project_names(obj: &serde_json::Map<String, Value>) -> HashMap<Strin
         }
     }
     out
+}
+
+
+fn default_bot_mask(name: &str) -> u16 {
+    let mut h: u32 = 2166136261;
+    for b in name.bytes() {
+        h = (h ^ (b as u32)).wrapping_mul(16777619);
+    }
+    ((h as u16) & 0x7fff) | (1 << 4)
+}
+
+fn parse_bot_val(raw: &str) -> Option<u16> {
+    let hex = raw.strip_prefix("b:")?;
+    if hex.is_empty() || hex.len() > 4 {
+        return None;
+    }
+    u16::from_str_radix(hex, 16).ok().map(|n| (n & 0x7fff) | (1 << 4))
+}
+
+fn sanitize_project_bots(
+    obj: &serde_json::Map<String, Value>,
+    projects_dir: &Path,
+) -> Result<HashMap<String, String>, String> {
+    let mut parsed = Vec::new();
+    for (proj, val) in obj {
+        if !is_valid_slug(proj) {
+            continue;
+        }
+        if let Some(mask) = val.as_str().and_then(parse_bot_val) {
+            parsed.push((proj.clone(), mask));
+        }
+    }
+    let mut owners: HashMap<u16, String> = HashMap::new();
+    if let Ok(rd) = fs::read_dir(projects_dir) {
+        for ent in rd.flatten() {
+            if !ent.path().is_dir() {
+                continue;
+            }
+            let Some(name) = ent.file_name().to_str().map(ToString::to_string) else {
+                continue;
+            };
+            if name.starts_with('.') || parsed.iter().any(|(p, _)| p == &name) {
+                continue;
+            }
+            owners.entry(default_bot_mask(&name)).or_insert(name);
+        }
+    }
+    let mut out = HashMap::new();
+    for (proj, mask) in parsed {
+        if let Some(prev) = owners.get(&mask) {
+            if prev != &proj {
+                return Err(format!("Micro-bot already used by '{prev}'"));
+            }
+        }
+        owners.insert(mask, proj.clone());
+        if mask != default_bot_mask(&proj) {
+            out.insert(proj, format!("b:{mask:04x}"));
+        }
+    }
+    Ok(out)
 }
 
 fn find_profile_text_in(profiles_dir: &Path, profile_name: &str) -> Option<String> {
@@ -1915,7 +1978,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     "show_right_panel": rail_cfg.show_right_panel,
                     "hidden_projects": rail_cfg.hidden_projects,
                     "project_labels": rail_cfg.project_labels,
-                    "project_names": rail_cfg.project_names
+                    "project_names": rail_cfg.project_names,
+                    "project_bots": rail_cfg.project_bots
                 }
             }),
         )
@@ -2177,6 +2241,15 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             cfg.project_names = sanitize_project_names(obj);
             dirty_cfg = true;
         }
+        if let Some(obj) = payload.get("project_bots").and_then(|v| v.as_object()) {
+            match sanitize_project_bots(obj, &app.root.join("projects")) {
+                Ok(bots) => {
+                    cfg.project_bots = bots;
+                    dirty_cfg = true;
+                }
+                Err(msg) => return write_http_err(&mut stream, 409, &msg).await,
+            }
+        }
         if payload.get("auto_label").and_then(|v| v.as_bool()) == Some(true) {
             apply_auto_labels(&app.root, &mut cfg);
             dirty_cfg = true;
@@ -2191,7 +2264,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "ok": true,
                 "hidden_projects": cfg.hidden_projects,
                 "project_labels": cfg.project_labels,
-                "project_names": cfg.project_names
+                "project_names": cfg.project_names,
+                "project_bots": cfg.project_bots
             }),
         )
         .await;
@@ -3073,6 +3147,26 @@ mod tests {
         let cleaned = sanitize_project_labels(&raw);
         assert!(!cleaned.contains_key("demo"));
         assert_eq!(cleaned.get("nemo").unwrap(), &vec!["cloud".to_string()]);
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_sanitize_project_bots_prevents_duplicates() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_bots_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("flint")).unwrap();
+        fs::create_dir_all(tmp.join("nemo")).unwrap();
+
+        let flint_def = format!("b:{:04x}", default_bot_mask("flint"));
+        let mut dup = serde_json::Map::new();
+        dup.insert("nemo".into(), json!(flint_def));
+        assert!(sanitize_project_bots(&dup, &tmp).is_err());
+
+        let unique_mask = (default_bot_mask("flint") ^ 0x0021) | (1 << 4);
+        let mut ok_map = serde_json::Map::new();
+        ok_map.insert("nemo".into(), json!(format!("b:{unique_mask:04x}")));
+        let clean = sanitize_project_bots(&ok_map, &tmp).unwrap();
+        assert_eq!(clean.get("nemo").map(String::as_str), Some(format!("b:{unique_mask:04x}").as_str()));
         let _ = fs::remove_dir_all(&tmp);
     }
 }

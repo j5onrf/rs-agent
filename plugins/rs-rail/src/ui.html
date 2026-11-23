@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="dark light" />
 <meta name="darkreader-lock" />
 <title>RS Rail</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fira+Code:wght@400;500;600&display=swap" />
 <style>
   :root {
     --bg: #0c0c0e;
@@ -43,9 +43,10 @@
     --syn-num: #fcd34d;
     --syn-cmt: #717885;
     --code-size: 12px;
+    --ui-size: 13px;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 13px; overflow: hidden; font-synthesis: style; }
+  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: var(--ui-size); overflow: hidden; font-synthesis: style; }
   body.theme-dark { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
   button, input, select, textarea, [tabindex] { font: inherit; color: inherit; outline: none; }
   input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.82; }
@@ -55,47 +56,15 @@
 
   /* Topbar */
   .topbar { height: 40px; min-height: 40px; background: var(--topbar-bg, var(--panel)); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 12px; gap: 10px; }
-  .tb-left, .tb-right { display: flex; align-items: center; gap: 9px; min-width: 0; }
-  .brand { font-weight: 600; letter-spacing: .2px; display: inline-flex; align-items: center; gap: 7px; color: var(--text); white-space: nowrap; background: transparent; border: none; padding: 4px 0 4px 4px; margin-left: -6px; border-radius: 6px; cursor: pointer; }
-  .brand:hover { background: var(--hover); }
+  .tb-left, .tb-right { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .brand { font-weight: 600; letter-spacing: .2px; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; color: var(--text); white-space: nowrap; background: var(--card); border: 1px solid var(--border); border-radius: 999px; cursor: default; }
+  .brand.clickable { cursor: pointer; }
+  .brand.clickable:hover { background: var(--hover); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
   .sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
   .tele { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; user-select: none; }
   .tele strong { color: var(--text); font-weight: 500; }
-  #tb-profile, #tb-git-txt, #tb-stats, #tb-usage { display: inline-flex; align-items: center; gap: 2ch; }
-  #tb-profile { margin-left: -3px; }
-  #tb-stats { margin-right: calc(2ch - 9px); }
-  #tb-ctx { margin-right: max(0px, calc(2ch - 17px)); }
-  body.ui-all-pills .tb-left,
-  body.ui-all-pills .tb-right { gap: 6px; }
-  body.ui-all-pills #tb-profile,
-  body.ui-all-pills #tb-git,
-  body.ui-all-pills #tb-stats,
-  body.ui-all-pills #tb-ctx {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 2px 9px;
-    gap: 1.5ch;
-    margin: 0 !important;
-  }
-  body.ui-all-pills .topbar .btn-icon,
-  body.ui-all-pills .topbar .brand {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    width: 26px;
-    height: 26px;
-    padding: 0 !important;
-    margin: 0 !important;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  body.ui-all-pills .topbar .btn-icon:hover,
-  body.ui-all-pills .topbar .brand:hover {
-    background: var(--hover);
-    border-color: color-mix(in srgb, var(--accent) 30%, var(--border));
-  }
+  #tb-git-txt { display: inline-flex; align-items: center; gap: 1.5ch; }
+  #tb-profile, #tb-git, #tb-stats, #tb-ctx { background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; gap: 1.5ch; }
   .git-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
   .git-dot.dirty { background: var(--accent); }
   #tb-ctx { position: relative; cursor: default; }
@@ -112,10 +81,10 @@
   .btn-danger { background: var(--del-bg); color: var(--err-text); border-color: rgba(239,68,68,.4); }
   .btn-sm { padding: 2px 8px; font-size: 11px; }
   .btn-icon { padding: 4px 6px; }
-  .topbar .btn-icon { background: transparent; border-color: transparent; color: var(--muted); }
-  .topbar .btn-icon:hover { background: var(--hover); color: var(--text); }
-  #btn-close-app { margin-left: 0; width: 25px; height: 25px; padding: 0; border-radius: 6px; opacity: 1; display: inline-flex; align-items: center; justify-content: center; transition: opacity .12s, background .12s, color .12s; }
-  #btn-close-app:hover { opacity: 1; color: var(--err-text); background: var(--del-bg); }
+  .topbar .btn-icon { background: var(--card); border: 1px solid var(--border); border-radius: 999px; color: var(--muted); width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+  .topbar .btn-icon:hover { background: var(--hover); color: var(--text); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
+  #btn-close-app { margin-left: 6px; transition: background .12s, color .12s, border-color .12s; }
+  #btn-close-app:hover { color: var(--err-text); background: var(--del-bg); border-color: rgba(239,68,68,.4); }
   .btn-send-circle { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: var(--card); color: var(--muted); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background .12s, border-color .12s, color .12s, filter .12s; }
   .btn-send-circle:hover { background: var(--hover); color: var(--text); }
   .btn-send-circle.ready { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
@@ -172,7 +141,6 @@
   .lbl-name { cursor: pointer; }
   .lbl-name:hover { color: var(--accent); }
   .ph-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 600; color: var(--text); }
-  .ph-kbd { font-size: 10px; color: var(--dim); border: 1px solid var(--border); background: var(--card); border-radius: 4px; padding: 1px 5px; }
   .ph-row { color: var(--muted); display: flex; justify-content: space-between; gap: 10px; }
 
   /* Right Sidebar 2-Pane Split (ThinkRail proportions: Top Files + Bottom [TASK | Memory]) */
@@ -186,7 +154,14 @@
   .file-del.arm { color: var(--err-text); background: var(--del-bg); }
   .rs-bot { height: 42%; min-height: 170px; display: flex; flex-direction: column; flex-shrink: 0; }
   .rs-tabs { display: flex; gap: 4px; }
-  .rs-tab { background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 2px 7px; font-size: 11px; color: var(--dim); cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 500; }
+  .rs-tab { background: transparent; border: 1px solid transparent; border-radius: 5px; padding: 2px 7px; font-size: 11px; color: var(--dim); cursor: pointer; text-transform: none; letter-spacing: 0; font-weight: 500; white-space: nowrap; }
+  .brand-letters { font-family: var(--mono); font-size: 12px; font-weight: 700; line-height: 16px; letter-spacing: 0.02em; text-transform: uppercase; color: var(--text); display: inline-block; text-align: center; }
+  .brand-letters.grad { background: linear-gradient(135deg, var(--text) 10%, var(--accent) 95%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .bot-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+  .bot-opt { position: relative; aspect-ratio: 1; background: var(--card); border: 1px solid var(--border); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text); padding: 0; transition: background .12s, border-color .12s; }
+  .bot-opt:hover:not(:disabled) { background: var(--hover); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .bot-opt.active { border-color: var(--accent); background: var(--accent-bg); }
+  .bot-opt:disabled { opacity: 0.28; cursor: not-allowed; }
   .rs-tab.active { background: var(--card); border-color: var(--border); color: var(--text); }
   .rs-pane { flex: 1; display: none; flex-direction: column; min-height: 0; }
   .rs-pane.open { display: flex; }
@@ -219,7 +194,7 @@
   .think-box summary:hover { background: var(--card); border-color: var(--border); }
   .think-box summary:hover .think-step, .think-box summary:hover .think-meta, .think-box summary:hover .think-chev { color: var(--text); opacity: 1; }
   .think-box[open] .think-chev { transform: rotate(90deg); }
-  .think-body { white-space: pre-wrap; margin: 5px 0 4px 6px; padding-left: 12px; border-left: 1px solid var(--border); color: var(--muted); opacity: 0.85; font-size: 12px; line-height: 1.48; }
+  .think-body { white-space: pre-wrap; margin: 5px 0 4px 6px; padding-left: 12px; border-left: 1px solid var(--border); color: var(--muted); opacity: 0.85; font-family: var(--mono); font-size: var(--code-size); line-height: 1.48; }
   .ans-row { display: flex; align-items: flex-start; gap: 9px; line-height: 1.55; }
   .bullet { width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); font-size: 0; user-select: none; margin-top: 6px; flex-shrink: 0; }
   .stream.chat-mode .ans-row .bullet { display: none; }
@@ -287,9 +262,6 @@
   .micro-pill:hover, .micro-pill.open { background: var(--hover); }
   .micro-pill.muted { color: var(--muted); }
   .micro-pill.muted:hover, .micro-pill.muted.open { color: var(--text); }
-  body.prompt-ghost .micro-pill { background: transparent; border-color: transparent; border-radius: 7px; padding: 0 7px; }
-  body.prompt-ghost .micro-pill:hover, body.prompt-ghost .micro-pill.open { background: var(--hover); }
-  body.prompt-ghost .skill-chip { border-radius: 7px; }
   .pop-wrap { position: relative; display: inline-flex; }
   .pop { position: absolute; bottom: calc(100% + 6px); left: 0; min-width: 168px; max-height: min(320px, 55vh); overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px; display: none; flex-direction: column; gap: 1px; box-shadow: 0 12px 28px rgba(0,0,0,.32); z-index: 30; }
   .pop.open { display: flex; }
@@ -372,7 +344,7 @@
   <header class="topbar">
     <div class="tb-left">
       <button class="btn btn-sm btn-icon" id="btn-toggle-proj" aria-label="Toggle sidebar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg></button>
-      <button type="button" class="brand" id="btn-brand-settings" aria-label="Settings"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="var(--text)"/><stop offset="100%" stop-color="var(--accent)"/></linearGradient></defs><path id="brand-path" d="M 7.2 3.5 L 12.7 8 L 7.2 12.5 L 3.7 12.5" stroke="url(#brandGrad)"/></svg></button>
+      <button type="button" class="brand" id="btn-brand-settings"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="var(--text)"/><stop offset="100%" stop-color="var(--accent)"/></linearGradient></defs><path id="brand-path" d="M 7.2 3.5 L 12.7 8 L 7.2 12.5 L 3.7 12.5" stroke="url(#brandGrad)"/></svg></button>
       <span class="tele" id="tb-profile">—</span>
       <span class="sep" id="tb-git-sep" style="display:none;"></span>
       <span class="tele" id="tb-git" style="display:none;"><span class="git-dot" id="tb-git-dot"></span><span id="tb-git-txt"></span></span>
@@ -516,6 +488,32 @@
   </div>
 </div>
 
+<!-- Micro-Bot Picker Modal -->
+<div class="modal-backdrop" id="modal-bot">
+  <div class="modal" style="width:460px;height:auto;max-height:84vh;">
+    <div class="modal-head">
+      <span id="mb-title">Micro-Bot</span>
+      <button class="btn btn-sm" id="btn-close-bot">✕</button>
+    </div>
+    <div class="modal-pane" style="gap:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span id="mb-cur" style="width:34px;height:34px;border-radius:8px;background:var(--card);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;"></span>
+          <div>
+            <div style="font-weight:600;font-size:12.5px;" id="mb-proj">—</div>
+            <div class="muted">Pick a unique micro-bot</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-sm" id="btn-bot-reset" style="display:none;">Default</button>
+          <button class="btn btn-sm" id="btn-bot-shuffle">Shuffle</button>
+        </div>
+      </div>
+      <div class="bot-grid" id="mb-grid"></div>
+    </div>
+  </div>
+</div>
+
 <!-- File Preview Modal -->
 <div class="modal-backdrop" id="modal-file">
   <div class="modal">
@@ -546,9 +544,9 @@ const BUILTIN_THEMES = [
 const DEFAULT_APPEARANCE = {
   theme: "dark-default",
   uiFont: "JetBrains Mono",
+  uiSize: 13,
   codeFont: "JetBrains Mono",
   codeSize: 12,
-  interfaceStyle: "composer",
   logoStyle: "d",
   microBots: true
 };
@@ -572,6 +570,37 @@ function getAppearance() {
 
 function allThemes() {
   return [...BUILTIN_THEMES, ...(STATE?.themes || [])];
+}
+
+const BRAND_GRAD_DEFS = `<defs><linearGradient id="brandGrad" gradientUnits="userSpaceOnUse" x1="3" y1="3" x2="13" y2="13"><stop offset="0%" stop-color="var(--text)"/><stop offset="100%" stop-color="var(--accent)"/></linearGradient></defs>`;
+
+function renderBrandLogo(cfg) {
+  const btn = $("btn-brand-settings");
+  if (!btn) return;
+  const c = cfg || getAppearance();
+  const isMono = (c.logoStyle || "d") === "a";
+  const badgeMode = c.microBots === "none" ? "none" : (c.microBots === false || c.microBots === "letters" ? "letters" : "bots");
+  const ap = STATE?.active_project;
+  const canPick = Boolean(ap && badgeMode === "bots");
+  btn.classList.toggle("clickable", canPick);
+  btn.tabIndex = canPick ? 0 : -1;
+  if (canPick) {
+    btn.title = "Change Micro-Bot";
+    btn.setAttribute("aria-label", "Change Micro-Bot");
+  } else {
+    btn.removeAttribute("title");
+    btn.removeAttribute("aria-label");
+  }
+  if (ap && badgeMode === "bots") {
+    btn.innerHTML = botSvg(ap.name, 17, isMono ? "currentColor" : "url(#brandGrad)", isMono ? "" : BRAND_GRAD_DEFS);
+  } else if (ap && badgeMode === "letters") {
+    const dname = projDisplay(ap.name);
+    const txt = (dname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || dname.slice(0, 2)).toUpperCase();
+    btn.innerHTML = `<span class="brand-letters${isMono ? "" : " grad"}">${esc(txt)}</span>`;
+  } else {
+    const stroke = isMono ? "currentColor" : "url(#brandGrad)";
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${isMono ? "" : BRAND_GRAD_DEFS}<path id="brand-path" d="M 7.2 3.5 L 12.7 8 L 7.2 12.5 L 3.7 12.5" stroke="${stroke}"/></svg>`;
+  }
 }
 
 function applyAppearance(next) {
@@ -627,8 +656,8 @@ function applyAppearance(next) {
   for (const [k, v] of Object.entries(vars)) root.setProperty(k, v);
   const uiMap = {
     "JetBrains Mono": '"JetBrainsMono Nerd Font", "JetBrainsMono NF", "JetBrains Mono", ui-monospace, monospace',
-    "Geist": '"Geist", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    "System": 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+    "Geist": '"Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    "System": '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
   };
   const codeMap = {
     "JetBrains Mono": '"JetBrainsMono Nerd Font", "JetBrainsMono NF", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
@@ -637,13 +666,10 @@ function applyAppearance(next) {
   };
   root.setProperty("--sans", uiMap[cfg.uiFont] || uiMap["JetBrains Mono"]);
   root.setProperty("--mono", codeMap[cfg.codeFont] || codeMap["JetBrains Mono"]);
+  root.setProperty("--ui-size", `${cfg.uiSize || 13}px`);
   root.setProperty("--code-size", `${cfg.codeSize}px`);
   document.body.classList.toggle("theme-dark", !isLight);
-  const ifStyle = cfg.interfaceStyle || (cfg.promptBar === "ghost" ? "clean" : "composer");
-  document.body.classList.toggle("ui-all-pills", ifStyle === "all");
-  document.body.classList.toggle("prompt-ghost", ifStyle === "clean");
-  const bp = document.getElementById("brand-path");
-  if (bp) bp.setAttribute("stroke", (cfg.logoStyle || "d") === "a" ? "currentColor" : "url(#brandGrad)");
+  renderBrandLogo(cfg);
   resizeInput();
 }
 applyAppearance();
@@ -794,19 +820,37 @@ function setRsNote(msg) {
   el._t = setTimeout(() => { el.textContent = ""; }, 4000);
 }
 
-function botSvg(name) {
+function hashBotMask(name) {
   let h = 2166136261;
   for (let i = 0; i < name.length; i++) h = Math.imul(h ^ name.charCodeAt(i), 16777619);
+  let mask = 0;
+  for (let i = 0; i < 15; i++) {
+    if ((h >> i) & 1 || i === 4) mask |= (1 << i);
+  }
+  return mask;
+}
+function parseBotVal(val) {
+  if (typeof val !== "string" || !val.startsWith("b:")) return null;
+  const n = parseInt(val.slice(2), 16);
+  return Number.isFinite(n) ? ((n & 0x7fff) | (1 << 4)) : null;
+}
+function projectBotMask(name) {
+  return parseBotVal(STATE?.ui_prefs?.project_bots?.[name]) ?? hashBotMask(name);
+}
+function botSvgFromMask(mask, size = 12, fill = "currentColor", defs = "") {
   const rects = [];
   for (let y = 0; y < 5; y++) {
     for (let x = 0; x < 3; x++) {
-      if ((h >> ((y * 3 + x) % 24)) & 1 || (y === 1 && x === 1)) {
+      if ((mask >> (y * 3 + x)) & 1 || (y === 1 && x === 1)) {
         rects.push(`<rect x="${3 + x * 2}" y="${3 + y * 2}" width="2" height="2" rx="0.4"/>`);
         if (x < 2) rects.push(`<rect x="${11 - x * 2}" y="${3 + y * 2}" width="2" height="2" rx="0.4"/>`);
       }
     }
   }
-  return `<svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">${rects.join("")}</svg>`;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="${fill}" aria-hidden="true">${defs}${rects.join("")}</svg>`;
+}
+function botSvg(name, size = 12, fill = "currentColor", defs = "") {
+  return botSvgFromMask(projectBotMask(name), size, fill, defs);
 }
 
 const projDisplay = (name) => (STATE?.ui_prefs?.project_names?.[name] || name);
@@ -828,7 +872,6 @@ function renderAll() {
     $("tb-git-dot").classList.toggle("dirty", gitLabel.includes("modified"));
   }
   $("btn-model-pill").textContent = `${STATE.provider.model} · ${STATE.provider.endpoint}`;
-  $("btn-model-pill").title = `${STATE.provider.model} · ${STATE.provider.endpoint} (Open Providers)`;
   $("btn-img").style.display = STATE.provider.is_local ? "none" : "inline-flex";
   disarmReset();
   $("btn-reset").style.display = (ap.history && ap.history.length) ? "inline-flex" : "none";
@@ -1852,14 +1895,21 @@ function renderModalTab() {
 
     const uiRow = document.createElement("div");
     uiRow.className = "setting-row";
-    uiRow.innerHTML = `<div><strong>Interface Font</strong><div class="muted">Labels, headings, and chat prose</div></div>
-      <select id="ap-ui-font" class="comp-select">
-        <option value="JetBrains Mono" ${ap.uiFont==="JetBrains Mono"?"selected":""}>JetBrains Mono</option>
-        <option value="Geist" ${ap.uiFont==="Geist"?"selected":""}>Geist</option>
-        <option value="System" ${ap.uiFont==="System"?"selected":""}>System Sans</option>
-      </select>`;
+    const uiSz = ap.uiSize || 13;
+    uiRow.innerHTML = `<div><strong>Interface Font &amp; Size</strong><div class="muted">Labels, headings, and chat prose</div></div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <select id="ap-ui-font" class="comp-select">
+          <option value="JetBrains Mono" ${ap.uiFont==="JetBrains Mono"?"selected":""}>JetBrains Mono</option>
+          <option value="Geist" ${ap.uiFont==="Geist"?"selected":""}>Geist</option>
+          <option value="System" ${ap.uiFont==="System"?"selected":""}>System Sans</option>
+        </select>
+        <select id="ap-ui-size" class="comp-select">
+          ${[11,12,13,14,15].map(n => `<option value="${n}" ${uiSz===n?"selected":""}>${n}px</option>`).join("")}
+        </select>
+      </div>`;
     pane.appendChild(uiRow);
     $("ap-ui-font").onchange = (e) => applyAppearance({ uiFont: e.target.value });
+    $("ap-ui-size").onchange = (e) => applyAppearance({ uiSize: +e.target.value });
 
     const codeRow = document.createElement("div");
     codeRow.className = "setting-row";
@@ -1878,27 +1928,13 @@ function renderModalTab() {
     $("ap-code-font").onchange = (e) => applyAppearance({ codeFont: e.target.value });
     $("ap-code-size").onchange = (e) => applyAppearance({ codeSize: +e.target.value });
 
-    const styleRow = document.createElement("div");
-    styleRow.className = "setting-row";
-    const curIf = ap.interfaceStyle || (ap.promptBar === "ghost" ? "clean" : "composer");
-    styleRow.innerHTML = `<div><strong>Interface Style</strong><div class="muted">Pills everywhere, composer pills only, or borderless clean</div></div>
-      <div style="display:flex;gap:4px;" class="rs-tabs">
-        <button class="rs-tab ${curIf === "all" ? "active" : ""}" id="btn-if-all">All Pills</button>
-        <button class="rs-tab ${curIf === "composer" ? "active" : ""}" id="btn-if-comp">Composer</button>
-        <button class="rs-tab ${curIf === "clean" ? "active" : ""}" id="btn-if-clean">Clean</button>
-      </div>`;
-    pane.appendChild(styleRow);
-    $("btn-if-all").onclick = () => { applyAppearance({ interfaceStyle: "all" }); renderModalTab(); };
-    $("btn-if-comp").onclick = () => { applyAppearance({ interfaceStyle: "composer" }); renderModalTab(); };
-    $("btn-if-clean").onclick = () => { applyAppearance({ interfaceStyle: "clean" }); renderModalTab(); };
-
     const logoRow = document.createElement("div");
     logoRow.className = "setting-row";
     const curLogo = ap.logoStyle || "d";
-    logoRow.innerHTML = `<div><strong>Brand Logo</strong><div class="muted">Dynamic theme gradient (D) or canonical monochrome (A)</div></div>
+    logoRow.innerHTML = `<div><strong>Brand Logo</strong><div class="muted">Dynamic theme gradient or canonical monochrome</div></div>
       <div style="display:flex;gap:4px;" class="rs-tabs">
-        <button class="rs-tab ${curLogo === "d" ? "active" : ""}" id="btn-logo-d">Gradient (D)</button>
-        <button class="rs-tab ${curLogo === "a" ? "active" : ""}" id="btn-logo-a">Monochrome (A)</button>
+        <button class="rs-tab ${curLogo === "d" ? "active" : ""}" id="btn-logo-d">Gradient</button>
+        <button class="rs-tab ${curLogo === "a" ? "active" : ""}" id="btn-logo-a">Monochrome</button>
       </div>`;
     pane.appendChild(logoRow);
     $("btn-logo-d").onclick = () => { applyAppearance({ logoStyle: "d" }); renderModalTab(); };
@@ -1969,11 +2005,10 @@ async function pickAcItem(idx) {
   await runLocalSlash(it.cmd);
 }
 
-const toggleLeft = () => {
+$("btn-toggle-proj").onclick = () => {
   const hidden = $("sidebar-left").classList.toggle("hidden");
   localStorage.setItem("rs_rail_left_hidden", hidden ? "1" : "0");
 };
-$("btn-toggle-proj").onclick = toggleLeft;
 if (localStorage.getItem("rs_rail_left_hidden") === "1") $("sidebar-left").classList.add("hidden");
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
@@ -1982,13 +2017,7 @@ document.addEventListener("keydown", (e) => {
     $("modal-settings").classList.remove("open");
     $("modal-new-proj").classList.remove("open");
     $("modal-file").classList.remove("open");
-  }
-  if ((e.ctrlKey || e.metaKey) && e.key === ",") { e.preventDefault(); openSettings(); }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") { e.preventDefault(); toggleLeft(); }
-  if ((e.ctrlKey || e.metaKey) && /^[1-9]$/.test(e.key) && STATE?.projects) {
-    const hs = new Set(STATE.ui_prefs?.hidden_projects || []);
-    const vis = STATE.projects.filter((p) => !hs.has(p.name));
-    if (vis[+e.key - 1]) { e.preventDefault(); loadState(vis[+e.key - 1].name); }
+    $("modal-bot").classList.remove("open");
   }
 });
 
@@ -2074,7 +2103,96 @@ $("btn-export-md").onclick = async () => {
   } catch (err) { setRsNote(err.message); }
 };
 $("btn-settings").onclick = () => openSettings();
-$("btn-brand-settings").onclick = () => openSettings();
+let botPage = 0;
+function buildBotCandidates(curMask, defMask, taken, page) {
+  const out = [curMask];
+  const seen = new Set([curMask]);
+  if (defMask !== curMask && !taken.has(defMask)) {
+    out.push(defMask);
+    seen.add(defMask);
+  }
+  let s = (0x9e3779b9 ^ Math.imul(page + 1, 0x85ebca6b)) >>> 0;
+  for (let guard = 0; out.length < 24 && guard < 4000; guard++) {
+    s = (Math.imul(s ^ (s >>> 15), 0x85ebca6b) + 0x27d4eb2d) >>> 0;
+    const m = (s & 0x7fff) | (1 << 4);
+    if (seen.has(m) || taken.has(m)) continue;
+    let bits = 0, top = 0, bot = 0;
+    for (let i = 0; i < 15; i++) {
+      if ((m >> i) & 1) { bits++; if (i < 6) top++; if (i >= 9) bot++; }
+    }
+    if (bits >= 6 && bits <= 11 && top >= 1 && bot >= 1) {
+      out.push(m);
+      seen.add(m);
+    }
+  }
+  return out;
+}
+function renderBotPicker() {
+  const ap = STATE?.active_project;
+  if (!ap) return;
+  const taken = new Map();
+  for (const p of STATE.projects || []) {
+    if (p.name !== ap.name) taken.set(projectBotMask(p.name), p.name);
+  }
+  const curMask = projectBotMask(ap.name);
+  const defMask = hashBotMask(ap.name);
+  const isMono = (getAppearance().logoStyle || "d") === "a";
+  const fill = isMono ? "currentColor" : "url(#brandGrad)";
+  const defs = isMono ? "" : BRAND_GRAD_DEFS;
+  $("mb-proj").textContent = projDisplay(ap.name);
+  $("mb-cur").innerHTML = botSvgFromMask(curMask, 22, fill, defs);
+  const rb = $("btn-bot-reset");
+  rb.style.display = curMask !== defMask ? "inline-flex" : "none";
+  rb.disabled = taken.has(defMask);
+  rb.title = taken.has(defMask) ? `Default used by ${taken.get(defMask)}` : "Restore default micro-bot";
+
+  const grid = $("mb-grid");
+  grid.innerHTML = "";
+  for (const m of buildBotCandidates(curMask, defMask, taken, botPage)) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "bot-opt" + (m === curMask ? " active" : "");
+    b.innerHTML = botSvgFromMask(m, 22, m === curMask ? fill : "currentColor", m === curMask ? defs : "");
+    const owner = taken.get(m);
+    if (owner) {
+      b.disabled = true;
+      b.title = `Used by ${owner}`;
+    } else {
+      b.onclick = async () => {
+        const nextBots = { ...(STATE.ui_prefs?.project_bots || {}) };
+        if (m === defMask) delete nextBots[ap.name];
+        else nextBots[ap.name] = `b:${m.toString(16).padStart(4, "0")}`;
+        const res = await api("/api/settings/ui", { project_bots: nextBots });
+        STATE.ui_prefs.project_bots = res.project_bots || nextBots;
+        renderAll();
+        renderBotPicker();
+      };
+    }
+    grid.appendChild(b);
+  }
+}
+function openBotPicker() {
+  botPage = 0;
+  renderBotPicker();
+  $("modal-bot").classList.add("open");
+}
+$("btn-close-bot").onclick = () => $("modal-bot").classList.remove("open");
+$("btn-bot-shuffle").onclick = () => { botPage += 1; renderBotPicker(); };
+$("btn-bot-reset").onclick = async () => {
+  const ap = STATE?.active_project;
+  if (!ap) return;
+  const nextBots = { ...(STATE.ui_prefs?.project_bots || {}) };
+  delete nextBots[ap.name];
+  const res = await api("/api/settings/ui", { project_bots: nextBots });
+  STATE.ui_prefs.project_bots = res.project_bots || nextBots;
+  renderAll();
+  renderBotPicker();
+};
+$("btn-brand-settings").onclick = () => {
+  const bRaw = getAppearance().microBots;
+  const isBots = bRaw !== "none" && bRaw !== false && bRaw !== "letters";
+  if (isBots && STATE?.active_project) openBotPicker();
+};
 $("btn-projects-nav").onclick = () => openSettings("projects");
 $("btn-profiles-nav").onclick = () => openSettings("profiles");
 $("btn-close-app").onclick = async () => {
