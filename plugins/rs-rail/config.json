@@ -1,39 +1,39 @@
 {
   "show_right_panel": true,
-  "last_project": "surogate37",
+  "last_project": "tokenlab",
   "project_labels": {
-    "lfm3": [
-      "local"
-    ],
-    "ling-tiny": [
-      "local"
-    ],
     "inkling2": [
-      "local"
-    ],
-    "surogate37": [
-      "local"
-    ],
-    "gem35": [
-      "cloud"
-    ],
-    "sage": [
-      "local"
-    ],
-    "qwen38": [
       "local"
     ],
     "groot": [
       "local"
     ],
-    "nemo": [
+    "flint": [
+      "local"
+    ],
+    "ling-tiny": [
+      "local"
+    ],
+    "gem35": [
       "cloud"
     ],
-    "flint": [
+    "qwen38": [
+      "local"
+    ],
+    "sage": [
       "local"
     ],
     "tokenlab": [
       "cloud"
+    ],
+    "nemo": [
+      "cloud"
+    ],
+    "surogate37": [
+      "local"
+    ],
+    "lfm3": [
+      "local"
     ]
   },
   "project_names": {

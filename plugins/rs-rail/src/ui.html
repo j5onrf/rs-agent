@@ -170,6 +170,36 @@
   .mem-input:focus { border-color: var(--accent); }
   .rs-note { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+  .proj-call { background: transparent; border: none; padding: 2px; border-radius: 4px; color: var(--muted); cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 0; }
+  .proj-item:hover .proj-call { display: inline-flex; }
+  .proj-call:hover { color: var(--accent); background: var(--accent-bg); }
+  .peer-card { border: 1px solid color-mix(in srgb, var(--cyan) 35%, var(--border)); background: var(--panel); border-radius: 8px; overflow: hidden; }
+  .peer-head { padding: 7px 11px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--cyan) 6%, var(--panel)); cursor: pointer; }
+  .peer-head:hover { background: var(--hover); }
+  .peer-title { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1; overflow: hidden; }
+  .peer-brief { color: var(--muted); font-family: var(--mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .peer-tag { font-family: var(--mono); font-size: 10.5px; color: var(--cyan); padding: 1px 6px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--cyan) 35%, var(--border)); background: color-mix(in srgb, var(--cyan) 10%, transparent); flex-shrink: 0; }
+  .peer-body { padding: 10px 12px; line-height: 1.55; }
+  .peer-body p:first-child { margin-top: 0; } .peer-body p:last-child { margin-bottom: 0; }
+  .peer-card .tool-raw { border-top: 1px solid var(--border); display: none; }
+  .peer-card.open .tool-raw { display: block; }
+  .call-route { display: flex; align-items: stretch; gap: 8px; }
+  .call-node { flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; text-align: left; }
+  .call-node-btn { cursor: pointer; transition: background .12s, border-color .12s; }
+  .call-node-btn:hover, .call-node-btn.open { background: var(--hover); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+  .call-node-btn.open .chev { transform: rotate(180deg); }
+  .call-arrow { display: flex; align-items: center; color: var(--muted); flex-shrink: 0; font-size: 13px; }
+  .call-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+  .call-name { font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .call-sub { font-family: var(--mono); font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .call-targets { max-height: 168px; overflow-y: auto; display: none; flex-direction: column; gap: 4px; padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+  .call-targets.open { display: flex; }
+  .call-target-opt { background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 6px 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; text-align: left; }
+  .call-target-opt:hover { background: var(--hover); }
+  .call-target-opt.active { background: var(--accent-bg); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+  .call-prompt { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; resize: vertical; min-height: 76px; max-height: 180px; line-height: 1.45; }
+  .call-prompt:focus { border-color: var(--accent); }
+
   /* Center Chat */
   .center { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   .stream { flex: 1; overflow-y: auto; padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 35%, transparent) transparent; }
@@ -514,6 +544,43 @@
   </div>
 </div>
 
+<!-- Peer Call Modal -->
+<div class="modal-backdrop" id="modal-call">
+  <div class="modal" style="width:480px;height:auto;max-height:86vh;">
+    <div class="modal-head">
+      <span>Call Peer Bot</span>
+      <button class="btn btn-sm" id="btn-close-call">✕</button>
+    </div>
+    <div class="modal-pane" style="gap:12px;">
+      <div class="call-route">
+        <div class="call-node" id="call-caller"></div>
+        <span class="call-arrow">→</span>
+        <button type="button" class="call-node call-node-btn" id="call-target-btn"></button>
+      </div>
+      <div class="call-targets" id="call-targets"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+        <div>
+          <div style="font-weight:600;font-size:12px;">Context</div>
+          <div class="muted" id="call-mode-hint">Sends caller's last turn + your prompt</div>
+        </div>
+        <div class="rs-tabs">
+          <button type="button" class="rs-tab active" id="btn-call-last">Last turn</button>
+          <button type="button" class="rs-tab" id="btn-call-full">Full transcript</button>
+        </div>
+      </div>
+      <div class="field">
+        <label class="muted">Question or Task</label>
+        <textarea class="call-prompt" id="call-prompt" rows="3" placeholder="e.g. Double-check edge cases in test_calc.py..."></textarea>
+      </div>
+      <div class="tool-err" id="call-err"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;">
+        <button type="button" class="btn" id="btn-cancel-call">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btn-run-call">Ask Bot</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- File Preview Modal -->
 <div class="modal-backdrop" id="modal-file">
   <div class="modal">
@@ -682,6 +749,7 @@ const SLASH_CMDS = [
   { cmd: "/ms", desc: "Providers & models" },
   { cmd: "/tk", desc: "Toggle auto-expand steps" },
   { cmd: "/export", desc: "Export transcript to .rs/transcripts/" },
+  { cmd: "/call", desc: "Ask another project bot" },
 ];
 
 function renderProseBlock(raw) {
@@ -923,11 +991,22 @@ function renderAll() {
     el.className = "proj-item" + (p.name === ap.name ? " active" : "");
     const dname = projDisplay(p.name);
     const badgeHtml = badgeMode === "none" ? "" : `<span class="proj-badge">${badgeMode === "bots" ? botSvg(p.name) : esc(dname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || dname.slice(0, 2))}</span>`;
+    const callBtn = p.name !== ap.name
+      ? `<button type="button" class="proj-call" title="Call ${esc(dname)}"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5h11v7.5h-6l-3 2.5V11H2.5z"/></svg></button>`
+      : "";
     const delBtn = p.file_count > 0
       ? `<button class="proj-del" title="Delete ${p.file_count} file(s)"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11"/><path d="M6 2.5h4"/><path d="M4.5 4.5l.7 9h5.6l.7-9"/></svg></button>`
       : "";
-    el.innerHTML = `<div class="proj-left">${badgeHtml}<span class="proj-name">${esc(dname)}</span></div><div class="proj-acts">${delBtn}<span class="proj-dot ${p.dirty ? "dirty" : ""}"></span></div>`;
+    el.innerHTML = `<div class="proj-left">${badgeHtml}<span class="proj-name">${esc(dname)}</span></div><div class="proj-acts">${callBtn}${delBtn}<span class="proj-dot ${p.dirty ? "dirty" : ""}"></span></div>`;
     el.onclick = () => { hc.classList.remove("open"); loadState(p.name); };
+    const cb = el.querySelector(".proj-call");
+    if (cb) {
+      cb.onclick = (e) => {
+        e.stopPropagation();
+        hc.classList.remove("open");
+        openCallModal(p.name);
+      };
+    }
     const db = el.querySelector(".proj-del");
     if (db) {
       db.onclick = async (e) => {
@@ -1091,6 +1170,9 @@ function renderHistory() {
     } else if (m.role === "tool_card") {
       if (!inRound) { step += 1; inRound = true; }
       wrap.appendChild(buildToolCard(m));
+    } else if (m.role === "peer_call") {
+      if (!inRound) { step += 1; inRound = true; }
+      wrap.appendChild(buildPeerCard(m));
     }
   }
   stream.appendChild(wrap);
@@ -1205,6 +1287,33 @@ function buildToolCard(t) {
   return card;
 }
 
+function buildPeerCard(m) {
+  const card = document.createElement("div");
+  card.className = "peer-card";
+  const tName = m.name || "peer";
+  const tag = m.summary ? `<span class="peer-tag">${esc(m.summary)}</span>` : "";
+  const brief = m.brief ? `<span class="peer-brief" title="${esc(m.brief)}">${esc(m.brief)}</span>` : "";
+  const elStr = m.elapsed_s !== undefined ? `${m.elapsed_s.toFixed(1)}s` : "";
+  const bodyHtml = m.ok === false
+    ? `<div class="tool-err">${esc(m.content || "Peer call failed")}</div>`
+    : `<div class="ans-body">${renderMarkdown(m.content || "")}</div>`;
+  card.innerHTML = `
+    <div class="peer-head"${m.raw ? "" : ' style="cursor:default;"'}>
+      <div class="peer-title">${botSvg(tName, 14)}<strong>${esc(projDisplay(tName))}</strong>${tag}${brief}</div>
+      <span class="muted">${elStr}</span>
+    </div>
+    <div class="peer-body">${bodyHtml}</div>
+  `;
+  if (m.raw) {
+    const pre = document.createElement("pre");
+    pre.className = "tool-raw";
+    pre.textContent = m.raw;
+    card.appendChild(pre);
+    card.querySelector(".peer-head").onclick = () => card.classList.toggle("open");
+  }
+  return card;
+}
+
 async function runLocalSlash(text) {
   const low = text.toLowerCase();
   if (low === "/r" || low === "/reset") { await api("/api/reset", {}); await loadState(); return true; }
@@ -1212,6 +1321,8 @@ async function runLocalSlash(text) {
   if (low === "/ms" || low === "/model") { openSettings("providers"); return true; }
   if (low === "/tk" || low === "/think") { await api("/api/settings/ui", { show_thinking: STATE?.ui_prefs?.show_thinking === false }); await loadState(); return true; }
   if (low === "/s" || low === "/skill") { openSettings("skills"); return true; }
+  if (low === "/call") { openCallModal(); return true; }
+  if (low.startsWith("/call ")) { openCallModal(text.slice(6).trim()); return true; }
   if (low === "/export") {
     const res = await api("/api/export", {});
     $("sidebar-right").classList.remove("hidden");
@@ -1383,6 +1494,11 @@ async function sendMessage(overrideText, overrideImgs) {
         else if (evName === "tool_result") {
           flushLive();
           wrap.appendChild(buildToolCard(d));
+          resetLiveNodes();
+          scrollNearBottom();
+        } else if (evName === "peer_call") {
+          flushLive();
+          wrap.appendChild(buildPeerCard(d));
           resetLiveNodes();
           scrollNearBottom();
         } else if (evName === "permission") {
@@ -2018,6 +2134,7 @@ document.addEventListener("keydown", (e) => {
     $("modal-new-proj").classList.remove("open");
     $("modal-file").classList.remove("open");
     $("modal-bot").classList.remove("open");
+    $("modal-call").classList.remove("open");
   }
 });
 
@@ -2256,6 +2373,122 @@ $("btn-create-np").onclick = async () => {
     $("np-err").textContent = err.message;
   }
 };
+
+let callTarget = "", callMode = "last_turn", callPickerOpen = false;
+function renderCallModal() {
+  const ap = STATE?.active_project;
+  if (!ap) return;
+  const siblings = (STATE?.projects || []).filter((p) => p.name !== ap.name);
+  const tgt = siblings.find((p) => p.name === callTarget) || siblings[0] || null;
+  callTarget = tgt ? tgt.name : "";
+
+  $("call-caller").innerHTML = `${botSvg(ap.name, 18)}<span class="call-meta"><span class="call-name">${esc(projDisplay(ap.name))}</span><span class="call-sub">${esc(ap.profile_name || "chat")}${ap.hud_summary ? " · " + esc(ap.hud_summary) : ""}</span></span>`;
+  const tbtn = $("call-target-btn");
+  if (tgt) {
+    tbtn.disabled = false;
+    tbtn.innerHTML = `${botSvg(tgt.name, 18)}<span class="call-meta"><span class="call-name">${esc(projDisplay(tgt.name))}</span><span class="call-sub">${esc(tgt.profile_name || "chat")}${tgt.hud_summary ? " · " + esc(tgt.hud_summary) : ""}</span></span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg>`;
+  } else {
+    tbtn.disabled = true;
+    tbtn.innerHTML = `<span class="call-meta"><span class="call-name">No sibling bots</span><span class="call-sub">Create another project first</span></span>`;
+  }
+
+  const tlist = $("call-targets");
+  tlist.innerHTML = "";
+  tlist.classList.toggle("open", callPickerOpen && siblings.length > 0);
+  tbtn.classList.toggle("open", callPickerOpen && siblings.length > 0);
+  for (const p of siblings) {
+    const opt = document.createElement("button");
+    opt.type = "button";
+    opt.className = "call-target-opt" + (tgt && tgt.name === p.name ? " active" : "");
+    opt.innerHTML = `<span style="display:flex;align-items:center;gap:8px;min-width:0;">${botSvg(p.name, 15)}<span style="min-width:0;display:flex;flex-direction:column;"><span class="call-name">${esc(projDisplay(p.name))}</span><span class="call-sub">${esc(p.profile_name || "chat")}${p.hud_summary ? " · " + esc(p.hud_summary) : ""}</span></span></span><span class="muted">${tgt && tgt.name === p.name ? "✓" : ""}</span>`;
+    opt.onclick = () => {
+      callTarget = p.name;
+      callPickerOpen = false;
+      renderCallModal();
+      $("call-prompt").focus();
+    };
+    tlist.appendChild(opt);
+  }
+
+  $("btn-call-last").classList.toggle("active", callMode === "last_turn");
+  $("btn-call-full").classList.toggle("active", callMode === "full");
+  $("call-mode-hint").textContent = callMode === "full"
+    ? "Sends conversation transcript + your prompt"
+    : "Sends caller's last turn + your prompt";
+  $("btn-run-call").disabled = !tgt || STREAMING;
+  if (!tgt) $("call-err").textContent = "Create another project workspace first to consult a peer bot.";
+}
+
+function openCallModal(prefTarget) {
+  if (STREAMING || !STATE?.active_project) return;
+  const ap = STATE.active_project;
+  const siblings = (STATE.projects || []).filter((p) => p.name !== ap.name);
+  const q = String(prefTarget || "").trim().toLowerCase();
+  const matched = q
+    ? siblings.find((p) => p.name.toLowerCase() === q) || siblings.find((p) => p.name.toLowerCase().startsWith(q))
+    : null;
+  callTarget = matched ? matched.name : (siblings.find((p) => p.name !== "chat")?.name || siblings[0]?.name || "");
+  callMode = "last_turn";
+  callPickerOpen = !matched && siblings.length > 1;
+  $("call-err").textContent = "";
+  renderCallModal();
+  $("modal-call").classList.add("open");
+  $("call-prompt").focus();
+}
+
+async function executePeerCall(target, mode, prompt) {
+  if (STREAMING) return;
+  STREAMING = true;
+  $("btn-send").style.display = "none";
+  $("btn-stop").style.display = "inline-flex";
+  const stream = $("stream");
+  if ($("empty-state")) stream.innerHTML = "";
+  document.querySelector(".center").classList.remove("is-empty");
+  let wrap = stream.querySelector(".turn-wrap");
+  if (!wrap) { wrap = document.createElement("div"); wrap.className = "turn-wrap"; stream.appendChild(wrap); }
+  const pending = document.createElement("div");
+  pending.className = "peer-card";
+  pending.innerHTML = `<div class="peer-head" style="cursor:default;"><div class="peer-title">${botSvg(target, 14)}<strong>${esc(projDisplay(target))}</strong><span class="peer-tag">${esc(mode.replace("_", " "))}</span><span class="peer-brief">${esc(prompt)}</span></div><span class="muted">calling...</span></div>`;
+  wrap.appendChild(pending);
+  stream.scrollTop = stream.scrollHeight;
+
+  let callErr = null;
+  try {
+    await api("/api/bot/call", { target, mode, prompt });
+  } catch (err) {
+    callErr = err.message;
+  } finally {
+    STREAMING = false;
+    $("btn-send").style.display = "inline-flex";
+    $("btn-stop").style.display = "none";
+    await loadState();
+    if (callErr) {
+      const ec = document.createElement("div");
+      ec.className = "err-card";
+      ec.innerHTML = `<div class="err-msg">⚠ ${esc(callErr)}</div><div class="err-acts"><button class="btn btn-sm">Try again</button></div>`;
+      ec.querySelector("button").onclick = () => executePeerCall(target, mode, prompt);
+      stream.appendChild(ec);
+      stream.scrollTop = stream.scrollHeight;
+    }
+  }
+}
+
+$("btn-close-call").onclick = $("btn-cancel-call").onclick = () => $("modal-call").classList.remove("open");
+$("call-target-btn").onclick = () => { callPickerOpen = !callPickerOpen; renderCallModal(); };
+$("btn-call-last").onclick = () => { callMode = "last_turn"; renderCallModal(); };
+$("btn-call-full").onclick = () => { callMode = "full"; renderCallModal(); };
+$("btn-run-call").onclick = async () => {
+  const prompt = $("call-prompt").value.trim();
+  if (!callTarget) { $("call-err").textContent = "Select a target bot."; return; }
+  if (!prompt) { $("call-err").textContent = "Enter a question or task for the target bot."; $("call-prompt").focus(); return; }
+  $("call-err").textContent = "";
+  $("call-prompt").value = "";
+  $("modal-call").classList.remove("open");
+  await executePeerCall(callTarget, callMode, prompt);
+};
+$("call-prompt").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("btn-run-call").click(); }
+});
 
 const params = new URLSearchParams(location.search);
 const liveEs = new EventSource("/api/live");

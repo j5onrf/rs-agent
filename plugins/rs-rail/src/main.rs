@@ -1,7 +1,7 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
@@ -1537,6 +1537,11 @@ fn export_session_markdown(sess: &SessionState) -> Result<String> {
                 let sum = item.summary.as_deref().unwrap_or("Done");
                 md.push_str(&format!("- `{name}({brief})` → {sum}\n\n"));
             }
+            "peer_call" => {
+                let target = item.name.as_deref().unwrap_or("peer");
+                let body = item.content.as_deref().unwrap_or("");
+                md.push_str(&format!("**Peer ({target}):**\n\n{body}\n\n---\n\n"));
+            }
             _ => {}
         }
     }
@@ -1662,6 +1667,567 @@ fn build_user_chat_message(text: &str, images: &[String]) -> ChatMessage {
         tool_calls: None,
         tool_call_id: None,
     }
+}
+
+fn filter_read_only_tools(a: Value, b: Value) -> Value {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    for arr in [a, b] {
+        if let Value::Array(items) = arr {
+            for item in items {
+                if let Some(name) = item.pointer("/function/name").and_then(|v| v.as_str()) {
+                    if tools::is_read_only_tool(name) && seen.insert(name.to_string()) {
+                        out.push(item);
+                    }
+                }
+            }
+        }
+    }
+    Value::Array(out)
+}
+
+fn call_bot_schema(collabs: &[String]) -> Value {
+    json!({
+        "type": "function",
+        "function": {
+            "name": "call_bot",
+            "description": "Consult a collaborator project bot (strictly read-only on your workspace) for review, verification, or a second opinion.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "target": {
+                        "type": "string",
+                        "enum": collabs,
+                        "description": "Target collaborator project name"
+                    },
+                    "task": {
+                        "type": "string",
+                        "description": "Specific question or review instruction for the collaborator"
+                    },
+                    "context": {
+                        "type": "string",
+                        "description": "Optional brief context or file paths to inspect"
+                    }
+                },
+                "required": ["target", "task"]
+            }
+        }
+    })
+}
+
+fn strip_json_fence(raw: &str) -> String {
+    let t = raw.trim();
+    if let Some(rest) = t.strip_prefix("```") {
+        let body = rest.split_once('\n').map(|(_, b)| b).unwrap_or(rest);
+        return body.trim_end_matches("```").trim().to_string();
+    }
+    t.to_string()
+}
+
+fn parse_profile_collab_raw(raw: &str, active_project: &str) -> (Vec<String>, String) {
+    let mut collabs = Vec::new();
+    let mut mode = "last_turn".to_string();
+    let mut in_fm = false;
+    for line in raw.lines() {
+        let t = line.trim();
+        if t == "---" {
+            if !in_fm {
+                in_fm = true;
+                continue;
+            }
+            break;
+        }
+        if !in_fm {
+            continue;
+        }
+        if let Some((k, v)) = t.split_once(':') {
+            let key = k.trim();
+            let clean = strip_inline_comment(v.trim()).trim_matches(['[', ']', '"', '\'']);
+            if matches!(key, "collaborator" | "collaborators") {
+                for item in clean.split(',') {
+                    let slug = item.trim().trim_matches(['"', '\'']).to_ascii_lowercase();
+                    if is_valid_slug(&slug) && slug != active_project && !collabs.contains(&slug) && collabs.len() < 8 {
+                        collabs.push(slug);
+                    }
+                }
+            } else if key == "call_mode" {
+                let m = clean.trim().to_ascii_lowercase();
+                if m == "full" || m == "last_turn" {
+                    mode = m;
+                }
+            }
+        }
+    }
+    (collabs, mode)
+}
+
+fn parse_profile_provider_raw(raw: &str) -> Option<String> {
+    let mut in_fm = false;
+    for line in raw.lines() {
+        let t = line.trim();
+        if t == "---" {
+            if !in_fm {
+                in_fm = true;
+                continue;
+            }
+            break;
+        }
+        if in_fm {
+            if let Some((k, v)) = t.split_once(':') {
+                if k.trim() == "provider" {
+                    let clean = strip_inline_comment(v.trim()).trim_matches(['"', '\'', ' ']);
+                    if !clean.is_empty() {
+                        return Some(clean.to_ascii_uppercase());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+fn resolve_collaborators(root: &Path, active_project: &str, prof_name: &str) -> (Vec<String>, String) {
+    let Some(raw) = find_profile_text_in(&root.join("profiles"), prof_name) else {
+        return (Vec::new(), "last_turn".into());
+    };
+    let (raw_collabs, mode) = parse_profile_collab_raw(&raw, active_project);
+    let collabs = raw_collabs
+        .into_iter()
+        .filter(|s| root.join("projects").join(s).is_dir())
+        .collect();
+    (collabs, mode)
+}
+
+fn find_env_slot_val(lines: &[&str], key: &str, require_valid_key: bool) -> Option<String> {
+    for commented in [false, true] {
+        for &l in lines {
+            let t = l.trim();
+            if t.starts_with('#') != commented {
+                continue;
+            }
+            let u = if commented { t.trim_start_matches('#').trim() } else { t };
+            if is_env_key(u, key) {
+                let val = extract_quoted_val(u).trim();
+                if !val.is_empty() && (!require_valid_key || is_valid_slot_val(val)) {
+                    return Some(val.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn normalize_chat_url_rail(url: &str) -> String {
+    let trimmed = url.trim().trim_end_matches('/');
+    if trimmed.ends_with("/v1") || trimmed.ends_with("/openai") || trimmed.ends_with("/v1beta") {
+        format!("{trimmed}/chat/completions")
+    } else {
+        url.trim().to_string()
+    }
+}
+
+fn parse_model_list_rail(raw: &str) -> (String, Vec<String>) {
+    let mut parts = raw.split(',').map(str::trim).filter(|s| !s.is_empty()).map(ToString::to_string);
+    let primary = parts.next().unwrap_or_else(|| "default".to_string());
+    (primary, parts.collect())
+}
+
+fn resolve_slot_provider_from_env(
+    env_content: &str,
+    slot: &str,
+    max_tokens: usize,
+) -> std::result::Result<ProviderConfig, String> {
+    let s = slot.trim().to_ascii_uppercase();
+    if s == "LOCAL" {
+        return Ok(ProviderConfig {
+            base_url: "http://127.0.0.1:8080/v1/chat/completions".into(),
+            api_key: "not-needed".into(),
+            model: "local-model".into(),
+            fallback_models: Vec::new(),
+            max_tokens,
+        });
+    }
+
+    let lines: Vec<&str> = env_content.lines().collect();
+    const DIRECT: &[(&str, &str, &str)] = &[
+        ("GEMINI", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "gemini-3.5-flash-lite"),
+        ("GOOGLE", "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", "gemini-3.5-flash-lite"),
+        ("OPENROUTER", "https://openrouter.ai/api/v1/chat/completions", "openrouter/free"),
+        ("OPENAI", "https://api.openai.com/v1/chat/completions", "gpt-4o"),
+        ("ANTHROPIC", "https://api.anthropic.com/v1/chat/completions", "claude-3-5-sonnet-20241022"),
+        ("DEEPSEEK", "https://api.deepseek.com/chat/completions", "deepseek-chat"),
+        ("GROQ", "https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile"),
+    ];
+    if let Some(&(_, def_url, def_model)) = DIRECT.iter().find(|&&(pfx, _, _)| pfx == s) {
+        let api_key = find_env_slot_val(&lines, &format!("{s}_API_KEY"), true)
+            .ok_or_else(|| format!("No valid {s}_API_KEY found in .env"))?;
+        let raw_model = find_env_slot_val(&lines, &format!("{s}_MODEL"), false).unwrap_or_else(|| def_model.into());
+        let (model, fallback_models) = parse_model_list_rail(&raw_model);
+        let base_url = normalize_chat_url_rail(
+            &find_env_slot_val(&lines, &format!("{s}_URL"), false).unwrap_or_else(|| def_url.into()),
+        );
+        return Ok(ProviderConfig { base_url, api_key, model, fallback_models, max_tokens });
+    }
+
+    let custom_idx = if s == "CUSTOM" {
+        Some(1)
+    } else {
+        s.strip_prefix("CUSTOM").and_then(|n| n.parse::<u8>().ok()).filter(|&n| (1..=9).contains(&n))
+    };
+    if let Some(i) = custom_idx {
+        let pfx = format!("CUSTOM{i}");
+        let legacy = i == 1;
+        let api_key = find_env_slot_val(&lines, &format!("{pfx}_API_KEY"), true)
+            .or_else(|| legacy.then(|| find_env_slot_val(&lines, "CUSTOM_API_KEY", true)).flatten())
+            .ok_or_else(|| format!("No valid {pfx}_API_KEY found in .env"))?;
+        let base_url = normalize_chat_url_rail(
+            &find_env_slot_val(&lines, &format!("{pfx}_URL"), false)
+                .or_else(|| legacy.then(|| find_env_slot_val(&lines, "CUSTOM_URL", false)).flatten())
+                .unwrap_or_else(|| "https://api.deepseek.com/chat/completions".into()),
+        );
+        let raw_model = find_env_slot_val(&lines, &format!("{pfx}_MODEL"), false)
+            .or_else(|| legacy.then(|| find_env_slot_val(&lines, "CUSTOM_MODEL", false)).flatten())
+            .unwrap_or_else(|| "default".into());
+        let (model, fallback_models) = parse_model_list_rail(&raw_model);
+        return Ok(ProviderConfig { base_url, api_key, model, fallback_models, max_tokens });
+    }
+
+    Err(format!("Unknown provider slot '{slot}'"))
+}
+
+async fn resolve_peer_provider(slot_opt: Option<&str>) -> std::result::Result<ProviderConfig, String> {
+    let Some(slot) = slot_opt.map(str::trim).filter(|s| !s.is_empty()) else {
+        return Ok(ProviderConfig::load().await);
+    };
+    if slot.eq_ignore_ascii_case("LOCAL") {
+        let mut cfg = resolve_slot_provider_from_env("", "LOCAL", get_max_tokens())?;
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_millis(500))
+            .build()
+            .unwrap_or_default();
+        if let Ok(resp) = client.get("http://127.0.0.1:8080/v1/models").send().await {
+            if let Ok(json) = resp.json::<Value>().await {
+                if let Some(id) = json.pointer("/data/0/id").and_then(|v| v.as_str()) {
+                    cfg.model = id.to_string();
+                }
+            }
+        }
+        return Ok(cfg);
+    }
+    let env_content = fs::read_to_string(get_env_path()).unwrap_or_default();
+    resolve_slot_provider_from_env(&env_content, slot, get_max_tokens())
+}
+
+fn chat_msg_text(m: &ChatMessage) -> String {
+    match &m.content {
+        Value::String(s) => s.clone(),
+        Value::Array(parts) => parts
+            .iter()
+            .filter_map(|p| p.get("text").and_then(|v| v.as_str()))
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    }
+}
+
+fn truncate_chars(s: &str, max_chars: usize) -> String {
+    if s.chars().count() <= max_chars {
+        return s.to_string();
+    }
+    let mut out: String = s.chars().take(max_chars).collect();
+    out.push_str("...[truncated]");
+    out
+}
+
+fn condense_for_caller(s: &str, max_chars: usize) -> String {
+    let mut out = String::with_capacity(s.len().min(max_chars));
+    let mut blank_run = 0u8;
+    for line in s.trim().lines() {
+        if line.trim().is_empty() {
+            blank_run += 1;
+            if blank_run <= 1 && !out.is_empty() {
+                out.push('\n');
+            }
+        } else {
+            blank_run = 0;
+            if !out.is_empty() {
+                out.push('\n');
+            }
+            out.push_str(line);
+        }
+    }
+    truncate_chars(&out, max_chars)
+}
+
+fn build_peer_envelope(
+    caller_project: &str,
+    mode: &str,
+    prompt: &str,
+    extra_context: Option<&str>,
+    caller_history: &[ChatMessage],
+    ws_files: &[String],
+) -> String {
+    let mut parts = Vec::new();
+    parts.push(format!("Caller workspace: {caller_project}"));
+    if ws_files.is_empty() {
+        parts.push("Workspace files: (none)".into());
+    } else {
+        let shown: Vec<&str> = ws_files.iter().take(60).map(String::as_str).collect();
+        let more = ws_files.len().saturating_sub(shown.len());
+        let suffix = if more > 0 { format!(" (+{more} more)") } else { String::new() };
+        parts.push(format!("Workspace files: {}{suffix}", shown.join(", ")));
+    }
+
+    let turns: Vec<&ChatMessage> = caller_history.iter().filter(|m| m.role != "system").collect();
+    if mode == "full" {
+        let mut digest = Vec::new();
+        let mut total = 0usize;
+        for m in turns.iter().rev() {
+            let line = match m.role.as_str() {
+                "user" => {
+                    let t = chat_msg_text(m);
+                    if t.trim().is_empty() {
+                        continue;
+                    }
+                    format!("User: {}", truncate_chars(t.trim(), 2000))
+                }
+                "assistant" => {
+                    let t = chat_msg_text(m);
+                    let tc_brief = m.tool_calls.as_ref().and_then(|v| v.as_array()).map(|arr| {
+                        arr.iter()
+                            .filter_map(|c| c.pointer("/function/name").and_then(|x| x.as_str()))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    });
+                    match (t.trim().is_empty(), tc_brief) {
+                        (false, Some(tc)) if !tc.is_empty() => {
+                            format!("Assistant [tools: {tc}]: {}", truncate_chars(t.trim(), 3000))
+                        }
+                        (false, _) => format!("Assistant: {}", truncate_chars(t.trim(), 3000)),
+                        (true, Some(tc)) if !tc.is_empty() => format!("Assistant [tools: {tc}]"),
+                        _ => continue,
+                    }
+                }
+                "tool" => {
+                    let first = m.content_as_str().lines().next().unwrap_or("").trim();
+                    if first.is_empty() {
+                        continue;
+                    }
+                    format!("Tool: {}", truncate_chars(first, 180))
+                }
+                _ => continue,
+            };
+            if total + line.len() > 20000 && !digest.is_empty() {
+                break;
+            }
+            total += line.len();
+            digest.push(line);
+        }
+        if !digest.is_empty() {
+            digest.reverse();
+            parts.push(format!("--- Caller Transcript (full mode) ---\n{}", digest.join("\n\n")));
+        }
+    } else {
+        let last_user = turns.iter().rev().find(|m| m.role == "user").map(|m| chat_msg_text(m)).unwrap_or_default();
+        let last_asst = turns
+            .iter()
+            .rev()
+            .find(|m| m.role == "assistant" && !chat_msg_text(m).trim().is_empty())
+            .map(|m| chat_msg_text(m))
+            .unwrap_or_default();
+        let mut ctx_lines = Vec::new();
+        if !last_user.trim().is_empty() {
+            ctx_lines.push(format!("Last user message: {}", truncate_chars(last_user.trim(), 1500)));
+        }
+        if !last_asst.trim().is_empty() {
+            ctx_lines.push(format!("Caller's last response:\n{}", truncate_chars(last_asst.trim(), 4000)));
+        }
+        if !ctx_lines.is_empty() {
+            parts.push(format!("--- Last Turn Context ---\n{}", ctx_lines.join("\n\n")));
+        }
+    }
+
+    if let Some(ex) = extra_context.map(str::trim).filter(|s| !s.is_empty()) {
+        parts.push(format!("Additional context: {}", truncate_chars(ex, 2000)));
+    }
+    parts.push(format!("--- Request for You ---\n{}", prompt.trim()));
+    parts.join("\n\n")
+}
+
+fn validate_peer_target(root: &Path, caller: &str, target: &str) -> std::result::Result<PathBuf, (u16, String)> {
+    if !is_valid_slug(target) || target == caller {
+        return Err((400, "Invalid target project".into()));
+    }
+    let dir = root.join("projects").join(target);
+    if !dir.is_dir() {
+        return Err((404, "Target project not found".into()));
+    }
+    Ok(dir)
+}
+
+struct PeerCallOutput {
+    synthesis: String,
+    elapsed_s: f64,
+    trace: Vec<String>,
+}
+
+async fn run_peer_call(
+    root: &Path,
+    caller_project: &str,
+    caller_workspace: &Path,
+    caller_ctx: Option<usize>,
+    target_project: &str,
+    mode: &str,
+    prompt: &str,
+    extra_context: Option<&str>,
+    caller_history: &[ChatMessage],
+    cancel_flag: Arc<AtomicBool>,
+) -> std::result::Result<PeerCallOutput, String> {
+    let target_dir = validate_peer_target(root, caller_project, target_project).map_err(|(_, e)| e)?;
+    let t0 = Instant::now();
+    let target_is_agent = target_project != "chat";
+    let mut target_cfg = WorkspaceConfig::load_or_default(&target_dir);
+    if !target_is_agent {
+        target_cfg.profile_name = "chat".into();
+    } else if target_cfg.profile_name == "chat" || Profile::load(&target_cfg.profile_name).is_none() {
+        if Profile::load(target_project).is_some() {
+            target_cfg.profile_name = target_project.into();
+        } else {
+            let avail = Profile::list_available();
+            let cand = Profile::find_workspace_candidates(target_project, &avail);
+            if let Some(first) = cand.first() {
+                target_cfg.profile_name = first.clone();
+            }
+        }
+    }
+    let target_prof = Profile::load(&target_cfg.profile_name).unwrap_or_else(|| Profile::parse("ROLE: Assistant."));
+    let target_provider_slot = find_profile_text_in(&root.join("profiles"), &target_cfg.profile_name)
+        .as_deref()
+        .and_then(parse_profile_provider_raw);
+    let target_saved = state::load_workspace_session(&target_dir);
+    let target_reasoning = match target_saved.reasoning {
+        Some(ref r) if r.is_empty() => None,
+        Some(ref r) => ReasoningSetting::parse(r),
+        None => target_prof.reasoning_budget.clone(),
+    };
+
+    set_profile_max_tokens(target_prof.ctx);
+    let outcome = async {
+        let mut ws_files = Vec::new();
+        list_workspace_files(caller_workspace, caller_workspace, false, &mut ws_files);
+
+        let mut sys = build_system_prompt(&target_prof, caller_workspace, target_is_agent, &[]);
+        sys.push_str(&format!(
+            "\n\n[Peer Consultation Mode]\nYou ({target_project}) are assisting sibling workspace '{caller_project}' ({}).\n{}\nKeep your answer concise, actionable, and grounded in what you read.",
+            caller_workspace.display(),
+            if target_is_agent {
+                "You have strictly read-only workspace tools (read_file, list_dir, search_code). Inspect files directly on demand; never attempt edits, commands, or recursive bot calls."
+            } else {
+                "Respond directly from the provided context."
+            }
+        ));
+
+        let envelope = build_peer_envelope(caller_project, mode, prompt, extra_context, caller_history, &ws_files);
+        let mut peer_history = vec![ChatMessage::system(sys), ChatMessage::user(envelope)];
+
+        // Depth=1 guard: target receives only read-only workspace tools and never call_bot.
+        let target_tools = if target_is_agent {
+            let c4 = tools::get_tools_schema_with_mcp(&ToolTier::Core4, false, &[], &[]).await;
+            let sm = tools::get_tools_schema_with_mcp(&ToolTier::Smol, false, &[], &[]).await;
+            let ro = filter_read_only_tools(c4, sm);
+            if ro.as_array().is_some_and(|a| !a.is_empty()) { Some(ro) } else { None }
+        } else {
+            None
+        };
+
+        let provider = resolve_peer_provider(target_provider_slot.as_deref()).await?;
+        let client = LlmClient::new(provider);
+        let boundary = SecurityBoundary::new_headless(caller_workspace);
+        let max_rounds = if target_is_agent { get_max_rounds().min(8).max(2) } else { 1 };
+        let mut trace = Vec::new();
+        let mut last_reply = String::new();
+
+        for round in 0..max_rounds {
+            if cancel_flag.load(Ordering::SeqCst) {
+                return Err("Peer call cancelled".into());
+            }
+            let tools_for_round = if round + 1 == max_rounds { None } else { target_tools.clone() };
+            let res = client
+                .stream_chat_raw_with_reasoning(
+                    &peer_history,
+                    tools_for_round,
+                    Some(cancel_flag.clone()),
+                    Some(target_reasoning.clone()),
+                    |_, _| {},
+                )
+                .await;
+            let (reply, _reasoning, tool_calls, _stats) = res.map_err(|e| e.to_string())?;
+            if !reply.trim().is_empty() {
+                last_reply = reply.clone();
+            }
+            let Some(calls) = tool_calls.filter(|c| !c.is_empty() && target_is_agent && round + 1 < max_rounds) else {
+                let synthesis = if reply.trim().is_empty() { last_reply } else { reply };
+                if synthesis.trim().is_empty() {
+                    return Err("Peer bot returned an empty response".into());
+                }
+                return Ok(PeerCallOutput {
+                    synthesis,
+                    elapsed_s: t0.elapsed().as_secs_f64(),
+                    trace,
+                });
+            };
+
+            let mut asst = ChatMessage::assistant(reply);
+            asst.tool_calls = Some(Value::Array(calls.clone()));
+            peer_history.push(asst);
+
+            for c in calls {
+                if cancel_flag.load(Ordering::SeqCst) {
+                    return Err("Peer call cancelled".into());
+                }
+                let cid = c["id"].as_str().unwrap_or("call_0").to_string();
+                let cname = c["function"]["name"].as_str().unwrap_or("tool");
+                let raw_a = c["function"]["arguments"].as_str().unwrap_or("{}");
+                if !tools::is_read_only_tool(cname) {
+                    trace.push(format!("{cname}: denied (read-only)"));
+                    peer_history.push(ChatMessage::tool_response(
+                        cid,
+                        "[denied] Peer bots only have read-only workspace access.".into(),
+                    ));
+                    continue;
+                }
+                let args = if target_prof.adapters {
+                    adapter::repair_tool_args(cname, raw_a)
+                } else {
+                    raw_a.to_string()
+                };
+                let brief = serde_json::from_str::<Value>(&args)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("path")
+                            .or_else(|| v.get("pattern"))
+                            .and_then(|x| x.as_str())
+                            .map(ToString::to_string)
+                    })
+                    .unwrap_or_default();
+                let resp_txt = match tools::execute_tool_with_auth(cname, &args, caller_workspace, &boundary, false).await {
+                    Ok(o) => {
+                        trace.push(format!("{cname}({brief}) -> {} line(s)", o.lines().count()));
+                        o
+                    }
+                    Err(e) => {
+                        trace.push(format!("{cname}({brief}) -> error: {e}"));
+                        format!("[tool error] {e}")
+                    }
+                };
+                peer_history.push(ChatMessage::tool_response(cid, resp_txt));
+            }
+        }
+        Err("Peer call exceeded max rounds".into())
+    }
+    .await;
+    set_profile_max_tokens(caller_ctx);
+    outcome
 }
 
 async fn write_http_json(stream: &mut TcpStream, status: u16, body: &Value) -> Result<()> {
@@ -1896,6 +2462,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 }
                 let cfg = WorkspaceConfig::load_or_default(&p);
                 let prof = if name == "chat" { "chat".into() } else { cfg.profile_name };
+                let hud = Profile::load(&prof)
+                    .map(|pr| pr.hud_summary(name != "chat"))
+                    .unwrap_or_default();
                 let has_git = p.join(".git").exists();
                 let dirty = has_git && git_status_brief(&p).1;
                 let mut files = Vec::new();
@@ -1907,6 +2476,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 proj_entries.push(json!({
                     "name": name,
                     "profile_name": prof,
+                    "hud_summary": hud,
                     "has_git": has_git,
                     "dirty": dirty,
                     "file_count": file_count
@@ -2298,6 +2868,92 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         return write_http_err(&mut stream, 400, "Unknown MCP request").await;
     }
 
+    if method == "POST" && path == "/api/bot/call" {
+        let target = payload.get("target").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let mode = match payload.get("mode").and_then(|v| v.as_str()).unwrap_or("last_turn") {
+            "full" => "full",
+            _ => "last_turn",
+        };
+        let prompt = payload.get("prompt").and_then(|v| v.as_str()).unwrap_or("").trim();
+        if prompt.is_empty() {
+            return write_http_err(&mut stream, 400, "Empty prompt").await;
+        }
+        let active = app.active_project.lock().await.clone();
+        if let Err((status, msg)) = validate_peer_target(&app.root, &active, target) {
+            return write_http_err(&mut stream, status, &msg).await;
+        }
+
+        let (caller_ws, caller_ctx, history, cancel_flag, start_gen) = {
+            let mut lock = app.sessions.lock().await;
+            let sess = lock.entry(active.clone()).or_insert_with(|| app.load_or_init_session(&active));
+            sess.cancel_flag.store(false, Ordering::SeqCst);
+            (
+                sess.workspace.clone(),
+                sess.ctx_override,
+                sess.llm_history.clone(),
+                sess.cancel_flag.clone(),
+                sess.generation,
+            )
+        };
+
+        return match run_peer_call(
+            &app.root,
+            &active,
+            &caller_ws,
+            caller_ctx,
+            target,
+            mode,
+            prompt,
+            None,
+            &history,
+            cancel_flag,
+        )
+        .await
+        {
+            Ok(out) => {
+                let item = UiTurnItem {
+                    role: "peer_call".into(),
+                    name: Some(target.into()),
+                    brief: Some(prompt.into()),
+                    ok: Some(true),
+                    summary: Some(if out.trace.is_empty() {
+                        mode.replace('_', " ")
+                    } else {
+                        format!("{} · {} read(s)", mode.replace('_', " "), out.trace.len())
+                    }),
+                    content: Some(out.synthesis.clone()),
+                    elapsed_s: Some(out.elapsed_s),
+                    raw: if out.trace.is_empty() { None } else { Some(out.trace.join("\n")) },
+                    ..Default::default()
+                };
+                {
+                    let mut lock = app.sessions.lock().await;
+                    if let Some(sess) = lock.get_mut(&active) {
+                        if sess.generation == start_gen {
+                            sess.ui_history.push(item.clone());
+                            let condensed = condense_for_caller(&out.synthesis, 2400);
+                            if sess.llm_history.last().is_some_and(|m| m.role == "user") {
+                                sess.llm_history.push(ChatMessage::assistant(format!(
+                                    "[Peer @{target} ({mode})]:\n{condensed}"
+                                )));
+                            } else {
+                                sess.llm_history.push(ChatMessage::user(format!(
+                                    "[Peer check -> @{target} ({mode})]: {prompt}"
+                                )));
+                                sess.llm_history.push(ChatMessage::assistant(format!(
+                                    "[Peer @{target}]:\n{condensed}"
+                                )));
+                            }
+                            save_rail_session(sess);
+                        }
+                    }
+                }
+                write_http_json(&mut stream, 200, &json!({ "ok": true, "item": item })).await
+            }
+            Err(e) => write_http_err(&mut stream, 500, &e).await,
+        };
+    }
+
     if method == "POST" && path == "/api/chat" {
         let raw_msg = payload.get("message").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
         let images: Vec<String> = payload
@@ -2333,6 +2989,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         tokio::spawn(async move {
             let (
                 workspace,
+                profile_name,
                 is_agent,
                 adapters,
                 delegate,
@@ -2349,6 +3006,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 let sess = lock.entry(active.clone()).or_insert_with(|| app_clone.load_or_init_session(&active));
                 (
                     sess.workspace.clone(),
+                    sess.profile_name.clone(),
                     sess.is_agent,
                     sess.adapters,
                     sess.delegate,
@@ -2404,8 +3062,19 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             history.push(build_user_chat_message(&effective_prompt, &images));
             let client = LlmClient::new(provider);
             let boundary = SecurityBoundary::new_headless(&workspace);
+            let (collabs, collab_mode) = if is_agent {
+                resolve_collaborators(&app_clone.root, &active, &profile_name)
+            } else {
+                (Vec::new(), "last_turn".to_string())
+            };
             let active_tools = if is_agent {
-                Some(tools::get_tools_schema_with_mcp(&tier, delegate, &mcp_servers, &mcp_tools).await)
+                let mut base = tools::get_tools_schema_with_mcp(&tier, delegate, &mcp_servers, &mcp_tools).await;
+                if !collabs.is_empty() {
+                    if let Value::Array(ref mut arr) = base {
+                        arr.push(call_bot_schema(&collabs));
+                    }
+                }
+                Some(base)
             } else {
                 None
             };
@@ -2585,6 +3254,72 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     let call = &calls[idx];
                     let call_id = call["id"].as_str().unwrap_or("call_0").to_string();
                     let raw_args = call["function"]["arguments"].as_str().unwrap_or("{}");
+                    if fn_name == "call_bot" {
+                        let clean_args = strip_json_fence(raw_args);
+                        let parsed: Value = serde_json::from_str(&clean_args).unwrap_or_else(|_| json!({}));
+                        let target = parsed.get("target").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+                        let task = parsed.get("task").and_then(|v| v.as_str()).unwrap_or("").trim().to_string();
+                        let extra_ctx = parsed
+                            .get("context")
+                            .and_then(|v| v.as_str())
+                            .map(str::trim)
+                            .filter(|s| !s.is_empty());
+
+                        let (ok, summary, synthesis, elapsed_s, raw_trace, tool_resp) =
+                            if target.is_empty() || task.is_empty() {
+                                let e = "Missing required 'target' or 'task' argument".to_string();
+                                (false, e.clone(), e.clone(), 0.0, None, format!("[tool error] {e}"))
+                            } else if !collabs.contains(&target) {
+                                let e = format!("Target '{target}' is not in collaborators ({})", collabs.join(", "));
+                                (false, e.clone(), e.clone(), 0.0, None, format!("[tool error] {e}"))
+                            } else {
+                                match run_peer_call(
+                                    &app_clone.root,
+                                    &active,
+                                    &workspace,
+                                    ctx_override,
+                                    &target,
+                                    &collab_mode,
+                                    &task,
+                                    extra_ctx,
+                                    &history,
+                                    cancel_flag.clone(),
+                                )
+                                .await
+                                {
+                                    Ok(out) => {
+                                        let sum = if out.trace.is_empty() {
+                                            format!("auto · {}", collab_mode.replace('_', " "))
+                                        } else {
+                                            format!("auto · {} read(s)", out.trace.len())
+                                        };
+                                        let raw_tr = if out.trace.is_empty() { None } else { Some(out.trace.join("\n")) };
+                                        let resp = out.synthesis.clone();
+                                        (true, sum, out.synthesis, out.elapsed_s, raw_tr, resp)
+                                    }
+                                    Err(e) => {
+                                        (false, "peer call failed".into(), e.clone(), 0.0, None, format!("[tool error] {e}"))
+                                    }
+                                }
+                            };
+
+                        let item = UiTurnItem {
+                            role: "peer_call".into(),
+                            name: Some(if target.is_empty() { "peer".into() } else { target }),
+                            brief: Some(task),
+                            ok: Some(ok),
+                            summary: Some(summary),
+                            content: Some(synthesis),
+                            elapsed_s: Some(elapsed_s),
+                            raw: raw_trace,
+                            ..Default::default()
+                        };
+                        let _ = tx.send(emit("peer_call", serde_json::to_value(&item).unwrap_or(json!({}))));
+                        new_ui_items.push(item);
+                        history.push(ChatMessage::tool_response(call_id, tool_resp));
+                        idx += 1;
+                        continue;
+                    }
                     let final_args = if adapters { adapter::repair_tool_args(fn_name, raw_args) } else { raw_args.into() };
                     let parsed_args: Value = serde_json::from_str(&final_args).unwrap_or_else(|_| json!({}));
                     let brief = parsed_args
@@ -3168,5 +3903,103 @@ mod tests {
         let clean = sanitize_project_bots(&ok_map, &tmp).unwrap();
         assert_eq!(clean.get("nemo").map(String::as_str), Some(format!("b:{unique_mask:04x}").as_str()));
         let _ = fs::remove_dir_all(&tmp);
+    }
+    #[test]
+    fn test_peer_envelope_modes_and_reasoning_isolation() {
+        let mut asst_old = ChatMessage::assistant("Old summary");
+        asst_old.reasoning_content = Some("SECRET_OLD_THINKING".into());
+        let mut asst_last = ChatMessage::assistant("Implemented add and subtract.");
+        asst_last.reasoning_content = Some("SECRET_LAST_THINKING".into());
+        let history = vec![
+            ChatMessage::system("sys"),
+            ChatMessage::user("Old prompt"),
+            asst_old,
+            ChatMessage::user("Write test_calc.py"),
+            asst_last,
+        ];
+        let files = vec!["test_calc.py".into(), "README.md".into()];
+
+        let lt = build_peer_envelope("surogate37", "last_turn", "Check edge cases", None, &history, &files);
+        assert!(lt.contains("Workspace files: test_calc.py, README.md"));
+        assert!(lt.contains("Write test_calc.py"));
+        assert!(lt.contains("Implemented add and subtract."));
+        assert!(!lt.contains("Old prompt"));
+        assert!(!lt.contains("SECRET_LAST_THINKING"));
+        assert!(!lt.contains("SECRET_OLD_THINKING"));
+
+        let full = build_peer_envelope("surogate37", "full", "Full audit", Some("Focus on NaN"), &history, &files);
+        assert!(full.contains("Old prompt"));
+        assert!(full.contains("Old summary"));
+        assert!(full.contains("Focus on NaN"));
+        assert!(!full.contains("SECRET_OLD_THINKING"));
+        assert!(!full.contains("SECRET_LAST_THINKING"));
+    }
+
+    #[test]
+    fn test_collaborators_frontmatter_and_target_validation() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_peer_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("profiles")).unwrap();
+        fs::create_dir_all(tmp.join("projects/surogate37")).unwrap();
+        fs::create_dir_all(tmp.join("projects/nemo")).unwrap();
+
+        fs::write(
+            tmp.join("profiles/surogate37.md"),
+            "---\ncollaborators: [nemo, surogate37, missing-bot, ../evil]\ncall_mode: full\n---\nROLE: Coder.",
+        )
+        .unwrap();
+
+        let (raw_collabs, mode) = parse_profile_collab_raw(
+            &fs::read_to_string(tmp.join("profiles/surogate37.md")).unwrap(),
+            "surogate37",
+        );
+        assert_eq!(raw_collabs, vec!["nemo", "missing-bot"]);
+        assert_eq!(mode, "full");
+
+        let (resolved, _) = resolve_collaborators(&tmp, "surogate37", "surogate37");
+        assert_eq!(resolved, vec!["nemo"]);
+
+        assert!(validate_peer_target(&tmp, "surogate37", "surogate37").is_err());
+        assert!(validate_peer_target(&tmp, "surogate37", "../evil").is_err());
+        assert!(validate_peer_target(&tmp, "surogate37", "missing-bot").is_err());
+        assert!(validate_peer_target(&tmp, "surogate37", "nemo").is_ok());
+        assert_eq!(strip_json_fence("```json\n{\"target\":\"nemo\"}\n```"), "{\"target\":\"nemo\"}");
+        assert_eq!(condense_for_caller("a\n\n\nb\n", 10), "a\n\nb");
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_env_slot_provider_resolution_reads_commented_and_custom_slots() {
+        let env = concat!(
+            "#GEMINI_API_KEY=\"your-key-here\"\n",
+            "#GEMINI_API_KEY=\"AIzaRealCloudKey\"\n",
+            "#GEMINI_MODEL=\"gemini-2.5-flash\"\n",
+            "OPENROUTER_API_KEY=\"sk-or-active\"\n",
+            "# CUSTOM2_API_KEY=\"tl-real-123\"\n",
+            "# CUSTOM2_URL=\"https://api.tokenlab.amd.com/v1/\"\n",
+            "# CUSTOM2_MODEL=\"DeepSeek-V4.1-Flash, Qwen3.8-27B\"\n",
+        );
+
+        let gem = resolve_slot_provider_from_env(env, "gemini", 32768).unwrap();
+        assert_eq!(gem.api_key, "AIzaRealCloudKey");
+        assert_eq!(gem.model, "gemini-2.5-flash");
+        assert_eq!(gem.max_tokens, 32768);
+        assert!(gem.base_url.contains("generativelanguage.googleapis.com"));
+
+        let c2 = resolve_slot_provider_from_env(env, "CUSTOM2", 16384).unwrap();
+        assert_eq!(c2.api_key, "tl-real-123");
+        assert_eq!(c2.base_url, "https://api.tokenlab.amd.com/v1/chat/completions");
+        assert_eq!(c2.model, "DeepSeek-V4.1-Flash");
+        assert_eq!(c2.fallback_models, vec!["Qwen3.8-27B"]);
+
+        let loc = resolve_slot_provider_from_env(env, "local", 8192).unwrap();
+        assert_eq!(loc.base_url, "http://127.0.0.1:8080/v1/chat/completions");
+        assert!(resolve_slot_provider_from_env(env, "OPENAI", 8192).is_err());
+
+        assert_eq!(
+            parse_profile_provider_raw("---\nprovider: gemini # cloud reviewer\n---\nROLE: Reviewer.").as_deref(),
+            Some("GEMINI")
+        );
+        assert_eq!(parse_profile_provider_raw("---\ncore4: true\n---\nROLE: Coder."), None);
     }
 }
