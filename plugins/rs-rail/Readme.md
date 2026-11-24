@@ -16,12 +16,12 @@ Consult sibling workspaces read-only from inside `rs-rail` without switching pro
 * **Reasoning isolated:** Caller `<think>` blocks are never forwarded in peer context envelopes.
 
 ### Ways to Call
-* **Auto-call (`call_bot`):** When an agent workspace has linked `collaborators`, its LLM receives `call_bot` automatically.
+* **Auto-call (`call_bot`):** When an agent workspace has linked `collaborators`, its LLM receives `call_bot` automatically (context controlled by `call_mode`, defaulting to `last_turn`).
 * **Picker modal (`/call`):** Click `/call` in **Actions**, hover a project in the left sidebar and click its message icon, or type `/call`.
-  * **Prompt only** *(default in modal)* — sends only your prompt + workspace file list.
+  * **Prompt only** *(default)* — sends only your prompt + workspace file list.
   * **Last turn** — sends the caller's last user/assistant exchange + your prompt.
   * **Full** — sends a condensed conversation digest (up to 20k chars) + your prompt.
-* **Inline slash:** `/call <bot>: <prompt>` sends immediately using `last_turn` context.
+* **Inline slash:** `/call <bot>: <prompt>` sends immediately using **Prompt only** (`none`); use the `/call` modal for **Last turn** or **Full**.
 
 ### Configuration
 

@@ -3,37 +3,37 @@
   "bot_mode": true,
   "last_project": "surogate37",
   "project_labels": {
-    "tokenlab": [
-      "cloud"
-    ],
-    "nemo": [
-      "cloud"
-    ],
-    "lfm3": [
-      "local"
-    ],
-    "qwen38": [
-      "local"
-    ],
-    "gem35": [
-      "cloud"
-    ],
     "surogate37": [
-      "local"
-    ],
-    "flint": [
       "local"
     ],
     "ling-tiny": [
       "local"
     ],
+    "gem35": [
+      "cloud"
+    ],
+    "lfm3": [
+      "local"
+    ],
+    "flint": [
+      "local"
+    ],
+    "tokenlab": [
+      "cloud"
+    ],
     "sage": [
       "local"
+    ],
+    "inkling2": [
+      "local"
+    ],
+    "nemo": [
+      "cloud"
     ],
     "groot": [
       "local"
     ],
-    "inkling2": [
+    "qwen38": [
       "local"
     ]
   },

@@ -393,7 +393,7 @@
     <div class="tb-right">
       <span class="tele" id="tb-stats" style="display:none;"></span>
       <span class="tele" id="tb-ctx">
-        <span id="tb-usage">0.0%</span>
+        <span id="tb-usage">CTX 0.0%</span>
         <span class="ctx-tip" id="tb-ctx-tip"></span>
       </span>
       <button class="btn btn-sm btn-icon" id="btn-toggle-task" aria-label="Toggle workspace panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="10" y1="2.5" x2="10" y2="13.5"/></svg></button>
@@ -1060,13 +1060,13 @@ function renderAll() {
     stPill.style.display = "inline-flex";
     const col = pct > 85 ? "var(--err-text)" : (pct > 70 ? "var(--warn-text)" : "var(--accent)");
     const barW = used > 0 ? Math.max(pct, 3).toFixed(1) : "0";
-    usageEl.innerHTML = pct > 70 ? `<span style="color:${col}">${pct.toFixed(1)}%</span>` : `${pct.toFixed(1)}%`;
+    usageEl.innerHTML = pct > 70 ? `CTX <span style="color:${col}">${pct.toFixed(1)}%</span>` : `CTX ${pct.toFixed(1)}%`;
     const meta = [`in ${(s.prompt_tokens || 0).toLocaleString()}`, `out ${(s.completion_tokens || 0).toLocaleString()}`];
     if (s.cached_tokens) meta.push(`cached ${s.cached_tokens.toLocaleString()}`);
     tip.innerHTML = `<span class="ctx-bar"><span class="ctx-fill" style="width:${barW}%;background:${col}"></span></span><div><strong>${used.toLocaleString()}</strong> / ${ctxMax.toLocaleString()} tokens</div><div class="muted" style="display:flex;gap:1.2ch;">${meta.map(m => `<span>${esc(m)}</span>`).join("")}</div>`;
   } else {
     stPill.style.display = "none";
-    usageEl.textContent = "0.0%";
+    usageEl.textContent = "CTX 0.0%";
     tip.innerHTML = `<span class="ctx-bar"><span class="ctx-fill" style="width:0%"></span></span><div><strong>0</strong> / ${ctxMax.toLocaleString()} tokens</div><div class="muted">Context budget ready</div>`;
   }
 
@@ -1423,7 +1423,7 @@ async function runLocalSlash(text) {
     const matched = siblings.find((p) => p.name.toLowerCase() === targetToken)
       || siblings.find((p) => p.name.toLowerCase().startsWith(targetToken));
     if (matched && promptText) {
-      await executePeerCall(matched.name, "last_turn", promptText);
+      await executePeerCall(matched.name, "none", promptText);
     } else {
       openCallModal(matched ? matched.name : targetToken, promptText);
     }
