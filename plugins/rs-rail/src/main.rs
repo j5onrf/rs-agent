@@ -2265,7 +2265,7 @@ fn short_provider_tag(base_url: &str) -> String {
         return "local".into();
     }
     let ep = format_endpoint(base_url).to_ascii_lowercase();
-    if ep.contains("googleapis.com") {
+    if ep == "googleapis" || ep.contains("googleapis.com") {
         return "gemini".into();
     }
     ep.trim_start_matches("api.")
@@ -4425,5 +4425,12 @@ mod tests {
         assert!(!tmp.join(".git").exists());
         assert!(!set_project_git(&tmp, false).unwrap());
         let _ = fs::remove_dir_all(&tmp);
+    }
+    #[test]
+    fn test_short_provider_tag_maps_googleapis_to_gemini() {
+        assert_eq!(short_provider_tag("http://127.0.0.1:8080/v1/chat/completions"), "local");
+        assert_eq!(short_provider_tag("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"), "gemini");
+        assert_eq!(short_provider_tag("https://openrouter.ai/api/v1/chat/completions"), "openrouter");
+        assert_eq!(short_provider_tag("https://api.tokenlab.amd.com/v1/chat/completions"), "tokenlab");
     }
 }
