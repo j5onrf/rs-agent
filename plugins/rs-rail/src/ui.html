@@ -111,7 +111,7 @@
   .sb-foot .btn-icon { background: transparent; border-color: transparent; color: var(--muted); opacity: 0; transition: opacity .15s, background .12s, color .12s; }
   .sidebar-left:hover .sb-foot .btn-icon, .sb-foot .btn-icon:focus-visible { opacity: 1; }
   .sb-foot .btn-icon:hover { opacity: 1; background: var(--hover); color: var(--text); }
-  .proj-item { padding: 5px 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 1px; border: 1px solid transparent; }
+  .proj-item { padding: 5px 8px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 3px; border: 1px solid transparent; }
   .proj-item:hover { background: var(--hover); }
   .proj-item.active { background: var(--active-bg, var(--user-bg)); border-color: var(--active-border, var(--user-border)); }
   .proj-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
@@ -119,6 +119,10 @@
   .proj-badge.bot { border-radius: 999px; }
   .proj-item.active .proj-badge { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
   .proj-name { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .proj-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+  .proj-sub { font-size: 10px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.25; transition: color .12s; }
+  .proj-item:hover .proj-sub, .proj-item.active .proj-sub { color: var(--muted); }
+  .proj-item.active .proj-name { font-weight: 600; }
   .proj-acts { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
   .proj-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); opacity: 0; transition: opacity .12s; }
   .proj-dot.dirty { background: var(--accent); opacity: 0.9; }
@@ -492,7 +496,7 @@
     </div>
     <div class="modal-body">
       <nav class="modal-nav">
-        <div class="nav-group">AGENT</div>
+        <div class="nav-group">RS-AGENT</div>
         <button class="nav-btn active" data-tab="providers">Providers & Models</button>
         <button class="nav-btn" data-tab="projects">Projects</button>
         <button class="nav-btn" data-tab="profiles">Profiles</button>
@@ -668,7 +672,8 @@ const DEFAULT_APPEARANCE = {
   codeFont: "JetBrains Mono",
   codeSize: 12,
   logoStyle: "d",
-  microBots: true
+  microBots: true,
+  showDesc: false
 };
 
 function hexLum(hex) {
@@ -1011,6 +1016,17 @@ function renderTopbarProfile(ap) {
   $("tb-profile").title = `Project: ${projTip}\nProfile: ${ap.profile_name || "missing"}${colTip}${provTip}`;
 }
 
+function fitSubWords(str, maxChars) {
+  const s = String(str || "").trim();
+  if (!s || s.length <= maxChars) return s;
+  let cut = s.slice(0, maxChars + 1);
+  const sp = cut.lastIndexOf(" ");
+  cut = sp > 0 ? cut.slice(0, sp) : s.slice(0, maxChars);
+  const openP = cut.lastIndexOf("(");
+  if (openP > 0 && cut.indexOf(")", openP) === -1) cut = cut.slice(0, openP);
+  return cut.replace(/[\s&+\-/:,(]+$/, "").trim();
+}
+
 function renderAll() {
   if (!STATE) return;
   const ap = STATE.active_project;
@@ -1085,7 +1101,10 @@ function renderAll() {
   plist.innerHTML = "";
   const hc = $("proj-hover");
   plist.onscroll = () => hc.classList.remove("open");
-  const badgeRaw = getAppearance().microBots;
+  const curAp = getAppearance();
+  const badgeRaw = curAp.microBots;
+  const showDesc = curAp.showDesc === true;
+  const maxDescChars = Math.max(16, Math.round(25 * 13 / (curAp.uiSize || 13)));
   const badgeMode = badgeRaw === "none" ? "none" : (badgeRaw === false || badgeRaw === "letters" ? "letters" : "bots");
   if (!shownProjects.length) {
     plist.innerHTML = `<div class="muted" style="padding:10px 8px;display:flex;flex-direction:column;gap:6px;"><span>No visible projects.</span><button class="btn btn-sm" id="btn-empty-proj-mgr">Manage Projects</button></div>`;
@@ -1102,7 +1121,14 @@ function renderAll() {
     const delBtn = p.file_count > 0
       ? `<button class="proj-del" title="Delete ${p.file_count} file(s)"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11"/><path d="M6 2.5h4"/><path d="M4.5 4.5l.7 9h5.6l.7-9"/></svg></button>`
       : "";
-    el.innerHTML = `<div class="proj-left">${badgeHtml}<span class="proj-name">${esc(dname)}</span></div><div class="proj-acts">${callBtn}${delBtn}<span class="proj-dot ${p.dirty ? "dirty" : ""}"></span></div>`;
+    const customDesc = STATE.ui_prefs?.project_descriptions?.[p.name] || "";
+    const profileDesc = STATE.profile_descriptions?.[p.profile_name] || "";
+    const shownRaw = customDesc || (showDesc ? profileDesc : "");
+    const pDesc = fitSubWords(shownRaw, maxDescChars);
+    const nameHtml = pDesc
+      ? `<span class="proj-meta"><span class="proj-name">${esc(dname)}</span><span class="proj-sub" title="${esc(shownRaw)}">${esc(pDesc)}</span></span>`
+      : `<span class="proj-name">${esc(dname)}</span>`;
+    el.innerHTML = `<div class="proj-left">${badgeHtml}${nameHtml}</div><div class="proj-acts">${callBtn}${delBtn}<span class="proj-dot ${p.dirty ? "dirty" : ""}"></span></div>`;
     el.onclick = () => { hc.classList.remove("open"); loadState(p.name); };
     const cb = el.querySelector(".proj-call");
     if (cb) {
@@ -1126,9 +1152,28 @@ function renderAll() {
       const r = el.getBoundingClientRect();
       const filesTxt = p.file_count ? `${p.file_count} file(s)` : "empty";
       const gitRow = p.has_git ? `<div class="ph-row"><span>Git</span><span>${p.dirty ? "modified" : "clean"}</span></div>` : "";
-      hc.innerHTML = `<div class="ph-top"><span>${esc(dname)}</span></div><div class="ph-row"><span>Profile</span><span>${esc(p.profile_name)}</span></div><div class="ph-row"><span>Workspace</span><span>${filesTxt}</span></div>${gitRow}`;
+      
+      let botRows = "";
+      if (isBotMode()) {
+        const rows = [];
+        if (p.name !== ap.name && (ap.collaborators || []).includes(p.name)) {
+          rows.push(`<div class="ph-row"><span>Collaborator</span><span style="color:var(--accent);">linked</span></div>`);
+        }
+        if (p.collaborators && p.collaborators.length) {
+          rows.push(`<div class="ph-row"><span>Auto-call</span><span>${esc(p.collaborators.join(", "))}</span></div>`);
+        }
+        if (p.call_mode && p.call_mode !== "none") {
+          rows.push(`<div class="ph-row"><span>Call mode</span><span>${esc(p.call_mode.replace("_", " "))}</span></div>`);
+        }
+        if (p.peer_provider) {
+          rows.push(`<div class="ph-row"><span>Provider</span><span>${esc(p.peer_provider)}</span></div>`);
+        }
+        botRows = rows.join("");
+      }
+
+      hc.innerHTML = `<div class="ph-top"><span>${esc(dname)}</span></div><div class="ph-row"><span>Profile</span><span>${esc(p.profile_name)}</span></div><div class="ph-row"><span>Workspace</span><span>${filesTxt}</span></div>${botRows}${gitRow}`;
       hc.style.left = `${r.right + 8}px`;
-      hc.style.top = `${Math.min(r.top, window.innerHeight - 110)}px`;
+      hc.style.top = `${Math.min(r.top, window.innerHeight - 160)}px`;
       hc.classList.add("open");
     };
     el.onmouseleave = () => hc.classList.remove("open");
@@ -1317,7 +1362,8 @@ function createEmpty() {
     return d;
   }
   const verb = ap.is_agent ? "build" : "explore";
-  const sub = ap.tagline ? `<div class="empty-sub">${esc(ap.tagline)}</div>` : "";
+  const tagTxt = STATE?.ui_prefs?.project_descriptions?.[ap.name] || ap.tagline;
+  const sub = tagTxt ? `<div class="empty-sub">${esc(tagTxt)}</div>` : "";
   d.innerHTML = `<div class="empty-title">What should we ${verb} in ${esc(projDisplay(ap.name))}?</div>${sub}`;
   return d;
 }
@@ -1698,12 +1744,19 @@ function renderModalTab() {
     const shownCount = STATE.projects.filter((p) => !hiddenSet.has(p.name)).length;
 
     const namesMap = STATE.ui_prefs?.project_names || {};
-    const saveProjPrefs = async (nextHidden, nextLabels, nextNames = namesMap) => {
+    const descsMap = STATE.ui_prefs?.project_descriptions || {};
+    const saveProjPrefs = async (nextHidden, nextLabels, nextNames = namesMap, nextDescs = descsMap) => {
       const hiddenArr = Array.from(nextHidden);
-      const res = await api("/api/settings/ui", { hidden_projects: hiddenArr, project_labels: nextLabels, project_names: nextNames });
+      const res = await api("/api/settings/ui", {
+        hidden_projects: hiddenArr,
+        project_labels: nextLabels,
+        project_names: nextNames,
+        project_descriptions: nextDescs,
+      });
       STATE.ui_prefs.hidden_projects = res.hidden_projects || hiddenArr;
       STATE.ui_prefs.project_labels = res.project_labels || nextLabels;
       STATE.ui_prefs.project_names = res.project_names || nextNames;
+      STATE.ui_prefs.project_descriptions = res.project_descriptions || nextDescs;
       const curHidden = new Set(STATE.ui_prefs.hidden_projects);
       if (curHidden.has(STATE.active_project.name)) {
         const next = STATE.projects.find((p) => p.name === "chat" && !curHidden.has("chat"))
@@ -1715,7 +1768,7 @@ function renderModalTab() {
 
     const head = document.createElement("div");
     head.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;";
-    head.innerHTML = `<div><div style="font-weight:600">Projects (${shownCount}/${STATE.projects.length} shown)</div><div class="muted">Filter sidebar with labels or toggle workspace visibility.</div></div>
+    head.innerHTML = `<div><div style="font-weight:600">Projects (${shownCount}/${STATE.projects.length} shown)</div><div class="muted">Filter sidebar by group or toggle workspace visibility.</div></div>
       <div style="display:flex;gap:6px;">
         <button class="btn btn-sm" id="btn-proj-show-all">Show All</button>
         <button class="btn btn-sm" id="btn-proj-hide-all" title="Hide all except chat">Hide All</button>
@@ -1736,7 +1789,7 @@ function renderModalTab() {
       for (const lbl of allLabels) {
         const chip = document.createElement("span");
         chip.className = "lbl-chip";
-        chip.innerHTML = `<span class="lbl-name" title="Show only '${esc(lbl)}' in sidebar">${esc(lbl)}</span><button class="lbl-ren" title="Rename label">✎</button><button class="lbl-del" title="Remove label from all projects">×</button>`;
+        chip.innerHTML = `<span class="lbl-name" title="Show only '${esc(lbl)}' in sidebar">${esc(lbl)}</span><button class="lbl-ren" title="Rename group">✎</button><button class="lbl-del" title="Remove group from all projects">×</button>`;
         chip.querySelector(".lbl-name").onclick = async () => {
           const onlyOther = STATE.projects.filter((p) => (p.name === "chat" ? hiddenSet.has("chat") : !(labelsMap[p.name] || []).includes(lbl))).map((p) => p.name);
           await saveProjPrefs(new Set(onlyOther), labelsMap);
@@ -1748,7 +1801,10 @@ function renderModalTab() {
           chip.replaceWith(inp);
           inp.focus();
           inp.select();
+          let done = false;
           const commit = async () => {
+            if (done) return;
+            done = true;
             const nextName = inp.value.trim();
             if (!nextName || nextName === lbl) { renderModalTab(); return; }
             const nextMap = structuredClone(labelsMap);
@@ -1757,7 +1813,7 @@ function renderModalTab() {
             }
             await saveProjPrefs(hiddenSet, nextMap);
           };
-          inp.onkeydown = (e) => { if (e.key === "Enter") commit(); else if (e.key === "Escape") renderModalTab(); };
+          inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { done = true; renderModalTab(); } };
           inp.onblur = commit;
         };
         const ldel = chip.querySelector(".lbl-del");
@@ -1791,11 +1847,16 @@ function renderModalTab() {
       const isVis = !hiddenSet.has(p.name);
       const pLabels = labelsMap[p.name] || [];
       const dname = projDisplay(p.name);
+      const pDesc = descsMap[p.name] || "";
       const subMeta = `${p.file_count} file(s)`;
       const row = document.createElement("div");
       row.className = "setting-row" + (STATE.active_project.name === p.name ? " active-slot" : "");
+      const descLineHtml = pDesc
+        ? `<div class="muted proj-desc-row" style="margin-top:2px;display:flex;align-items:center;gap:4px;"><span class="proj-desc-txt">${esc(pDesc)}</span><button type="button" class="proj-ren proj-desc-edit" title="Edit description">✎</button></div>`
+        : "";
       row.innerHTML = `<div style="min-width:0;flex:1;">
         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><strong class="proj-disp">${esc(dname)}</strong><button type="button" class="proj-ren">✎</button> <span class="muted">${esc(subMeta)}</span></div>
+        ${descLineHtml}
         <div class="proj-tags"></div>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
@@ -1804,6 +1865,35 @@ function renderModalTab() {
         </select>` : ""}
         <button class="switch ${isVis ? "on" : ""}"></button>
       </div>`;
+
+      const editDesc = (anchorEl) => {
+        const inp = document.createElement("input");
+        inp.className = "tag-inp";
+        inp.style.width = "240px";
+        inp.maxLength = 100;
+        inp.placeholder = "Short description (empty clears)...";
+        inp.value = pDesc;
+        anchorEl.replaceWith(inp);
+        inp.focus();
+        inp.select();
+        let done = false;
+        const commit = async () => {
+          if (done) return;
+          done = true;
+          const v = inp.value.replace(/[\r\n\t]+/g, " ").trim().slice(0, 100);
+          if (v === pDesc) { renderModalTab(); return; }
+          const nextDescs = structuredClone(descsMap);
+          if (!v) delete nextDescs[p.name];
+          else nextDescs[p.name] = v;
+          await saveProjPrefs(hiddenSet, labelsMap, namesMap, nextDescs);
+        };
+        inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { done = true; renderModalTab(); } };
+        inp.onblur = commit;
+      };
+
+      const descRowEl = row.querySelector(".proj-desc-row");
+      const descEditBtn = row.querySelector(".proj-desc-edit");
+      if (descRowEl && descEditBtn) descEditBtn.onclick = () => editDesc(descRowEl);
 
       const renBtn = row.querySelector(".proj-ren");
       const dispEl = row.querySelector(".proj-disp");
@@ -1834,7 +1924,7 @@ function renderModalTab() {
       for (const l of pLabels) {
         const tag = document.createElement("span");
         tag.className = "proj-tag";
-        tag.innerHTML = `<span>${esc(l)}</span><button title="Remove label">×</button>`;
+        tag.innerHTML = `<span>${esc(l)}</span><button title="Remove group">×</button>`;
         tag.querySelector("button").onclick = async () => {
           const nextMap = structuredClone(labelsMap);
           nextMap[p.name] = pLabels.filter((x) => x !== l);
@@ -1847,11 +1937,11 @@ function renderModalTab() {
       const addBtn = document.createElement("button");
       addBtn.className = "btn btn-sm";
       addBtn.style.cssText = "padding:1px 7px;border-radius:999px;font-size:10.5px;";
-      addBtn.textContent = "+ label";
+      addBtn.textContent = "+ group";
       addBtn.onclick = () => {
         const inp = document.createElement("input");
         inp.className = "tag-inp";
-        inp.placeholder = "label...";
+        inp.placeholder = "group...";
         inp.setAttribute("list", "proj-labels-dl");
         addBtn.replaceWith(inp);
         inp.focus();
@@ -1912,6 +2002,16 @@ function renderModalTab() {
         tagsBox.appendChild(gBtn);
       }
 
+      if (!pDesc) {
+        const dBtn = document.createElement("button");
+        dBtn.className = "btn btn-sm";
+        dBtn.style.cssText = "padding:1px 7px;border-radius:999px;font-size:10.5px;";
+        dBtn.textContent = "+ desc";
+        dBtn.title = "Add project description";
+        dBtn.onclick = () => editDesc(dBtn);
+        tagsBox.appendChild(dBtn);
+      }
+
       const provSel = row.querySelector(".proj-prov");
       if (provSel) provSel.onchange = async (e) => {
         const nextProvs = structuredClone(STATE.ui_prefs?.project_providers || {});
@@ -1935,7 +2035,9 @@ function renderModalTab() {
       const cur = STATE.active_project.profile_name === prof;
       const row = document.createElement("div");
       row.className = "setting-row" + (cur ? " active-slot" : "");
-      row.innerHTML = `<div><strong>${esc(prof)}</strong></div><button class="btn btn-sm ${cur ? "btn-primary" : ""}" ${locked ? "disabled" : ""}>${cur ? "Active" : "Select"}</button>`;
+      const profDesc = STATE.profile_descriptions?.[prof] || "";
+      const descHtml = profDesc ? `<div class="muted" style="margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(profDesc)}">${esc(profDesc)}</div>` : "";
+      row.innerHTML = `<div style="min-width:0;flex:1;"><strong>${esc(prof)}</strong>${descHtml}</div><button class="btn btn-sm ${cur ? "btn-primary" : ""}" ${locked ? "disabled" : ""}>${cur ? "Active" : "Select"}</button>`;
       row.querySelector("button").onclick = async () => { projectsAutoLabeled = false; await api("/api/settings/profile", { profile_name: prof }); await loadState(); };
       pane.appendChild(row);
     }
@@ -2247,6 +2349,12 @@ function renderModalTab() {
     $("btn-bots-on").onclick = () => setBotMode(true, true);
     $("btn-bots-off").onclick = () => setBotMode(false, false);
     $("btn-bots-none").onclick = () => setBotMode("none", false);
+
+    const descRow = document.createElement("div");
+    descRow.className = "setting-row";
+    descRow.innerHTML = `<div><strong>Sidebar Descriptions</strong><div class="muted">Show profile frontmatter descriptions in sidebar (custom notes always show)</div></div><button class="btn btn-sm">${ap.showDesc === true ? "Shown" : "Hidden"}</button>`;
+    descRow.querySelector("button").onclick = () => { applyAppearance({ showDesc: ap.showDesc !== true }); renderAll(); };
+    pane.appendChild(descRow);
 
     const r = document.createElement("div");
     r.className = "setting-row";
@@ -2701,6 +2809,9 @@ function renderBotPicker() {
       chip.className = "collab-chip" + (on ? " on" : "");
       chip.innerHTML = `${botSvg(p.name, 12)}<span>${esc(projDisplay(p.name))}</span>`;
       chip.onclick = async () => {
+        if (chip.disabled) return;
+        chip.disabled = true;
+        try {
         const nextSet = new Set(activeCollabs);
         if (on) nextSet.delete(p.name); else nextSet.add(p.name);
         const nextMap = structuredClone(STATE.ui_prefs?.project_collabs || {});
@@ -2717,14 +2828,17 @@ function renderBotPicker() {
           }
           payload.project_actions = nextActsMap;
         }
-        const res = await api("/api/settings/ui", payload);
-        STATE.ui_prefs.project_collabs = res.project_collabs || {};
-        if (res.project_actions) STATE.ui_prefs.project_actions = res.project_actions;
-        ap.collaborators = res.project_collabs?.[ap.name] ?? nextMap[ap.name];
-        renderBotPicker();
-        renderActionsPane();
-        renderTopbarProfile(ap);
-        if ($("modal-actions").classList.contains("open")) renderManageActions();
+          const res = await api("/api/settings/ui", payload);
+          STATE.ui_prefs.project_collabs = res.project_collabs || {};
+          if (res.project_actions) STATE.ui_prefs.project_actions = res.project_actions;
+          ap.collaborators = res.project_collabs?.[ap.name] ?? nextMap[ap.name];
+          renderBotPicker();
+          renderActionsPane();
+          renderTopbarProfile(ap);
+          if ($("modal-actions").classList.contains("open")) renderManageActions();
+        } finally {
+          chip.disabled = false;
+        }
       };
       cbox.appendChild(chip);
     }

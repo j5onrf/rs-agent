@@ -53,6 +53,8 @@ struct RailConfig {
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     project_names: HashMap<String, String>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    project_descriptions: HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     project_bots: HashMap<String, String>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     project_providers: HashMap<String, String>,
@@ -71,6 +73,7 @@ impl Default for RailConfig {
             hidden_projects: Vec::new(),
             project_labels: HashMap::new(),
             project_names: HashMap::new(),
+            project_descriptions: HashMap::new(),
             project_bots: HashMap::new(),
             project_providers: HashMap::new(),
             project_collabs: HashMap::new(),
@@ -151,6 +154,22 @@ fn sanitize_project_names(obj: &serde_json::Map<String, Value>) -> HashMap<Strin
     out
 }
 
+
+fn sanitize_project_descriptions(obj: &serde_json::Map<String, Value>) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    for (proj, val) in obj {
+        if !is_valid_slug(proj) {
+            continue;
+        }
+        if let Some(raw) = val.as_str() {
+            let s = raw.trim();
+            if !s.is_empty() && s.chars().count() <= 100 && !s.chars().any(char::is_control) {
+                out.insert(proj.clone(), s.to_string());
+            }
+        }
+    }
+    out
+}
 
 fn default_bot_mask(name: &str) -> u16 {
     let mut h: u32 = 2166136261;
@@ -379,34 +398,12 @@ fn split_frontmatter(raw: &str) -> (Vec<(&str, &str)>, &str) {
 
 fn profile_tagline_in(profiles_dir: &Path, prof_name: &str) -> Option<String> {
     let raw = find_profile_text_in(profiles_dir, prof_name)?;
-    let (fm, body) = split_frontmatter(&raw);
-    let picked = fm
-        .into_iter()
-        .find_map(|(k, v)| {
-            matches!(k, "tagline" | "description")
-                .then(|| v.trim_matches(['"', '\'', ' ']))
-                .filter(|s| !s.is_empty())
-        })
-        .or_else(|| {
-            body.lines().find_map(|l| {
-                let t = l.trim();
-                t.strip_prefix("ROLE:")
-                    .or_else(|| t.strip_prefix("Role:"))
-                    .map(str::trim)
-                    .filter(|s| !s.is_empty())
-            })
-        })
-        .or_else(|| {
-            body.lines().find_map(|l| {
-                let t = l.trim().trim_start_matches(['#', '-', '*', ' ']).trim();
-                (!t.is_empty()
-                    && !t.starts_with("```")
-                    && !t.starts_with("<!--")
-                    && !(t.starts_with('[') && t.ends_with(']'))
-                    && !t.ends_with(':'))
-                .then_some(t)
-            })
-        })?;
+    let (fm, _) = split_frontmatter(&raw);
+    let picked = fm.into_iter().find_map(|(k, v)| {
+        matches!(k, "tagline" | "description")
+            .then(|| v.trim_matches(['"', '\'', ' ']))
+            .filter(|s| !s.is_empty())
+    })?;
     let first = picked
         .split_once(". ")
         .filter(|(head, _)| head.chars().count() >= 16)
@@ -417,7 +414,7 @@ fn profile_tagline_in(profiles_dir: &Path, prof_name: &str) -> Option<String> {
     Some(truncate_chars(first, 84))
 }
 
-fn derive_auto_labels_in(root: &Path, project: &str, prof_name: &str) -> Vec<String> {
+fn derive_auto_labels_in(root: &Path, cfg: &RailConfig, project: &str, prof_name: &str) -> Vec<String> {
     if project == "chat" {
         return Vec::new();
     }
@@ -429,7 +426,7 @@ fn derive_auto_labels_in(root: &Path, project: &str, prof_name: &str) -> Vec<Str
         if matches!(k, "label" | "labels") {
             let mut list = Vec::new();
             for item in v.trim_matches(['[', ']']).split(',') {
-                if let Some(lbl) = sanitize_label(item.trim_matches(['"', '\'', ' '])) {
+                if let Some(lbl) = sanitize_label(item.trim_matches(['\"', '\'', ' '])) {
                     if !list.contains(&lbl) && list.len() < 8 {
                         list.push(lbl);
                     }
@@ -441,15 +438,22 @@ fn derive_auto_labels_in(root: &Path, project: &str, prof_name: &str) -> Vec<Str
         }
     }
     let prof = Profile::parse(&raw);
+    let mut list = Vec::new();
     if !prof.mcp_servers.is_empty() {
-        vec!["mcp".into()]
+        list.push("mcp".into());
     } else {
         match prof.tier {
-            ToolTier::PureBash => vec!["purebash".into()],
-            ToolTier::Core4 => vec!["cloud".into()],
-            ToolTier::Smol => vec!["local".into()],
+            ToolTier::PureBash => list.push("purebash".into()),
+            ToolTier::Core4 => list.push("cloud".into()),
+            ToolTier::Smol => list.push("local".into()),
         }
     }
+    let has_collab = !resolve_collaborators(root, project, prof_name).0.is_empty();
+    let has_prov = effective_project_provider(root, cfg, project, prof_name).is_some();
+    if (has_collab || has_prov) && !list.contains(&"microbot".to_string()) && list.len() < 8 {
+        list.push("microbot".into());
+    }
+    list
 }
 
 fn apply_auto_labels(root: &Path, cfg: &mut RailConfig) -> usize {
@@ -471,14 +475,14 @@ fn apply_auto_labels(root: &Path, cfg: &mut RailConfig) -> usize {
         let allow_refresh = cfg
             .project_labels
             .get(&name)
-            .map(|cur| !cur.is_empty() && cur.iter().all(|l| matches!(l.as_str(), "mcp" | "purebash" | "cloud" | "local")))
+            .map(|cur| !cur.is_empty() && cur.iter().all(|l| matches!(l.as_str(), "mcp" | "purebash" | "cloud" | "local" | "microbot")))
             .unwrap_or(true);
         if !allow_refresh {
             continue;
         }
         let ws_cfg = WorkspaceConfig::load_or_default(&p);
         let prof_name = if ws_cfg.profile_name == "chat" { name.as_str() } else { ws_cfg.profile_name.as_str() };
-        let labels = derive_auto_labels_in(root, &name, prof_name);
+        let labels = derive_auto_labels_in(root, cfg, &name, prof_name);
         if !labels.is_empty() && cfg.project_labels.get(&name) != Some(&labels) {
             cfg.project_labels.insert(name, labels);
             added += 1;
@@ -2710,6 +2714,16 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         }
         proj_entries.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
 
+        let profiles = Profile::list_available();
+        let profiles_dir = app.root.join("profiles");
+        let mut profile_descriptions: HashMap<String, String> = profiles
+            .iter()
+            .filter_map(|p| profile_tagline_in(&profiles_dir, p).map(|d| (p.clone(), d)))
+            .collect();
+        if let Some(chat_desc) = profile_tagline_in(&profiles_dir, "chat") {
+            profile_descriptions.insert("chat".into(), chat_desc);
+        }
+
         let sess_val = {
             let mut lock = app.sessions.lock().await;
             let sess = lock.entry(active_name.clone()).or_insert_with(|| app.load_or_init_session(&active_name));
@@ -2719,7 +2733,11 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             let memory = fs::read_to_string(sess.workspace.join(".rs/memory.md")).unwrap_or_default();
             let r_str = reasoning_to_string(&sess.reasoning);
             let pr_str = reasoning_to_string(&sess.profile_reasoning);
-            let tagline = profile_tagline_in(&app.root.join("profiles"), &sess.profile_name);
+            let tagline = rail_cfg
+                .project_descriptions
+                .get(&sess.project_name)
+                .cloned()
+                .or_else(|| profile_descriptions.get(&sess.profile_name).cloned());
             json!({
                 "name": sess.project_name,
                 "path": sess.workspace.display().to_string(),
@@ -2756,7 +2774,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             &json!({
                 "projects": proj_entries,
                 "active_project": sess_val,
-                "profiles": Profile::list_available(),
+                "profiles": profiles,
+                "profile_descriptions": profile_descriptions,
                 "skills": Skill::list_available(),
                 "providers": slots,
                 "provider": {
@@ -2777,6 +2796,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     "hidden_projects": rail_cfg.hidden_projects,
                     "project_labels": rail_cfg.project_labels,
                     "project_names": rail_cfg.project_names,
+                    "project_descriptions": rail_cfg.project_descriptions,
                     "project_bots": rail_cfg.project_bots,
                     "project_providers": rail_cfg.project_providers,
                     "project_collabs": rail_cfg.project_collabs,
@@ -2905,7 +2925,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
 
     if method == "POST" && path == "/api/project/git" {
         let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("").trim();
-        let enable = payload.get("enable").and_then(|v| v.as_bool()).unwrap_or(false);
+        let Some(enable) = payload.get("enable").and_then(|v| v.as_bool()) else {
+            return write_http_err(&mut stream, 400, "Missing 'enable' boolean").await;
+        };
         if !is_valid_slug(name) {
             return write_http_err(&mut stream, 400, "Invalid project slug").await;
         }
@@ -3063,6 +3085,10 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             cfg.project_names = sanitize_project_names(obj);
             dirty_cfg = true;
         }
+        if let Some(obj) = payload.get("project_descriptions").and_then(|v| v.as_object()) {
+            cfg.project_descriptions = sanitize_project_descriptions(obj);
+            dirty_cfg = true;
+        }
         if let Some(obj) = payload.get("project_bots").and_then(|v| v.as_object()) {
             match sanitize_project_bots(obj, &app.root.join("projects")) {
                 Ok(bots) => {
@@ -3100,6 +3126,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "hidden_projects": cfg.hidden_projects,
                 "project_labels": cfg.project_labels,
                 "project_names": cfg.project_names,
+                "project_descriptions": cfg.project_descriptions,
                 "project_bots": cfg.project_bots,
                 "project_providers": cfg.project_providers,
                 "project_collabs": cfg.project_collabs,
@@ -4309,7 +4336,7 @@ mod tests {
         assert_eq!(truncate_chars("αβγ", 3), "αβγ");
     }
     #[test]
-    fn test_profile_tagline_in_uses_existing_role_and_body() {
+    fn test_profile_tagline_in_reads_frontmatter_only() {
         let tmp = std::env::temp_dir().join(format!("rs_rail_tag_{}", std::process::id()));
         let _ = fs::remove_dir_all(&tmp);
         fs::create_dir_all(&tmp).unwrap();
@@ -4318,8 +4345,8 @@ mod tests {
         fs::write(tmp.join("plain.md"), "# Conversational Assistant\nExplore ideas.").unwrap();
         fs::write(tmp.join("explicit.md"), "---\ntagline: \"Fast cloud reviewer\"\n---\nROLE: Ignored.").unwrap();
 
-        assert_eq!(profile_tagline_in(&tmp, "role_only").as_deref(), Some("NVIDIA Nemotron Systems Architect"));
-        assert_eq!(profile_tagline_in(&tmp, "plain").as_deref(), Some("Conversational Assistant"));
+        assert_eq!(profile_tagline_in(&tmp, "role_only"), None);
+        assert_eq!(profile_tagline_in(&tmp, "plain"), None);
         assert_eq!(profile_tagline_in(&tmp, "explicit").as_deref(), Some("Fast cloud reviewer"));
         let _ = fs::remove_dir_all(&tmp);
     }
@@ -4432,5 +4459,50 @@ mod tests {
         assert_eq!(short_provider_tag("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"), "gemini");
         assert_eq!(short_provider_tag("https://openrouter.ai/api/v1/chat/completions"), "openrouter");
         assert_eq!(short_provider_tag("https://api.tokenlab.amd.com/v1/chat/completions"), "tokenlab");
+    }
+    #[test]
+    fn test_sanitize_project_descriptions_bounds_and_controls() {
+        let mut map = serde_json::Map::new();
+        map.insert("surogate37".into(), json!("  This is a bot project  "));
+        map.insert("empty".into(), json!("   "));
+        map.insert("ctrl".into(), json!("bad\nline"));
+        map.insert("toolong".into(), json!("x".repeat(101)));
+        map.insert("../bad".into(), json!("nope"));
+        let clean = sanitize_project_descriptions(&map);
+        assert_eq!(clean.get("surogate37").map(String::as_str), Some("This is a bot project"));
+        assert!(!clean.contains_key("empty"));
+        assert!(!clean.contains_key("ctrl"));
+        assert!(!clean.contains_key("toolong"));
+        assert!(!clean.contains_key("../bad"));
+    }
+    #[test]
+    fn test_auto_labels_derives_microbot_for_collaborator_and_provider() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_mb_lbl_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("profiles")).unwrap();
+        fs::create_dir_all(tmp.join("projects/gem35")).unwrap();
+        fs::create_dir_all(tmp.join("projects/surogate37")).unwrap();
+
+        fs::write(tmp.join("profiles/gem35.md"), "---
+core4: true
+provider: GEMINI
+---
+hi").unwrap();
+        fs::write(tmp.join("profiles/surogate37.md"), "---
+collaborators: [gem35]
+---
+hi").unwrap();
+
+        WorkspaceConfig { profile_name: "gem35".into(), is_agent: true, tier: ToolTier::Core4, adapters: false, delegate: false }
+            .save(tmp.join("projects/gem35")).unwrap();
+        WorkspaceConfig { profile_name: "surogate37".into(), is_agent: true, tier: ToolTier::Smol, adapters: false, delegate: false }
+            .save(tmp.join("projects/surogate37")).unwrap();
+
+        let mut cfg = RailConfig::default();
+        apply_auto_labels(&tmp, &mut cfg);
+
+        assert_eq!(cfg.project_labels.get("gem35").unwrap(), &vec!["cloud".to_string(), "microbot".to_string()]);
+        assert_eq!(cfg.project_labels.get("surogate37").unwrap(), &vec!["local".to_string(), "microbot".to_string()]);
+        let _ = fs::remove_dir_all(&tmp);
     }
 }

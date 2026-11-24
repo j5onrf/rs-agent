@@ -2,38 +2,51 @@
   "show_right_panel": true,
   "bot_mode": true,
   "last_project": "chat",
+  "hidden_projects": [
+    "flint",
+    "groot",
+    "lfm3",
+    "ling-tiny",
+    "nemo",
+    "qwen38",
+    "sage",
+    "tokenlab"
+  ],
   "project_labels": {
-    "surogate37": [
+    "ling-tiny": [
+      "local"
+    ],
+    "lfm3": [
       "local"
     ],
     "tokenlab": [
       "cloud"
     ],
+    "surogate37": [
+      "local",
+      "microbot"
+    ],
+    "gem35": [
+      "cloud",
+      "microbot"
+    ],
     "flint": [
       "local"
     ],
-    "inkling2": [
-      "local"
-    ],
-    "sage": [
+    "qwen38": [
       "local"
     ],
     "nemo": [
       "cloud"
     ],
-    "ling-tiny": [
-      "local"
+    "inkling2": [
+      "local",
+      "microbot"
     ],
-    "gem35": [
-      "cloud"
-    ],
-    "lfm3": [
+    "sage": [
       "local"
     ],
     "groot": [
-      "local"
-    ],
-    "qwen38": [
       "local"
     ]
   },
@@ -44,11 +57,14 @@
     "surogate37": "b:1395"
   },
   "project_collabs": {
-    "surogate37": [
-      "gem35"
-    ],
     "gem35": [
       "surogate37"
+    ],
+    "inkling2": [
+      "surogate37"
+    ],
+    "surogate37": [
+      "gem35"
     ]
   },
   "project_actions": {
