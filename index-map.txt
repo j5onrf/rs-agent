@@ -27,17 +27,10 @@
 #   ├── plugins/rs-rail/rs-rail.desktop  - [Desktop Entry]
 #   ├── plugins/rs-rail/src/main.rs      - CLI Entrypoint & Runtime Loop
 #   ├── plugins/rs-rail/src/ui.html      - --bg: #0c0c0e;
-#   ├── plugins/rs-rail/themes/catppuccin.json - "accent": "#cba6f7",
 #   ├── plugins/rs-rail/themes/claude.json - "name": "Claude",
 #   ├── plugins/rs-rail/themes/darkbot.json - "name": "DarkBot",
-#   ├── plugins/rs-rail/themes/dracula.json - "accent": "#bd93f9",
 #   ├── plugins/rs-rail/themes/eldritch.json - "accent": "#37f499",
-#   ├── plugins/rs-rail/themes/gruvbox.json - "accent": "#a9b665",
-#   ├── plugins/rs-rail/themes/kanagawa.json - "accent": "#7e9cd8",
-#   ├── plugins/rs-rail/themes/noctalia-light.json - "accent": "#3d449b",
-#   ├── plugins/rs-rail/themes/noctalia.json - "name": "Noctalia",
 #   ├── plugins/rs-rail/themes/pure-light.json - "name": "Pure Light",
-#   ├── plugins/rs-rail/themes/tokyo-night.json - "accent": "#7aa2f7",
 #   ├── plugins/t3code/Cargo.toml        - name = "t3code-bridge"
 #   ├── plugins/t3code/Readme.md         - A native Rust Agent Client Protocol (ACP) stdio bridge connecting the `rs-agent`
 #   ├── plugins/t3code/launch.sh         - #!/usr/bin/env bash
@@ -58,6 +51,7 @@
 #   ├── profiles/purebash.md             - Pure Bash LFM Minimalist Shell Agent
 #   ├── profiles/qwen38.md               - Qwen3.8-35B-Distill (Local)
 #   ├── profiles/sage.md                 - InternScience Sage-A1.5 35B Autonomous Systems Architect & Verification Agent
+#   ├── profiles/surogate37.md           - Surogate 3.7 35B-A3B Autonomous Systems Agent
 #   ├── profiles/tokenlab.md             - AMD Token Lab DeepSeek-V4.1-Flash Systems & Coding Engineer
 #   ├── projects/flint/math_demo.py      - def is_prime(n):
 #   ├── projects/gem35/math_demo.py      - def is_prime(n):
@@ -68,6 +62,8 @@
 #   ├── projects/ling-tiny/math_demo.py  - #!/usr/bin/env python3
 #   ├── projects/nemo/math_utils.py      - #!/usr/bin/env python3
 #   ├── projects/sage/test_calc.py       - def add(a, b):
+#   ├── projects/surogate37/math_demo.py - #!/usr/bin/env python3
+#   ├── projects/surogate37/test_calc.py - #!/usr/bin/env python3
 #   ├── projects/tokenlab/calc.py        - def add(a, b):
 #   ├── rs-context.md                    - Rs-Agent Context Router
 #   ├── rs-hook.sh                       - Rs-Agent shell hook (minimal: < 0.2ms, Bash & Zsh, macOS & Linux)
@@ -112,11 +108,11 @@
 
 ### `plugins/rs-rail/src/main.rs`
 ```rust
-  L048: impl Default for RailConfig {
-    L049: fn default() -> Self;
+  L065: impl Default for RailConfig {
+    L066: fn default() -> Self;
   }
-  L2620: async fn main() -> Result<()>;
-  L2640: mod tests;
+  L3673: async fn main() -> Result<()>;
+  L3693: mod tests;
 ```
 
 ### `plugins/t3code/src/main.rs`

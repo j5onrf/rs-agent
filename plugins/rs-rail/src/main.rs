@@ -34,6 +34,7 @@ fn default_true() -> bool {
 #[derive(Clone, Serialize, Deserialize)]
 struct ActionItem {
     cmd: String,
+    #[serde(default)]
     desc: String,
 }
 
@@ -216,24 +217,29 @@ fn sanitize_project_actions(obj: &serde_json::Map<String, Value>) -> HashMap<Str
         if !is_valid_slug(proj) {
             continue;
         }
-        let mut list = Vec::new();
-        if let Some(arr) = val.as_array() {
-            for item in arr {
-                if let (Some(cmd), Some(desc)) = (
-                    item.get("cmd").and_then(|v| v.as_str()),
-                    item.get("desc").and_then(|v| v.as_str()),
-                ) {
-                    let c = cmd.trim();
-                    let d = desc.trim();
-                    if !c.is_empty() && c.len() <= 120 && d.len() <= 60 && list.len() < 16 {
-                        list.push(ActionItem { cmd: c.to_string(), desc: d.to_string() });
-                    }
-                }
+        let Some(arr) = val.as_array() else {
+            continue;
+        };
+        let mut list: Vec<ActionItem> = Vec::new();
+        for item in arr {
+            let Some(cmd_raw) = item.get("cmd").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let desc_raw = item.get("desc").and_then(|v| v.as_str()).unwrap_or("");
+            let c = cmd_raw.trim();
+            let d = desc_raw.trim();
+            if !c.is_empty()
+                && c.chars().count() <= 500
+                && d.chars().count() <= 60
+                && !c.chars().any(char::is_control)
+                && !d.chars().any(char::is_control)
+                && !list.iter().any(|x| x.cmd == c)
+                && list.len() < 16
+            {
+                list.push(ActionItem { cmd: c.to_string(), desc: d.to_string() });
             }
         }
-        if !list.is_empty() {
-            out.insert(proj.clone(), list);
-        }
+        out.insert(proj.clone(), list);
     }
     out
 }
@@ -530,6 +536,17 @@ struct TurnStats {
     tps: f64,
 }
 
+fn rail_hud_summary(prof: &Profile, is_agent: bool) -> String {
+    let mut p = prof.clone();
+    p.reasoning_budget = None;
+    let s = p.hud_summary(is_agent);
+    if !is_agent && s == "no tools · pure chat" {
+        "no tools".to_string()
+    } else {
+        s
+    }
+}
+
 fn reasoning_to_string(r: &Option<ReasoningSetting>) -> String {
     match r {
         Some(ReasoningSetting::Tokens(n)) => n.to_string(),
@@ -655,7 +672,7 @@ impl AppRuntime {
         if profile_missing {
             cfg.profile_name.clear();
         }
-        let hud_summary = prof.hud_summary(cfg.is_agent);
+        let hud_summary = rail_hud_summary(&prof, cfg.is_agent);
         set_profile_max_tokens(prof.ctx);
         let sys = build_system_prompt(&prof, &proj_dir, cfg.is_agent, &active_skills);
         let final_reasoning = if reasoning.is_some() { reasoning } else if saved.reasoning.is_some() { None } else { prof.reasoning_budget.clone() };
@@ -778,7 +795,15 @@ fn git_status_brief(dir: &Path) -> (String, bool) {
     let text = String::from_utf8_lossy(&out.stdout);
     let mut lines = text.lines();
     let head = lines.next().unwrap_or("").trim_start_matches("##").trim();
-    let branch = head.split("...").next().unwrap_or(head).split_whitespace().next().unwrap_or("detached");
+    let head_clean = head
+        .strip_prefix("No commits yet on ")
+        .or_else(|| head.strip_prefix("Initial commit on "))
+        .unwrap_or(head);
+    let branch = if head_clean.starts_with("HEAD (no branch)") {
+        "detached"
+    } else {
+        head_clean.split("...").next().unwrap_or(head_clean).split_whitespace().next().unwrap_or("detached")
+    };
     let dirty = lines.filter(|l| !l.trim().is_empty()).count();
     let label = if dirty == 0 {
         format!("git: {branch} · clean")
@@ -1669,6 +1694,38 @@ fn list_workspace_files(dir: &Path, root: &Path, include_rs: bool, out: &mut Vec
     }
 }
 
+fn set_project_git(proj_dir: &Path, enable: bool) -> Result<bool> {
+    let git_path = proj_dir.join(".git");
+    if enable {
+        if git_path.exists() {
+            return Ok(true);
+        }
+        let out = std::process::Command::new("git")
+            .arg("-C")
+            .arg(proj_dir)
+            .arg("init")
+            .output()?;
+        if !out.status.success() {
+            let msg = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            anyhow::bail!("{}", if msg.is_empty() { "git init failed".into() } else { msg });
+        }
+        Ok(true)
+    } else {
+        match fs::symlink_metadata(&git_path) {
+            Ok(meta) => {
+                if meta.is_dir() && !meta.file_type().is_symlink() {
+                    fs::remove_dir_all(&git_path)?;
+                } else {
+                    fs::remove_file(&git_path)?;
+                }
+                Ok(false)
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+            Err(e) => Err(e.into()),
+        }
+    }
+}
+
 fn clean_project_dir(proj_dir: &Path) -> Result<usize> {
     let mut removed = 0;
     if let Ok(rd) = fs::read_dir(proj_dir) {
@@ -1916,7 +1973,7 @@ fn parse_profile_collab_raw(raw: &str, active_project: &str) -> (Vec<String>, St
             }
         } else if key == "call_mode" {
             let m = clean.trim().to_ascii_lowercase();
-            if m == "full" || m == "last_turn" {
+            if matches!(m.as_str(), "full" | "last_turn" | "none") {
                 mode = m;
             }
         }
@@ -2165,7 +2222,7 @@ fn build_peer_envelope(
             digest.reverse();
             parts.push(format!("--- Caller Transcript (full mode) ---\n{}", digest.join("\n\n")));
         }
-    } else {
+    } else if mode == "last_turn" {
         let last_user = turns.iter().rev().find(|m| m.role == "user").map(|m| chat_msg_text(m)).unwrap_or_default();
         let last_asst = turns
             .iter()
@@ -2629,7 +2686,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 let cfg = WorkspaceConfig::load_or_default(&p);
                 let prof = if name == "chat" { "chat".into() } else { cfg.profile_name };
                 let hud = Profile::load(&prof)
-                    .map(|pr| pr.hud_summary(name != "chat"))
+                    .map(|pr| rail_hud_summary(&pr, name != "chat"))
                     .unwrap_or_default();
                 let has_git = p.join(".git").exists();
                 let dirty = has_git && git_status_brief(&p).1;
@@ -2846,6 +2903,23 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         return write_http_json(&mut stream, 200, &json!({ "name": name })).await;
     }
 
+    if method == "POST" && path == "/api/project/git" {
+        let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("").trim();
+        let enable = payload.get("enable").and_then(|v| v.as_bool()).unwrap_or(false);
+        if !is_valid_slug(name) {
+            return write_http_err(&mut stream, 400, "Invalid project slug").await;
+        }
+        let projects_root = app.root.join("projects").canonicalize()?;
+        let proj_dir = projects_root.join(name);
+        if !proj_dir.is_dir() || !proj_dir.canonicalize().is_ok_and(|c| c.starts_with(&projects_root)) {
+            return write_http_err(&mut stream, 404, "Project not found").await;
+        }
+        return match set_project_git(&proj_dir, enable) {
+            Ok(has_git) => write_http_json(&mut stream, 200, &json!({ "ok": true, "has_git": has_git })).await,
+            Err(e) => write_http_err(&mut stream, 500, &e.to_string()).await,
+        };
+    }
+
     if method == "POST" && path == "/api/project/clean" {
         let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("").trim();
         if !is_valid_slug(name) {
@@ -2924,7 +2998,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     sess.ctx_override = loaded.ctx;
                     sess.reasoning = loaded.reasoning_budget.clone();
                     sess.profile_reasoning = loaded.reasoning_budget.clone();
-                    sess.hud_summary = loaded.hud_summary(true);
+                    sess.hud_summary = rail_hud_summary(&loaded, true);
                     set_profile_max_tokens(loaded.ctx);
                     let cfg = WorkspaceConfig {
                         profile_name: sess.profile_name.clone(),
@@ -3010,8 +3084,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             cfg.project_actions = sanitize_project_actions(obj);
             dirty_cfg = true;
         }
-        if payload.get("auto_label").and_then(|v| v.as_bool()) == Some(true) {
-            apply_auto_labels(&app.root, &mut cfg);
+        if payload.get("auto_label").and_then(|v| v.as_bool()) == Some(true)
+            && apply_auto_labels(&app.root, &mut cfg) > 0
+        {
             dirty_cfg = true;
         }
         if dirty_cfg {
@@ -3066,6 +3141,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         let target = payload.get("target").and_then(|v| v.as_str()).unwrap_or("").trim();
         let mode = match payload.get("mode").and_then(|v| v.as_str()).unwrap_or("last_turn") {
             "full" => "full",
+            "none" => "none",
             _ => "last_turn",
         };
         let prompt = payload.get("prompt").and_then(|v| v.as_str()).unwrap_or("").trim();
@@ -3113,10 +3189,13 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     name: Some(target.into()),
                     brief: Some(prompt.into()),
                     ok: Some(true),
-                    summary: Some(if out.trace.is_empty() {
-                        format!("{} · {}", mode.replace('_', " "), out.provider_tag)
-                    } else {
-                        format!("{} · {} · {} read(s)", mode.replace('_', " "), out.provider_tag, out.trace.len())
+                    summary: Some({
+                        let mode_lbl = match mode { "none" => "prompt only", "full" => "full", _ => "last turn" };
+                        if out.trace.is_empty() {
+                            format!("{mode_lbl} · {}", out.provider_tag)
+                        } else {
+                            format!("{mode_lbl} · {} · {} read(s)", out.provider_tag, out.trace.len())
+                        }
                     }),
                     content: Some(out.synthesis.clone()),
                     elapsed_s: Some(out.elapsed_s),
@@ -4143,6 +4222,12 @@ mod tests {
         assert!(full.contains("Focus on NaN"));
         assert!(!full.contains("SECRET_OLD_THINKING"));
         assert!(!full.contains("SECRET_LAST_THINKING"));
+
+        let none = build_peer_envelope("surogate37", "none", "Pure prompt question", None, &history, &files);
+        assert!(none.contains("Pure prompt question"));
+        assert!(!none.contains("Write test_calc.py"));
+        assert!(!none.contains("Implemented add and subtract."));
+        assert!(!none.contains("Old prompt"));
     }
 
     #[test]
@@ -4297,13 +4382,48 @@ mod tests {
         let mut map = serde_json::Map::new();
         map.insert("surogate37".into(), json!([
             { "cmd": "/call gem35", "desc": "Ask Gemini" },
+            { "cmd": "/call gem35", "desc": "Duplicate ignored" },
             { "cmd": "", "desc": "empty" },
-            { "cmd": "cargo check", "desc": "Verify build" }
+            { "cmd": "bad\ncmd", "desc": "ctrl" },
+            { "cmd": "Create a handoff" },
+            { "cmd": "a".repeat(250), "desc": "é".repeat(60) },
+            { "cmd": "x".repeat(501), "desc": "too long" }
         ]));
+        map.insert("emptyproj".into(), json!([]));
         map.insert("../bad".into(), json!([]));
         let clean = sanitize_project_actions(&map);
-        assert_eq!(clean.get("surogate37").unwrap().len(), 2);
-        assert_eq!(clean.get("surogate37").unwrap()[0].cmd, "/call gem35");
+        let items = clean.get("surogate37").unwrap();
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].cmd, "/call gem35");
+        assert_eq!(items[1].cmd, "Create a handoff");
+        assert_eq!(items[1].desc, "");
+        assert_eq!(items[2].cmd.len(), 250);
+        assert_eq!(clean.get("emptyproj").unwrap().len(), 0);
         assert!(!clean.contains_key("../bad"));
+    }
+    #[test]
+    fn test_rail_hud_summary_omits_reasoning_budget() {
+        let agent = Profile::parse("---\nadapters: true\nreasoning_budget: 350\n---\nhi");
+        assert_eq!(rail_hud_summary(&agent, true), "adp");
+        let chat = Profile::parse("---\nreasoning_budget: 250\n---\nhi");
+        assert_eq!(rail_hud_summary(&chat, false), "no tools");
+    }
+    #[test]
+    fn test_set_project_git_init_and_remove() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_proj_git_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+
+        assert!(set_project_git(&tmp, true).unwrap());
+        fs::write(tmp.join("a.txt"), "hi").unwrap();
+        let (lbl, dirty) = git_status_brief(&tmp);
+        assert!(dirty && lbl.starts_with("git: ") && !lbl.starts_with("git: No ") && lbl.contains("1 modified"), "got: {lbl}");
+        assert!(tmp.join(".git").is_dir());
+        assert!(set_project_git(&tmp, true).unwrap());
+
+        assert!(!set_project_git(&tmp, false).unwrap());
+        assert!(!tmp.join(".git").exists());
+        assert!(!set_project_git(&tmp, false).unwrap());
+        let _ = fs::remove_dir_all(&tmp);
     }
 }

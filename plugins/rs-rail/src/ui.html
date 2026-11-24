@@ -61,7 +61,6 @@
   .brand { font-weight: 600; letter-spacing: .2px; display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; padding: 0; color: var(--text); white-space: nowrap; background: var(--card); border: 1px solid var(--border); border-radius: 999px; cursor: default; }
   .brand.clickable { cursor: pointer; }
   .brand.clickable:hover { background: var(--hover); border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); }
-  .sep { width: 1px; height: 14px; background: var(--border); flex-shrink: 0; }
   .tele { font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 6px; user-select: none; }
   .tele strong { color: var(--text); font-weight: 500; }
   #tb-git-txt { display: inline-flex; align-items: center; gap: 1.5ch; }
@@ -117,6 +116,7 @@
   .proj-item.active { background: var(--active-bg, var(--user-bg)); border-color: var(--active-border, var(--user-border)); }
   .proj-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
   .proj-badge { width: 18px; height: 18px; border-radius: 4px; background: var(--card); border: 1px solid var(--border); color: var(--muted); font-size: 9.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase; }
+  .proj-badge.bot { border-radius: 999px; }
   .proj-item.active .proj-badge { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
   .proj-name { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .proj-acts { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
@@ -135,7 +135,7 @@
   .proj-tag button:hover, .lbl-chip button:hover { color: var(--text); }
   .proj-ren { background: transparent; border: none; padding: 0 3px; cursor: pointer; color: var(--dim); font-size: 11px; line-height: 1; }
   .proj-ren:hover { color: var(--text); }
-  .lbl-chip button.arm { color: var(--err-text); background: var(--del-bg); border-radius: 4px; padding: 1px 4px; }
+  .proj-tag button.arm, .lbl-chip button.arm { color: var(--err-text); background: var(--del-bg); border-radius: 4px; padding: 1px 4px; }
   .tag-inp { width: 96px; background: var(--bg); border: 1px solid var(--accent); border-radius: 999px; padding: 1px 8px; font-size: 11px; color: var(--text); outline: none; }
   .lbl-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .lbl-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: var(--card); color: var(--text); }
@@ -164,10 +164,12 @@
   .task-box-head { display: flex; justify-content: space-between; align-items: center; }
   .task-box-title { font-size: 11px; font-weight: 600; color: var(--accent); }
   .task-box-body { font-size: 11px; color: var(--muted); line-height: 1.4; white-space: pre-wrap; max-height: 90px; overflow-y: auto; font-family: var(--mono); }
-  .act-row { padding: 6px 8px; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; border: 1px solid var(--border); background: var(--card); transition: background .12s, border-color .12s; }
+  .act-row { padding: 6px 8px; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; border: 1px solid var(--border); background: var(--card); transition: background .12s, border-color .12s; min-width: 0; }
   .act-row:hover { background: var(--hover); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
-  .act-cmd { font-family: var(--mono); font-size: 11.5px; color: var(--text); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
-  .act-desc { font-size: 10.5px; color: var(--dim); }
+  .act-cmd { font-family: var(--mono); font-size: 11.5px; color: var(--text); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex: 0 1 auto; }
+  .act-cmd svg { flex-shrink: 0; }
+  .act-cmd > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .act-desc { font-size: 10.5px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; text-align: right; flex: 0 3 auto; }
   .mem-input { flex: 1; margin: 4px 10px 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 7px 8px; font-family: var(--mono); font-size: 12px; color: var(--text); resize: none; outline: none; line-height: 1.45; }
   .mem-input:focus { border-color: var(--accent); }
   /* Micro-Bot Peer Cards & Sidebar Call Button */
@@ -179,7 +181,7 @@
   .peer-head:hover { background: var(--hover); }
   .peer-title { display: flex; align-items: center; gap: 7px; min-width: 0; flex: 1; overflow: hidden; }
   .peer-brief { color: var(--muted); font-family: var(--mono); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .peer-tag { font-family: var(--mono); font-size: 10.5px; color: var(--cyan); padding: 1px 6px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--cyan) 35%, var(--border)); background: color-mix(in srgb, var(--cyan) 10%, transparent); flex-shrink: 0; }
+  .peer-tag { font-family: var(--mono); font-size: 10.5px; color: var(--cyan); padding: 1px 6px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--cyan) 35%, var(--border)); background: color-mix(in srgb, var(--cyan) 10%, transparent); flex-shrink: 0;  display: inline-flex; align-items: center; gap: 1.2ch; }
   .peer-body { padding: 10px 12px; line-height: 1.55; }
   .peer-card .tool-raw { border-top: 1px solid var(--border); display: none; }
   .peer-card.open .tool-raw { display: block; }
@@ -191,7 +193,7 @@
   .call-arrow { display: flex; align-items: center; color: var(--muted); flex-shrink: 0; font-size: 13px; }
   .call-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
   .call-name { font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .call-sub { font-family: var(--mono); font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .call-sub { font-family: var(--mono); font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;  display: flex; align-items: center; gap: 1.2ch; }
   .call-targets { max-height: 168px; overflow-y: auto; display: none; flex-direction: column; gap: 4px; padding: 4px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
   .call-targets.open { display: flex; }
   .call-target-opt { background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 6px 8px; display: flex; align-items: center; justify-content: space-between; gap: 8px; cursor: pointer; text-align: left; }
@@ -199,6 +201,14 @@
   .call-target-opt.active { background: var(--accent-bg); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
   .call-prompt { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; resize: vertical; min-height: 76px; max-height: 180px; line-height: 1.45; }
   .call-prompt:focus { border-color: var(--accent); }
+  .bot-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+  .bot-opt { height: 46px; background: var(--card); border: 1px solid var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--muted); padding: 0; transition: background .12s, border-color .12s, color .12s; }
+  .bot-opt:hover:not(:disabled) { background: var(--hover); color: var(--text); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+  .bot-opt.active { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+  .bot-opt:disabled { opacity: 0.28; }
+  .collab-chip { height: 26px; padding: 0 9px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: background .12s, border-color .12s, color .12s; }
+  .collab-chip:hover { background: var(--hover); color: var(--text); }
+  .collab-chip.on { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); font-weight: 500; }
 
   /* Center Chat */
   .center { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -378,7 +388,6 @@
       <button class="btn btn-sm btn-icon" id="btn-toggle-proj" aria-label="Toggle sidebar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg></button>
       <button type="button" class="brand" id="btn-brand-settings"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="var(--text)"/><stop offset="100%" stop-color="var(--accent)"/></linearGradient></defs><path id="brand-path" d="M 7.2 3.5 L 12.7 8 L 7.2 12.5 L 3.7 12.5" stroke="url(#brandGrad)"/></svg></button>
       <span class="tele" id="tb-profile">—</span>
-      <span class="sep" id="tb-git-sep" style="display:none;"></span>
       <span class="tele" id="tb-git" style="display:none;"><span class="git-dot" id="tb-git-dot"></span><span id="tb-git-txt"></span></span>
     </div>
     <div class="tb-right">
@@ -485,8 +494,8 @@
       <nav class="modal-nav">
         <div class="nav-group">AGENT</div>
         <button class="nav-btn active" data-tab="providers">Providers & Models</button>
-        <button class="nav-btn" data-tab="profiles">Profiles</button>
         <button class="nav-btn" data-tab="projects">Projects</button>
+        <button class="nav-btn" data-tab="profiles">Profiles</button>
         <button class="nav-btn" data-tab="skills">Skills</button>
         <button class="nav-btn" data-tab="mcp">MCP / Plugins</button>
         <div class="nav-group">INTERFACE</div>
@@ -509,14 +518,16 @@
       <div class="field">
         <label class="muted">Add Action Shortcut</label>
         <div style="display:flex;gap:6px;">
-          <input id="act-input-cmd" placeholder="e.g. /call gem35 or cargo check" style="flex:1.3;font-family:var(--mono);font-size:12px;" />
-          <input id="act-input-desc" placeholder="Label / description" style="flex:1;font-size:12px;" />
+          <input id="act-input-cmd" maxlength="500" placeholder="e.g. Create a handoff or cargo check" style="flex:1.3;min-width:0;font-family:var(--mono);font-size:12px;" />
+          <input id="act-input-desc" maxlength="60" placeholder="Description (optional)" style="flex:1;min-width:0;font-size:12px;" />
           <button class="btn btn-primary btn-sm" id="btn-save-action">Add</button>
         </div>
+        <div class="tool-err" id="act-err" style="display:none;font-size:11px;"></div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <label class="muted">Custom Actions for <strong id="act-modal-proj" style="color:var(--text);"></strong></label>
+          <label class="muted">Actions for <strong id="act-modal-proj" style="color:var(--text);"></strong></label>
+          <button class="btn btn-sm" id="btn-reset-actions" style="display:none;">Reset defaults</button>
         </div>
         <div id="act-manage-list" style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow-y:auto;"></div>
       </div>
@@ -574,7 +585,7 @@
       <div id="mb-collab-sec" style="display:none;flex-direction:column;gap:6px;border-top:1px solid var(--border);padding-top:10px;">
         <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
           <span style="font-weight:600;font-size:12px;">Can auto-call</span>
-          <span class="muted">Sibling bots available via call_bot</span>
+          <span class="muted">Sibling bots for call_bot &amp; Actions</span>
         </div>
         <div id="mb-collabs" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
       </div>
@@ -601,9 +612,10 @@
           <div style="font-weight:600;font-size:12px;">Context</div>
           <div class="muted" id="call-mode-hint">Sends caller's last turn + your prompt</div>
         </div>
-        <div class="rs-tabs">
+        <div class="rs-tabs" style="flex-shrink:0;">
+          <button type="button" class="rs-tab" id="btn-call-none">Prompt only</button>
           <button type="button" class="rs-tab active" id="btn-call-last">Last turn</button>
-          <button type="button" class="rs-tab" id="btn-call-full">Full transcript</button>
+          <button type="button" class="rs-tab" id="btn-call-full">Full</button>
         </div>
       </div>
       <div class="field">
@@ -706,10 +718,6 @@ function renderBrandLogo(cfg) {
   }
   if (ap && badgeMode === "bots") {
     btn.innerHTML = botSvg(ap.name, 17, isMono ? "currentColor" : "url(#brandGrad)", isMono ? "" : BRAND_GRAD_DEFS);
-  } else if (ap && badgeMode === "letters") {
-    const dname = projDisplay(ap.name);
-    const txt = (dname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || dname.slice(0, 2)).toUpperCase();
-    btn.innerHTML = `<span class="brand-letters${isMono ? "" : " grad"}">${esc(txt)}</span>`;
   } else {
     const stroke = isMono ? "currentColor" : "url(#brandGrad)";
     btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${isMono ? "" : BRAND_GRAD_DEFS}<path id="brand-path" d="M 7.2 3.5 L 12.7 8 L 7.2 12.5 L 3.7 12.5" stroke="${stroke}"/></svg>`;
@@ -892,11 +900,30 @@ async function loadState(project) {
   renderAll();
 }
 
+let projectsAutoLabeled = false;
+async function lazyAutoLabelProjects() {
+  if (projectsAutoLabeled) return;
+  projectsAutoLabeled = true;
+  try {
+    const prev = JSON.stringify(STATE?.ui_prefs?.project_labels || {});
+    const res = await api("/api/settings/ui", { auto_label: true });
+    if (STATE?.ui_prefs && res.project_labels) {
+      STATE.ui_prefs.project_labels = res.project_labels;
+      if (JSON.stringify(res.project_labels) !== prev && $("modal-settings").classList.contains("open") && ACTIVE_TAB === "projects") {
+        renderModalTab();
+      }
+    }
+  } catch {
+    projectsAutoLabeled = false;
+  }
+}
+
 function openSettings(tab) {
   if (tab) ACTIVE_TAB = tab;
   noctaliaBrowse = false;
   $("modal-settings").classList.add("open");
   renderModalTab();
+  if (ACTIVE_TAB === "projects") lazyAutoLabelProjects();
 }
 
 function loadPinnedMap() {
@@ -970,6 +997,20 @@ function botSvg(name, size = 12, fill = "currentColor", defs = "") {
 
 const projDisplay = (name) => (STATE?.ui_prefs?.project_names?.[name] || name);
 
+function renderTopbarProfile(ap) {
+  if (!ap) return;
+  const dispName = projDisplay(ap.name);
+  const hudParts = String(ap.hud_summary || "").split(" · ").filter(Boolean);
+  const cols = (ap.is_agent && isBotMode() && Array.isArray(ap.collaborators)) ? ap.collaborators : [];
+  const peerProv = isBotMode() ? (STATE?.projects?.find((p) => p.name === ap.name)?.peer_provider || "") : "";
+  if (cols.length || peerProv) hudParts.push("mb");
+  $("tb-profile").innerHTML = `<strong>${esc(dispName)}</strong>${hudParts.map(t => `<span>${esc(t)}</span>`).join("")}`;
+  const projTip = dispName !== ap.name ? `${dispName} (${ap.name})` : ap.name;
+  const colTip = cols.length ? `\nAuto-call: ${cols.join(", ")}` : "";
+  const provTip = peerProv ? `\nPeer provider: ${peerProv}` : "";
+  $("tb-profile").title = `Project: ${projTip}\nProfile: ${ap.profile_name || "missing"}${colTip}${provTip}`;
+}
+
 function renderAll() {
   if (!STATE) return;
   const ap = STATE.active_project;
@@ -977,17 +1018,16 @@ function renderAll() {
   $("msg-input").placeholder = ap.is_agent
     ? (isBotMode() ? `Ask ${dispName}... (/ commands, /call peer)` : `Ask ${dispName}... (/ commands, Enter to send)`)
     : `Message ${dispName}... (/ commands, Enter to send)`;
-  const hudParts = String(ap.hud_summary || "").split(" · ").filter(Boolean);
-  $("tb-profile").innerHTML = `<strong>${esc(dispName)}</strong>${hudParts.map(t => `<span>${esc(t)}</span>`).join("")}`;
-  const projTip = dispName !== ap.name ? `${dispName} (${ap.name})` : ap.name;
-  $("tb-profile").title = `Project: ${projTip}\nProfile: ${ap.profile_name || "missing"}`;
+  renderTopbarProfile(ap);
   const gitLabel = (ap.git || "").replace(/^git:\s*/i, "").trim();
   const showGit = !!gitLabel && gitLabel !== "[none]";
-  $("tb-git-sep").style.display = showGit ? "inline-block" : "none";
   $("tb-git").style.display = showGit ? "inline-flex" : "none";
   if (showGit) {
-    $("tb-git-txt").innerHTML = gitLabel.split(" · ").filter(Boolean).map(t => `<span>${esc(t)}</span>`).join("");
-    $("tb-git-dot").classList.toggle("dirty", gitLabel.includes("modified"));
+    const isDirty = gitLabel.includes("modified");
+    const gitParts = gitLabel.split(" · ").filter(Boolean).map((t) => t.replace(/\s+modified$/i, ""));
+    $("tb-git-txt").innerHTML = gitParts.map((t) => `<span>${esc(t)}</span>`).join("");
+    $("tb-git").title = gitLabel.replace(" · ", " — ");
+    $("tb-git-dot").classList.toggle("dirty", isDirty);
   }
   const shortEndpoint = (ep) => {
     const raw = String(ep || "").trim().toLowerCase().replace(/:\d+$/, "");
@@ -997,7 +1037,7 @@ function renderAll() {
   };
   const mp = $("btn-model-pill");
   mp.innerHTML = `<span class="mp-name">${esc(STATE.provider.model)}</span><span class="mp-ext">${esc(shortEndpoint(STATE.provider.endpoint))}</span>`;
-  mp.title = `${STATE.provider.model} · ${STATE.provider.endpoint}`;
+  mp.title = `${STATE.provider.model} (${STATE.provider.endpoint})`;
   $("btn-img").style.display = STATE.provider.is_local ? "none" : "inline-flex";
   disarmReset();
   $("btn-reset").style.display = (ap.history && ap.history.length) ? "inline-flex" : "none";
@@ -1023,7 +1063,7 @@ function renderAll() {
     usageEl.innerHTML = pct > 70 ? `<span style="color:${col}">${pct.toFixed(1)}%</span>` : `${pct.toFixed(1)}%`;
     const meta = [`in ${(s.prompt_tokens || 0).toLocaleString()}`, `out ${(s.completion_tokens || 0).toLocaleString()}`];
     if (s.cached_tokens) meta.push(`cached ${s.cached_tokens.toLocaleString()}`);
-    tip.innerHTML = `<span class="ctx-bar"><span class="ctx-fill" style="width:${barW}%;background:${col}"></span></span><div><strong>${used.toLocaleString()}</strong> / ${ctxMax.toLocaleString()} tokens</div><div class="muted">${meta.join(" · ")}</div>`;
+    tip.innerHTML = `<span class="ctx-bar"><span class="ctx-fill" style="width:${barW}%;background:${col}"></span></span><div><strong>${used.toLocaleString()}</strong> / ${ctxMax.toLocaleString()} tokens</div><div class="muted" style="display:flex;gap:1.2ch;">${meta.map(m => `<span>${esc(m)}</span>`).join("")}</div>`;
   } else {
     stPill.style.display = "none";
     usageEl.textContent = "0.0%";
@@ -1048,7 +1088,7 @@ function renderAll() {
     const el = document.createElement("div");
     el.className = "proj-item" + (p.name === ap.name ? " active" : "");
     const dname = projDisplay(p.name);
-    const badgeHtml = badgeMode === "none" ? "" : `<span class="proj-badge">${badgeMode === "bots" ? botSvg(p.name) : esc(dname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || dname.slice(0, 2))}</span>`;
+    const badgeHtml = badgeMode === "none" ? "" : `<span class="proj-badge${badgeMode === "bots" ? " bot" : ""}">${badgeMode === "bots" ? botSvg(p.name) : esc(dname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || dname.slice(0, 2))}</span>`;
     const callBtn = isBotMode() && p.name !== ap.name
       ? `<button type="button" class="proj-call" title="Call ${esc(dname)}"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5h11v7.5h-6l-3 2.5V11H2.5z"/></svg></button>`
       : "";
@@ -1088,14 +1128,14 @@ function renderAll() {
     plist.appendChild(el);
   });
 
-  const fmtR = (v) => /^\d+$/.test(v) ? (v === "0" ? "Off" : `${v}t`) : v;
+  const fmtR = (v) => /^\d+$/.test(v) ? (v === "0" ? "Off" : v) : v;
   const standardReasons = [
     ["", "Model default"],
     ["0", "Off (0)"],
-    ["250", "250t"],
-    ["350", "350t"],
-    ["500", "500t"],
-    ["1000", "1000t"],
+    ["250", "250"],
+    ["350", "350"],
+    ["500", "500"],
+    ["1000", "1000"],
     ["low", "low"],
     ["medium", "medium"],
     ["high", "high"],
@@ -1203,6 +1243,7 @@ function renderAll() {
   renderHistory();
   if ($("modal-settings").classList.contains("open")) renderModalTab();
   if ($("modal-call").classList.contains("open")) renderCallModal();
+  if ($("modal-actions").classList.contains("open")) renderManageActions();
 }
 
 function renderHistory() {
@@ -1339,7 +1380,8 @@ function buildPeerCard(m) {
   const card = document.createElement("div");
   card.className = "peer-card";
   const tName = m.name || "peer";
-  const tag = m.summary ? `<span class="peer-tag">${esc(m.summary)}</span>` : "";
+  const tagParts = String(m.summary || "").split(" · ").filter(Boolean);
+  const tag = tagParts.length ? `<span class="peer-tag">${tagParts.map(t => `<span>${esc(t)}</span>`).join("")}</span>` : "";
   const brief = m.brief ? `<span class="peer-brief" title="${esc(m.brief)}">${esc(m.brief)}</span>` : "";
   const elStr = m.elapsed_s !== undefined ? `${m.elapsed_s.toFixed(1)}s` : "";
   const bodyHtml = m.ok === false
@@ -1668,17 +1710,11 @@ function renderModalTab() {
     head.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;";
     head.innerHTML = `<div><div style="font-weight:600">Projects (${shownCount}/${STATE.projects.length} shown)</div><div class="muted">Filter sidebar with labels or toggle workspace visibility.</div></div>
       <div style="display:flex;gap:6px;">
-        <button class="btn btn-sm" id="btn-proj-auto" title="Categorize unconfigured projects from profile frontmatter">Auto-Label</button>
         <button class="btn btn-sm" id="btn-proj-show-all">Show All</button>
         <button class="btn btn-sm" id="btn-proj-hide-all" title="Hide all except chat">Hide All</button>
       </div>`;
     pane.appendChild(head);
 
-    $("btn-proj-auto").onclick = async () => {
-      const res = await api("/api/settings/ui", { auto_label: true });
-      STATE.ui_prefs.project_labels = res.project_labels || {};
-      renderAll();
-    };
     $("btn-proj-show-all").onclick = () => saveProjPrefs(new Set(), labelsMap);
     $("btn-proj-hide-all").onclick = () => saveProjPrefs(new Set(STATE.projects.map((p) => p.name).filter((n) => n !== "chat")), labelsMap);
 
@@ -1748,9 +1784,9 @@ function renderModalTab() {
       const isVis = !hiddenSet.has(p.name);
       const pLabels = labelsMap[p.name] || [];
       const dname = projDisplay(p.name);
-      const subMeta = dname !== p.name ? `${p.name} · ${p.profile_name} · ${p.file_count} file(s)` : `${p.profile_name} · ${p.file_count} file(s)`;
+      const subMeta = `${p.file_count} file(s)`;
       const row = document.createElement("div");
-      row.className = "setting-row";
+      row.className = "setting-row" + (STATE.active_project.name === p.name ? " active-slot" : "");
       row.innerHTML = `<div style="min-width:0;flex:1;">
         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;"><strong class="proj-disp">${esc(dname)}</strong><button type="button" class="proj-ren">✎</button> <span class="muted">${esc(subMeta)}</span></div>
         <div class="proj-tags"></div>
@@ -1804,7 +1840,7 @@ function renderModalTab() {
       const addBtn = document.createElement("button");
       addBtn.className = "btn btn-sm";
       addBtn.style.cssText = "padding:1px 7px;border-radius:999px;font-size:10.5px;";
-      addBtn.textContent = "+ tag";
+      addBtn.textContent = "+ label";
       addBtn.onclick = () => {
         const inp = document.createElement("input");
         inp.className = "tag-inp";
@@ -1826,6 +1862,48 @@ function renderModalTab() {
         inp.onblur = commit;
       };
       tagsBox.appendChild(addBtn);
+
+      if (p.has_git) {
+        const gChip = document.createElement("span");
+        gChip.className = "proj-tag";
+        gChip.title = p.dirty ? "Git initialized (modified)" : "Git initialized (clean)";
+        gChip.innerHTML = `<span style="color:${p.dirty ? "var(--accent)" : "var(--text)"};">git</span><button title="Remove .git repository">×</button>`;
+        const gDel = gChip.querySelector("button");
+        gDel.onclick = async () => {
+          if (!gDel.classList.contains("arm")) {
+            gDel.classList.add("arm");
+            gDel.textContent = "del?";
+            setTimeout(() => { gDel.classList.remove("arm"); gDel.textContent = "×"; }, 2200);
+            return;
+          }
+          gDel.disabled = true;
+          try {
+            await api("/api/project/git", { name: p.name, enable: false });
+            await loadState();
+          } catch (err) {
+            gDel.disabled = false;
+            alert(err.message);
+          }
+        };
+        tagsBox.appendChild(gChip);
+      } else {
+        const gBtn = document.createElement("button");
+        gBtn.className = "btn btn-sm";
+        gBtn.style.cssText = "padding:1px 7px;border-radius:999px;font-size:10.5px;";
+        gBtn.textContent = "+ git";
+        gBtn.title = "Initialize git repository";
+        gBtn.onclick = async () => {
+          gBtn.disabled = true;
+          try {
+            await api("/api/project/git", { name: p.name, enable: true });
+            await loadState();
+          } catch (err) {
+            gBtn.disabled = false;
+            alert(err.message);
+          }
+        };
+        tagsBox.appendChild(gBtn);
+      }
 
       const provSel = row.querySelector(".proj-prov");
       if (provSel) provSel.onchange = async (e) => {
@@ -1851,7 +1929,7 @@ function renderModalTab() {
       const row = document.createElement("div");
       row.className = "setting-row" + (cur ? " active-slot" : "");
       row.innerHTML = `<div><strong>${esc(prof)}</strong></div><button class="btn btn-sm ${cur ? "btn-primary" : ""}" ${locked ? "disabled" : ""}>${cur ? "Active" : "Select"}</button>`;
-      row.querySelector("button").onclick = async () => { await api("/api/settings/profile", { profile_name: prof }); await loadState(); };
+      row.querySelector("button").onclick = async () => { projectsAutoLabeled = false; await api("/api/settings/profile", { profile_name: prof }); await loadState(); };
       pane.appendChild(row);
     }
   } else if (ACTIVE_TAB === "skills") {
@@ -2049,7 +2127,7 @@ function renderModalTab() {
       card.className = "theme-card" + (ap.theme === t.id ? " active" : "");
       card.setAttribute("role", "button");
       card.tabIndex = 0;
-      const tag = t.source === "live" ? `live · ${t.mode}` : (t.source === "custom" ? `custom · ${t.mode}` : "fallback");
+      const tag = t.source === "live" ? `live ${t.mode}` : (t.source === "custom" ? `custom ${t.mode}` : "fallback");
       const delHtml = t.source === "custom" ? `<button class="theme-del" title="Delete theme">✕</button>` : "";
       card.innerHTML = `<span class="theme-swatch" style="background:linear-gradient(135deg, ${esc(t.bg)} 50%, ${esc(t.accent)} 50%)"></span><span class="theme-meta"><span class="theme-name">${esc(t.name)}</span><span class="theme-tag">${esc(tag)}</span></span>${delHtml}`;
       card.onclick = () => { applyAppearance({ theme: t.id }); renderModalTab(); };
@@ -2165,7 +2243,7 @@ function renderModalTab() {
 
     const r = document.createElement("div");
     r.className = "setting-row";
-    r.innerHTML = `<div><strong>Auto-Expand Steps</strong><div class="muted">Expand reasoning steps by default · Synced with CLI <code>/tk</code> via state.json</div></div><button class="btn btn-sm">${STATE.ui_prefs.show_thinking !== false ? "Expanded" : "Collapsed"}</button>`;
+    r.innerHTML = `<div><strong>Auto-Expand Steps</strong><div class="muted">Expand reasoning steps by default (synced with CLI <code>/tk</code>)</div></div><button class="btn btn-sm">${STATE.ui_prefs.show_thinking !== false ? "Expanded" : "Collapsed"}</button>`;
     r.querySelector("button").onclick = async () => { await api("/api/settings/ui", { show_thinking: STATE.ui_prefs.show_thinking === false }); await loadState(); };
     pane.appendChild(r);
   }
@@ -2293,32 +2371,93 @@ function switchRsTab(tab) {
 if ($("rs-tab-acts")) $("rs-tab-acts").onclick = () => switchRsTab("acts");
 if ($("rs-tab-mem")) $("rs-tab-mem").onclick = () => switchRsTab("mem");
 
+let actionsBusy = false;
+
+function setActErr(msg) {
+  const el = $("act-err");
+  if (!el) return;
+  el.textContent = msg || "";
+  el.style.display = msg ? "block" : "none";
+}
+
+function defaultActionsFor(ap) {
+  if (!ap) return [];
+  const defs = [];
+  if (ap.is_agent) {
+    defs.push({ cmd: "/task", desc: ap.task_md ? "Run TASK.md" : "Start autonomous goal" });
+  }
+  if (isBotMode()) {
+    defs.push({ cmd: "/call", desc: "Open peer bot picker" });
+    for (const c of ap.collaborators || []) {
+      const cmd = `/call ${c}`;
+      if (!defs.some((a) => a.cmd === cmd)) defs.push({ cmd, desc: "Ask peer" });
+    }
+  }
+  return defs;
+}
+
+function getEffectiveActions(ap) {
+  if (!ap) return [];
+  const saved = STATE?.ui_prefs?.project_actions?.[ap.name];
+  const list = Array.isArray(saved) ? saved : defaultActionsFor(ap);
+  return list.filter((item) => isBotMode() || (item.cmd !== "/call" && !item.cmd.startsWith("/call ")));
+}
+
+async function saveProjectActions(nextMap) {
+  if (actionsBusy) return false;
+  actionsBusy = true;
+  setActErr("");
+  const addBtn = $("btn-save-action");
+  const resetBtn = $("btn-reset-actions");
+  if (addBtn) addBtn.disabled = true;
+  if (resetBtn) resetBtn.disabled = true;
+  try {
+    const res = await api("/api/settings/ui", { project_actions: nextMap });
+    if (STATE?.ui_prefs) STATE.ui_prefs.project_actions = res.project_actions || {};
+    renderManageActions();
+    renderActionsPane();
+    return true;
+  } catch (err) {
+    setActErr(err.message || "Failed to save actions");
+    return false;
+  } finally {
+    actionsBusy = false;
+    renderManageActions();
+  }
+}
+
 function renderManageActions() {
   const ap = STATE?.active_project;
   const list = $("act-manage-list");
   if (!list || !ap) return;
   $("act-modal-proj").textContent = projDisplay(ap.name);
+  const resetBtn = $("btn-reset-actions");
+  resetBtn.style.display = Array.isArray(STATE?.ui_prefs?.project_actions?.[ap.name]) ? "inline-flex" : "none";
+  resetBtn.disabled = actionsBusy;
   list.innerHTML = "";
-  const customList = (STATE?.ui_prefs?.project_actions?.[ap.name] || []);
-  if (!customList.length) {
-    list.innerHTML = `<div class="muted" style="padding:6px 2px;">No custom actions added for this workspace.</div>`;
+  const actions = getEffectiveActions(ap);
+  const addBtn = $("btn-save-action");
+  if (addBtn) {
+    addBtn.disabled = actionsBusy || actions.length >= 16;
+    addBtn.title = actions.length >= 16 ? "Maximum 16 actions per workspace" : "";
+  }
+  if (!actions.length) {
+    list.innerHTML = `<div class="muted" style="padding:6px 2px;">No actions configured for this workspace.</div>`;
     return;
   }
-  customList.forEach((item, idx) => {
+  actions.forEach((item) => {
     const row = document.createElement("div");
     row.className = "act-row";
     row.style.cursor = "default";
-    row.innerHTML = `<span class="act-cmd"><span>${esc(item.cmd)}</span></span><div style="display:flex;align-items:center;gap:8px;"><span class="act-desc">${esc(item.desc || "")}</span><button class="btn btn-sm btn-danger" style="padding:1px 5px;font-size:10px;">✕</button></div>`;
+    row.title = item.desc ? `${item.cmd} — ${item.desc}` : item.cmd;
+    const descHtml = item.desc ? `<span class="act-desc" style="max-width:100%;">${esc(item.desc)}</span>` : "";
+    row.innerHTML = `<span class="act-cmd"><span>${esc(item.cmd)}</span></span><div style="display:flex;align-items:center;gap:8px;min-width:0;max-width:50%;flex-shrink:0;">${descHtml}<button class="btn btn-sm btn-danger" style="padding:1px 5px;font-size:10px;flex-shrink:0;" title="Remove">✕</button></div>`;
     row.querySelector("button").onclick = async (e) => {
       e.stopPropagation();
       const nextMap = structuredClone(STATE?.ui_prefs?.project_actions || {});
-      const cur = [...(nextMap[ap.name] || [])];
-      cur.splice(idx, 1);
-      if (cur.length) nextMap[ap.name] = cur; else delete nextMap[ap.name];
-      const res = await api("/api/settings/ui", { project_actions: nextMap });
-      if (STATE?.ui_prefs) STATE.ui_prefs.project_actions = res.project_actions || {};
-      renderManageActions();
-      renderActionsPane();
+      const base = Array.isArray(nextMap[ap.name]) ? [...nextMap[ap.name]] : [...defaultActionsFor(ap)];
+      nextMap[ap.name] = base.filter((a) => a.cmd !== item.cmd);
+      await saveProjectActions(nextMap);
     };
     list.appendChild(row);
   });
@@ -2328,6 +2467,7 @@ function openManageActions() {
   if (!STATE?.active_project) return;
   $("act-input-cmd").value = "";
   $("act-input-desc").value = "";
+  setActErr("");
   renderManageActions();
   $("modal-actions").classList.add("open");
   $("act-input-cmd").focus();
@@ -2338,19 +2478,28 @@ $("btn-add-action").onclick = () => openManageActions();
 
 $("btn-save-action").onclick = async () => {
   const ap = STATE?.active_project;
-  if (!ap) return;
-  const cmd = $("act-input-cmd").value.trim();
-  const desc = $("act-input-desc").value.trim() || cmd;
-  if (!cmd) return;
+  if (!ap || actionsBusy) return;
+  const cmd = $("act-input-cmd").value.trim().slice(0, 500);
+  const desc = $("act-input-desc").value.trim().slice(0, 60);
+  if (!cmd) { setActErr("Enter a command or prompt."); $("act-input-cmd").focus(); return; }
   const nextMap = structuredClone(STATE?.ui_prefs?.project_actions || {});
-  const cur = [...(nextMap[ap.name] || [])];
+  const cur = Array.isArray(nextMap[ap.name]) ? [...nextMap[ap.name]] : [...defaultActionsFor(ap)];
+  if (cur.length >= 16) { setActErr("Maximum 16 actions per workspace."); return; }
+  if (cur.some((x) => x.cmd === cmd)) { setActErr("That action already exists."); return; }
   cur.push({ cmd, desc });
-  const res = await api("/api/settings/ui", { project_actions: nextMap });
-  if (STATE?.ui_prefs) STATE.ui_prefs.project_actions = res.project_actions || {};
-  $("act-input-cmd").value = "";
-  $("act-input-desc").value = "";
-  renderManageActions();
-  renderActionsPane();
+  nextMap[ap.name] = cur;
+  if (await saveProjectActions(nextMap)) {
+    $("act-input-cmd").value = "";
+    $("act-input-desc").value = "";
+    $("act-input-cmd").focus();
+  }
+};
+$("btn-reset-actions").onclick = async () => {
+  const ap = STATE?.active_project;
+  if (!ap || actionsBusy) return;
+  const nextMap = structuredClone(STATE?.ui_prefs?.project_actions || {});
+  delete nextMap[ap.name];
+  await saveProjectActions(nextMap);
 };
 $("act-input-cmd").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); $("btn-save-action").click(); } };
 $("act-input-desc").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); $("btn-save-action").click(); } };
@@ -2375,66 +2524,54 @@ function renderActionsPane() {
     list.appendChild(box);
   }
 
-  const acts = [];
-  if (ap.is_agent && !ap.task_md) {
-    acts.push({
-      cmd: "/task",
-      desc: "Start autonomous goal",
-      action: () => {
+  const actions = getEffectiveActions(ap);
+  if (!actions.length && !(ap.is_agent && ap.task_md)) {
+    list.innerHTML = `<div class="muted" style="padding:4px 2px;">No actions. Click + to add.</div>`;
+    return;
+  }
+
+  for (const item of actions) {
+    const row = document.createElement("div");
+    row.className = "act-row";
+    row.title = item.desc ? `${item.cmd} — ${item.desc}` : item.cmd;
+    let botName = "";
+    if (item.cmd.startsWith("/call ")) {
+      const peer = item.cmd.slice(6).replace(/:.*$/, "").trim();
+      if ((STATE?.projects || []).some((p) => p.name === peer)) botName = peer;
+    }
+    const ico = botName ? botSvg(botName, 12) : "";
+    const descHtml = item.desc ? `<span class="act-desc">${esc(item.desc)}</span>` : "";
+    row.innerHTML = `<span class="act-cmd">${ico}<span>${esc(item.cmd)}</span></span>${descHtml}`;
+    row.onclick = (e) => {
+      if (item.cmd === "/call") {
+        openCallModal();
+        return;
+      }
+      if (item.cmd === "/task" && !ap.task_md) {
         const inp = $("msg-input");
         if (!inp.value.startsWith("/task")) inp.value = "/task " + inp.value;
         resizeInput(); updateSendReady(); inp.focus();
         inp.setSelectionRange(inp.value.length, inp.value.length);
+        return;
       }
-    });
-  }
-
-  if (isBotMode()) {
-    acts.push({
-      cmd: "/call",
-      desc: "Open peer bot picker",
-      action: () => openCallModal()
-    });
-
-    for (const c of ap.collaborators || []) {
-      acts.push({
-        cmd: `/call ${c}`,
-        bot: c,
-        desc: "Ask peer directly",
-        action: () => {
-          const inp = $("msg-input");
-          inp.value = `/call ${c}: `;
-          resizeInput(); updateSendReady(); inp.focus();
-          inp.setSelectionRange(inp.value.length, inp.value.length);
-        }
-      });
-    }
-  }
-
-  // Custom user actions for this workspace
-  for (const item of (STATE?.ui_prefs?.project_actions?.[ap.name] || [])) {
-    acts.push({
-      cmd: item.cmd,
-      desc: item.desc || "",
-      action: () => {
+      if (item.cmd.startsWith("/call ") && !/^\/call\s+\S+:\s*\S/.test(item.cmd)) {
         const inp = $("msg-input");
-        if (item.cmd.startsWith("/call ")) {
-          inp.value = item.cmd.includes(":") ? `${item.cmd} ` : `${item.cmd}: `;
-        } else {
-          inp.value = item.cmd.endsWith(" ") ? item.cmd : `${item.cmd} `;
-        }
+        const prefix = item.cmd.includes(":") ? `${item.cmd} ` : `${item.cmd}: `;
+        const curVal = inp.value.trimStart();
+        inp.value = curVal && !curVal.startsWith("/") ? `${prefix}${curVal}` : prefix;
         resizeInput(); updateSendReady(); inp.focus();
         inp.setSelectionRange(inp.value.length, inp.value.length);
+        return;
       }
-    });
-  }
-
-  for (const item of acts) {
-    const row = document.createElement("div");
-    row.className = "act-row";
-    const ico = item.bot ? botSvg(item.bot, 12) : "";
-    row.innerHTML = `<span class="act-cmd">${ico}<span>${esc(item.cmd)}</span></span><span class="act-desc">${esc(item.desc)}</span>`;
-    row.onclick = item.action;
+      if (e.shiftKey || item.cmd.endsWith(":")) {
+        const inp = $("msg-input");
+        inp.value = item.cmd.endsWith(" ") ? item.cmd : `${item.cmd} `;
+        resizeInput(); updateSendReady(); inp.focus();
+        inp.setSelectionRange(inp.value.length, inp.value.length);
+        return;
+      }
+      sendMessage(item.cmd);
+    };
     list.appendChild(row);
   }
 }
@@ -2561,10 +2698,26 @@ function renderBotPicker() {
         if (on) nextSet.delete(p.name); else nextSet.add(p.name);
         const nextMap = structuredClone(STATE.ui_prefs?.project_collabs || {});
         nextMap[ap.name] = Array.from(nextSet);
-        const res = await api("/api/settings/ui", { project_collabs: nextMap });
+        const payload = { project_collabs: nextMap };
+        const savedActs = STATE.ui_prefs?.project_actions?.[ap.name];
+        if (Array.isArray(savedActs)) {
+          const cmd = `/call ${p.name}`;
+          const nextActsMap = structuredClone(STATE.ui_prefs?.project_actions || {});
+          if (on) {
+            nextActsMap[ap.name] = savedActs.filter((a) => a.cmd !== cmd);
+          } else if (!savedActs.some((a) => a.cmd === cmd || a.cmd.startsWith(`${cmd}:`))) {
+            nextActsMap[ap.name] = [...savedActs, { cmd, desc: "Ask peer" }].slice(0, 16);
+          }
+          payload.project_actions = nextActsMap;
+        }
+        const res = await api("/api/settings/ui", payload);
         STATE.ui_prefs.project_collabs = res.project_collabs || {};
-        ap.collaborators = nextMap[ap.name];
+        if (res.project_actions) STATE.ui_prefs.project_actions = res.project_actions;
+        ap.collaborators = res.project_collabs?.[ap.name] ?? nextMap[ap.name];
         renderBotPicker();
+        renderActionsPane();
+        renderTopbarProfile(ap);
+        if ($("modal-actions").classList.contains("open")) renderManageActions();
       };
       cbox.appendChild(chip);
     }
@@ -2614,6 +2767,7 @@ document.querySelectorAll(".modal-backdrop").forEach((m) => {
 });
 document.querySelectorAll(".nav-btn").forEach(b => b.onclick = () => {
   ACTIVE_TAB = b.dataset.tab; noctaliaBrowse = false; renderModalTab();
+  if (ACTIVE_TAB === "projects") lazyAutoLabelProjects();
 });
 
 $("btn-reasoning-pill").onclick = (e) => {
@@ -2653,6 +2807,7 @@ $("btn-create-np").onclick = async () => {
   if (!name) return;
   try {
     const created = await api("/api/project/create", { name, profile });
+    projectsAutoLabeled = false;
     $("np-name").value = "";
     $("modal-new-proj").classList.remove("open");
     await loadState(created.name);
@@ -2661,7 +2816,7 @@ $("btn-create-np").onclick = async () => {
   }
 };
 
-let callTarget = "", callMode = "last_turn", callPickerOpen = false;
+let callTarget = "", callMode = "none", callPickerOpen = false;
 function renderCallModal() {
   const ap = STATE?.active_project;
   if (!ap) return;
@@ -2669,11 +2824,22 @@ function renderCallModal() {
   const tgt = siblings.find((p) => p.name === callTarget) || siblings[0] || null;
   callTarget = tgt ? tgt.name : "";
 
-  $("call-caller").innerHTML = `${botSvg(ap.name, 18)}<span class="call-meta"><span class="call-name">${esc(projDisplay(ap.name))}</span><span class="call-sub">${esc(ap.profile_name || "chat")}${ap.hud_summary ? " · " + esc(ap.hud_summary) : ""}</span></span>`;
+  const subRow = (...parts) => {
+    const items = parts.filter(Boolean);
+    return items.length ? `<span class="call-sub">${items.map((t) => `<span>${esc(t)}</span>`).join("")}</span>` : "";
+  };
+  const callerProv = STATE?.projects?.find((p) => p.name === ap.name)?.peer_provider || "";
+  const callerHasMb = (ap.is_agent && (ap.collaborators || []).length > 0) || Boolean(callerProv);
+  $("call-caller").innerHTML = `${botSvg(ap.name, 18)}<span class="call-meta"><span class="call-name">${esc(projDisplay(ap.name))}</span>${subRow(callerHasMb ? "mb" : "", callerProv)}</span>`;
+  const tgtSub = (p) => subRow(
+    p.name === "chat" ? "no tools" : "",
+    (ap.collaborators || []).includes(p.name) ? "linked" : "",
+    p.peer_provider
+  );
   const tbtn = $("call-target-btn");
   if (tgt) {
     tbtn.disabled = false;
-    tbtn.innerHTML = `${botSvg(tgt.name, 18)}<span class="call-meta"><span class="call-name">${esc(projDisplay(tgt.name))}</span><span class="call-sub">${esc(tgt.profile_name || "chat")}${tgt.hud_summary ? " · " + esc(tgt.hud_summary) : ""}${tgt.peer_provider ? " · " + esc(tgt.peer_provider) : ""}</span></span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg>`;
+    tbtn.innerHTML = `${botSvg(tgt.name, 18)}<span class="call-meta"><span class="call-name">${esc(projDisplay(tgt.name))}</span>${tgtSub(tgt)}</span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg>`;
   } else {
     tbtn.disabled = true;
     tbtn.innerHTML = `<span class="call-meta"><span class="call-name">No sibling bots</span><span class="call-sub">Create another project first</span></span>`;
@@ -2687,7 +2853,7 @@ function renderCallModal() {
     const opt = document.createElement("button");
     opt.type = "button";
     opt.className = "call-target-opt" + (tgt && tgt.name === p.name ? " active" : "");
-    opt.innerHTML = `<span style="display:flex;align-items:center;gap:8px;min-width:0;">${botSvg(p.name, 15)}<span style="min-width:0;display:flex;flex-direction:column;"><span class="call-name">${esc(projDisplay(p.name))}</span><span class="call-sub">${esc(p.profile_name || "chat")}${p.hud_summary ? " · " + esc(p.hud_summary) : ""}${p.peer_provider ? " · " + esc(p.peer_provider) : ""}</span></span></span><span class="muted">${tgt && tgt.name === p.name ? "✓" : ""}</span>`;
+    opt.innerHTML = `<span style="display:flex;align-items:center;gap:8px;min-width:0;">${botSvg(p.name, 15)}<span class="call-meta"><span class="call-name">${esc(projDisplay(p.name))}</span>${tgtSub(p)}</span></span><span class="muted">${tgt && tgt.name === p.name ? "✓" : ""}</span>`;
     opt.onclick = () => {
       callTarget = p.name;
       callPickerOpen = false;
@@ -2697,11 +2863,14 @@ function renderCallModal() {
     tlist.appendChild(opt);
   }
 
+  $("btn-call-none").classList.toggle("active", callMode === "none");
   $("btn-call-last").classList.toggle("active", callMode === "last_turn");
   $("btn-call-full").classList.toggle("active", callMode === "full");
-  $("call-mode-hint").textContent = callMode === "full"
-    ? "Sends conversation transcript + your prompt"
-    : "Sends caller's last turn + your prompt";
+  $("call-mode-hint").textContent = callMode === "none"
+    ? "Sends only your prompt (no chat history)"
+    : (callMode === "full"
+      ? "Sends conversation transcript + your prompt"
+      : "Sends caller's last turn + your prompt");
   $("btn-run-call").disabled = !tgt || STREAMING;
   if (!tgt) $("call-err").textContent = "Create another project workspace first to consult a peer bot.";
 }
@@ -2714,8 +2883,11 @@ function openCallModal(prefTarget, prefPrompt) {
   const matched = q
     ? siblings.find((p) => p.name.toLowerCase() === q) || siblings.find((p) => p.name.toLowerCase().startsWith(q))
     : null;
-  callTarget = matched ? matched.name : (siblings.find((p) => p.name !== "chat")?.name || siblings[0]?.name || "");
-  callMode = "last_turn";
+  const linked = (ap.collaborators || []).find((c) => siblings.some((p) => p.name === c));
+  callTarget = matched
+    ? matched.name
+    : (linked || siblings.find((p) => p.peer_provider)?.name || siblings.find((p) => p.name !== "chat")?.name || siblings[0]?.name || "");
+  callMode = "none";
   callPickerOpen = !matched && siblings.length > 1;
   $("call-err").textContent = "";
   if (typeof prefPrompt === "string") $("call-prompt").value = prefPrompt;
@@ -2764,6 +2936,7 @@ async function executePeerCall(target, mode, prompt) {
 
 $("btn-close-call").onclick = $("btn-cancel-call").onclick = () => $("modal-call").classList.remove("open");
 $("call-target-btn").onclick = () => { callPickerOpen = !callPickerOpen; renderCallModal(); };
+$("btn-call-none").onclick = () => { callMode = "none"; renderCallModal(); };
 $("btn-call-last").onclick = () => { callMode = "last_turn"; renderCallModal(); };
 $("btn-call-full").onclick = () => { callMode = "full"; renderCallModal(); };
 $("btn-run-call").onclick = async () => {
