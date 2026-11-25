@@ -82,12 +82,24 @@ impl Default for RailConfig {
     }
 }
 
+static RAIL_CFG_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
+
 impl RailConfig {
     fn load(path: &Path) -> Self {
         fs::read_to_string(path)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default()
+    }
+
+    fn load_for_write(path: &Path) -> Result<Self> {
+        match fs::read_to_string(path) {
+            Ok(s) if s.trim().is_empty() => Ok(Self::default()),
+            Ok(s) => Ok(serde_json::from_str(&s)?),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
+            Err(e) => Err(e.into()),
+        }
     }
 
     fn save(&self, path: &Path) -> Result<()> {
@@ -171,7 +183,12 @@ fn sanitize_project_descriptions(obj: &serde_json::Map<String, Value>) -> HashMa
     out
 }
 
+const CHAT_BOT_MASK: u16 = 0x8010;
+
 fn default_bot_mask(name: &str) -> u16 {
+    if name == "chat" || name == "chatbot" {
+        return CHAT_BOT_MASK;
+    }
     let mut h: u32 = 2166136261;
     for b in name.bytes() {
         h = (h ^ (b as u32)).wrapping_mul(16777619);
@@ -184,7 +201,7 @@ fn parse_bot_val(raw: &str) -> Option<u16> {
     if hex.is_empty() || hex.len() > 4 {
         return None;
     }
-    u16::from_str_radix(hex, 16).ok().map(|n| (n & 0x7fff) | (1 << 4))
+    u16::from_str_radix(hex, 16).ok().map(|n| (n & 0xffff) | (1 << 4))
 }
 
 fn sanitize_project_bots(
@@ -219,7 +236,7 @@ fn sanitize_project_bots(
     for (proj, mask) in parsed {
         if let Some(prev) = owners.get(&mask) {
             if prev != &proj {
-                return Err(format!("Micro-bot already used by '{prev}'"));
+                return Err(format!("rs-bot already used by '{prev}'"));
             }
         }
         owners.insert(mask, proj.clone());
@@ -296,7 +313,7 @@ fn sanitize_project_providers(
         let raw = val.as_str().unwrap_or("").trim().to_ascii_uppercase();
         if raw.is_empty() || raw == "DEFAULT" {
             let proj_dir = root.join("projects").join(proj);
-            let prof = WorkspaceConfig::load_or_default(&proj_dir).profile_name;
+            let prof = resolve_project_cfg(&root.join("profiles"), &proj_dir, proj).profile_name;
             let has_fm = find_profile_text_in(&root.join("profiles"), &prof)
                 .as_deref()
                 .and_then(parse_profile_provider_raw)
@@ -335,7 +352,7 @@ fn sanitize_project_collabs(
             out.insert(proj.clone(), list);
         } else {
             let proj_dir = projects_dir.join(proj);
-            let prof = WorkspaceConfig::load_or_default(&proj_dir).profile_name;
+            let prof = resolve_project_cfg(&root.join("profiles"), &proj_dir, proj).profile_name;
             let has_fm = find_profile_text_in(&root.join("profiles"), &prof)
                 .is_some_and(|r| !parse_profile_collab_raw(&r, proj).0.is_empty());
             if has_fm {
@@ -448,10 +465,17 @@ fn derive_auto_labels_in(root: &Path, cfg: &RailConfig, project: &str, prof_name
             ToolTier::Smol => list.push("local".into()),
         }
     }
-    let has_collab = !resolve_collaborators(root, project, prof_name).0.is_empty();
+    let collab_src = cfg
+        .project_collabs
+        .get(project)
+        .cloned()
+        .unwrap_or_else(|| parse_profile_collab_raw(&raw, project).0);
+    let has_collab = collab_src
+        .iter()
+        .any(|s| s != project && root.join("projects").join(s).is_dir());
     let has_prov = effective_project_provider(root, cfg, project, prof_name).is_some();
-    if (has_collab || has_prov) && !list.contains(&"microbot".to_string()) && list.len() < 8 {
-        list.push("microbot".into());
+    if (has_collab || has_prov) && !list.contains(&"rs-bot".to_string()) && list.len() < 8 {
+        list.push("rs-bot".into());
     }
     list
 }
@@ -475,13 +499,13 @@ fn apply_auto_labels(root: &Path, cfg: &mut RailConfig) -> usize {
         let allow_refresh = cfg
             .project_labels
             .get(&name)
-            .map(|cur| !cur.is_empty() && cur.iter().all(|l| matches!(l.as_str(), "mcp" | "purebash" | "cloud" | "local" | "microbot")))
+            .map(|cur| !cur.is_empty() && cur.iter().all(|l| matches!(l.as_str(), "mcp" | "purebash" | "cloud" | "local" | "microbot" | "rs-bot" | "rsbot")))
             .unwrap_or(true);
         if !allow_refresh {
             continue;
         }
-        let ws_cfg = WorkspaceConfig::load_or_default(&p);
-        let prof_name = if ws_cfg.profile_name == "chat" { name.as_str() } else { ws_cfg.profile_name.as_str() };
+        let ws_cfg = resolve_project_cfg(&root.join("profiles"), &p, &name);
+        let prof_name = ws_cfg.profile_name.as_str();
         let labels = derive_auto_labels_in(root, cfg, &name, prof_name);
         if !labels.is_empty() && cfg.project_labels.get(&name) != Some(&labels) {
             cfg.project_labels.insert(name, labels);
@@ -631,24 +655,7 @@ impl AppRuntime {
         let proj_dir = self.root.join("projects").join(project);
         let _ = fs::create_dir_all(&proj_dir);
         let is_agent = project != "chat";
-        let mut cfg = WorkspaceConfig::load_or_default(&proj_dir);
-        if !is_agent {
-            cfg.is_agent = false;
-            cfg.profile_name = "chat".into();
-        } else {
-            cfg.is_agent = true;
-            if cfg.profile_name == "chat" || Profile::load(&cfg.profile_name).is_none() {
-                if Profile::load(project).is_some() {
-                    cfg.profile_name = project.into();
-                } else {
-                    let avail = Profile::list_available();
-                    let cand = Profile::find_workspace_candidates(project, &avail);
-                    if let Some(first) = cand.first() {
-                        cfg.profile_name = first.clone();
-                    }
-                }
-            }
-        }
+        let mut cfg = resolve_project_cfg(&self.root.join("profiles"), &proj_dir, project);
 
         let saved = state::load_workspace_session(&proj_dir);
         let active_skills: Vec<String> = saved
@@ -737,11 +744,34 @@ fn is_valid_slug(name: &str) -> bool {
         && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
 }
 
+fn resolve_project_cfg(profiles_dir: &Path, proj_dir: &Path, project: &str) -> WorkspaceConfig {
+    let mut cfg = WorkspaceConfig::load_or_default(proj_dir);
+    if project == "chat" {
+        cfg.is_agent = false;
+        cfg.profile_name = "chat".into();
+        return cfg;
+    }
+    cfg.is_agent = true;
+    let prof_exists = |name: &str| find_profile_text_in(profiles_dir, name).is_some() || Profile::load(name).is_some();
+    if cfg.profile_name == "chat" || !prof_exists(&cfg.profile_name) {
+        if prof_exists(project) {
+            cfg.profile_name = project.into();
+        } else {
+            let avail = Profile::list_available();
+            if let Some(first) = Profile::find_workspace_candidates(project, &avail).first() {
+                cfg.profile_name = first.clone();
+            }
+        }
+    }
+    cfg
+}
+
 fn atomic_write(path: &Path, content: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let tmp = path.with_extension(format!("tmp.{}", std::process::id()));
+    let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+    let tmp = path.with_extension(format!("tmp.{}.{seq}", std::process::id()));
     fs::write(&tmp, content)?;
     fs::rename(&tmp, path)?;
     Ok(())
@@ -776,11 +806,14 @@ fn git_status_brief(dir: &Path) -> (String, bool) {
     let mut in_git = false;
     while let Some(d) = cur {
         if d.join(".git").exists() {
-            // Do not attribute the parent rs-agent repo's status to a project without its own .git.
-            if d.join("projects").is_dir() && dir != d {
+            // Do not attribute a parent repo's status to a project without its own .git.
+            if (d.join("projects").is_dir() || d.file_name().is_some_and(|n| n == "projects")) && dir != d {
                 break;
             }
             in_git = true;
+            break;
+        }
+        if d.file_name().is_some_and(|n| n == "projects") && dir != d {
             break;
         }
         cur = d.parent();
@@ -794,8 +827,11 @@ fn git_status_brief(dir: &Path) -> (String, bool) {
         .args(["--no-optional-locks", "status", "--porcelain", "-b", "--no-renames"])
         .output()
     else {
-        return ("git: [none]".into(), false);
+        return (String::new(), false);
     };
+    if !out.status.success() {
+        return (String::new(), false);
+    }
     let text = String::from_utf8_lossy(&out.stdout);
     let mut lines = text.lines();
     let head = lines.next().unwrap_or("").trim_start_matches("##").trim();
@@ -1070,7 +1106,8 @@ fn update_env_file(
     if !out.ends_with('\n') {
         out.push('\n');
     }
-    let tmp = env_path.with_extension(format!("env.tmp.{}", std::process::id()));
+    let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+    let tmp = env_path.with_extension(format!("env.tmp.{}.{seq}", std::process::id()));
     fs::write(&tmp, &out)?;
     #[cfg(unix)]
     {
@@ -1879,11 +1916,13 @@ fn save_rail_session(sess: &SessionState) {
 }
 
 fn set_last_project(root: &Path, name: &str) {
+    let _guard = RAIL_CFG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let cfg_path = root.join("plugins/rs-rail/config.json");
-    let mut cfg = RailConfig::load(&cfg_path);
-    if cfg.last_project.as_deref() != Some(name) {
-        cfg.last_project = Some(name.to_string());
-        let _ = cfg.save(&cfg_path);
+    if let Ok(mut cfg) = RailConfig::load_for_write(&cfg_path) {
+        if cfg.last_project.as_deref() != Some(name) {
+            cfg.last_project = Some(name.to_string());
+            let _ = cfg.save(&cfg_path);
+        }
     }
 }
 
@@ -2096,12 +2135,23 @@ fn resolve_slot_provider_from_env(
     Err(format!("Unknown provider slot '{slot}'"))
 }
 
-async fn resolve_peer_provider(slot_opt: Option<&str>) -> std::result::Result<ProviderConfig, String> {
+fn apply_ctx_override(mut cfg: ProviderConfig, ctx_override: Option<usize>) -> ProviderConfig {
+    if let Some(ctx) = ctx_override {
+        cfg.max_tokens = ctx;
+    }
+    cfg
+}
+
+async fn resolve_peer_provider(
+    slot_opt: Option<&str>,
+    ctx_override: Option<usize>,
+) -> std::result::Result<ProviderConfig, String> {
+    let eff_max = ctx_override.unwrap_or_else(get_max_tokens);
     let Some(slot) = slot_opt.map(str::trim).filter(|s| !s.is_empty()) else {
-        return Ok(ProviderConfig::load().await);
+        return Ok(apply_ctx_override(ProviderConfig::load().await, ctx_override));
     };
     if slot.eq_ignore_ascii_case("LOCAL") {
-        let mut cfg = resolve_slot_provider_from_env("", "LOCAL", get_max_tokens())?;
+        let mut cfg = resolve_slot_provider_from_env("", "LOCAL", eff_max)?;
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_millis(500))
             .build()
@@ -2116,7 +2166,7 @@ async fn resolve_peer_provider(slot_opt: Option<&str>) -> std::result::Result<Pr
         return Ok(cfg);
     }
     let env_content = fs::read_to_string(get_env_path()).unwrap_or_default();
-    resolve_slot_provider_from_env(&env_content, slot, get_max_tokens())
+    resolve_slot_provider_from_env(&env_content, slot, eff_max)
 }
 
 fn chat_msg_text(m: &ChatMessage) -> String {
@@ -2293,7 +2343,6 @@ async fn run_peer_call(
     root: &Path,
     caller_project: &str,
     caller_workspace: &Path,
-    caller_ctx: Option<usize>,
     target_project: &str,
     mode: &str,
     prompt: &str,
@@ -2304,20 +2353,7 @@ async fn run_peer_call(
     let target_dir = validate_peer_target(root, caller_project, target_project).map_err(|(_, e)| e)?;
     let t0 = Instant::now();
     let target_is_agent = target_project != "chat";
-    let mut target_cfg = WorkspaceConfig::load_or_default(&target_dir);
-    if !target_is_agent {
-        target_cfg.profile_name = "chat".into();
-    } else if target_cfg.profile_name == "chat" || Profile::load(&target_cfg.profile_name).is_none() {
-        if Profile::load(target_project).is_some() {
-            target_cfg.profile_name = target_project.into();
-        } else {
-            let avail = Profile::list_available();
-            let cand = Profile::find_workspace_candidates(target_project, &avail);
-            if let Some(first) = cand.first() {
-                target_cfg.profile_name = first.clone();
-            }
-        }
-    }
+    let target_cfg = resolve_project_cfg(&root.join("profiles"), &target_dir, target_project);
     let rail_cfg = RailConfig::load(&root.join("plugins/rs-rail/config.json"));
     let target_raw = find_profile_text_in(&root.join("profiles"), &target_cfg.profile_name);
     let target_provider_slot = effective_project_provider(root, &rail_cfg, target_project, &target_cfg.profile_name);
@@ -2333,36 +2369,34 @@ async fn run_peer_call(
         None => target_prof.reasoning_budget.clone(),
     };
 
-    set_profile_max_tokens(target_prof.ctx);
-    let outcome = async {
-        let mut ws_files = Vec::new();
-        list_workspace_files(caller_workspace, caller_workspace, false, &mut ws_files);
+    let mut ws_files = Vec::new();
+    list_workspace_files(caller_workspace, caller_workspace, false, &mut ws_files);
 
-        let mut sys = build_system_prompt(&target_prof, caller_workspace, target_is_agent, &[]);
-        sys.push_str(&format!(
-            "\n\n[Peer Consultation Mode]\nYou ({target_project}) are assisting sibling workspace '{caller_project}' ({}).\n{}\nKeep your answer concise, actionable, and grounded in what you read.",
-            caller_workspace.display(),
-            if target_is_agent {
-                "You have strictly read-only workspace tools (read_file, list_dir, search_code). Inspect files directly on demand; never attempt edits, commands, or recursive bot calls."
-            } else {
-                "Respond directly from the provided context."
-            }
-        ));
-
-        let envelope = build_peer_envelope(caller_project, mode, prompt, extra_context, caller_history, &ws_files);
-        let mut peer_history = vec![ChatMessage::system(sys), ChatMessage::user(envelope)];
-
-        // Depth=1 guard: target receives only read-only workspace tools and never call_bot.
-        let target_tools = if target_is_agent {
-            let c4 = tools::get_tools_schema_with_mcp(&ToolTier::Core4, false, &[], &[]).await;
-            let sm = tools::get_tools_schema_with_mcp(&ToolTier::Smol, false, &[], &[]).await;
-            let ro = filter_read_only_tools(c4, sm);
-            if ro.as_array().is_some_and(|a| !a.is_empty()) { Some(ro) } else { None }
+    let mut sys = build_system_prompt(&target_prof, caller_workspace, target_is_agent, &[]);
+    sys.push_str(&format!(
+        "\n\n[Peer Consultation Mode]\nYou ({target_project}) are assisting sibling workspace '{caller_project}' ({}).\n{}\nKeep your answer concise, actionable, and grounded in what you read.",
+        caller_workspace.display(),
+        if target_is_agent {
+            "You have strictly read-only workspace tools (read_file, list_dir, search_code). Inspect files directly on demand; never attempt edits, commands, or recursive bot calls."
         } else {
-            None
-        };
+            "Respond directly from the provided context."
+        }
+    ));
 
-        let provider = resolve_peer_provider(target_provider_slot.as_deref()).await?;
+    let envelope = build_peer_envelope(caller_project, mode, prompt, extra_context, caller_history, &ws_files);
+    let mut peer_history = vec![ChatMessage::system(sys), ChatMessage::user(envelope)];
+
+    // Depth=1 guard: target receives only read-only workspace tools and never call_bot.
+    let target_tools = if target_is_agent {
+        let c4 = tools::get_tools_schema_with_mcp(&ToolTier::Core4, false, &[], &[]).await;
+        let sm = tools::get_tools_schema_with_mcp(&ToolTier::Smol, false, &[], &[]).await;
+        let ro = filter_read_only_tools(c4, sm);
+        if ro.as_array().is_some_and(|a| !a.is_empty()) { Some(ro) } else { None }
+    } else {
+        None
+    };
+
+    let provider = resolve_peer_provider(target_provider_slot.as_deref(), target_prof.ctx).await?;
         let provider_tag = short_provider_tag(&provider.base_url);
         let model_info = format!("{} ({})", provider.model, format_endpoint(&provider.base_url));
         let client = LlmClient::new(provider);
@@ -2449,11 +2483,7 @@ async fn run_peer_call(
                 peer_history.push(ChatMessage::tool_response(cid, resp_txt));
             }
         }
-        Err("Peer call exceeded max rounds".into())
-    }
-    .await;
-    set_profile_max_tokens(caller_ctx);
-    outcome
+    Err("Peer call exceeded max rounds".into())
 }
 
 async fn write_http_json(stream: &mut TcpStream, status: u16, body: &Value) -> Result<()> {
@@ -2687,8 +2717,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 if name.starts_with('.') {
                     continue;
                 }
-                let cfg = WorkspaceConfig::load_or_default(&p);
-                let prof = if name == "chat" { "chat".into() } else { cfg.profile_name };
+                let cfg = resolve_project_cfg(&app.root.join("profiles"), &p, &name);
+                let prof = cfg.profile_name;
                 let hud = Profile::load(&prof)
                     .map(|pr| rail_hud_summary(&pr, name != "chat"))
                     .unwrap_or_default();
@@ -3062,62 +3092,67 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         if let Some(show) = payload.get("show_thinking").and_then(|v| v.as_bool()) {
             state::set_show_thinking_summaries(Some(show));
         }
-        let cfg_path = app.root.join("plugins/rs-rail/config.json");
-        let mut cfg = RailConfig::load(&cfg_path);
-        let mut dirty_cfg = false;
-        if let Some(show_rp) = payload.get("show_right_panel").and_then(|v| v.as_bool()) {
-            cfg.show_right_panel = show_rp;
-            dirty_cfg = true;
-        }
-        if let Some(bm) = payload.get("bot_mode").and_then(|v| v.as_bool()) {
-            cfg.bot_mode = bm;
-            dirty_cfg = true;
-        }
-        if let Some(arr) = payload.get("hidden_projects").and_then(|v| v.as_array()) {
-            cfg.hidden_projects = sanitize_hidden_projects(arr);
-            dirty_cfg = true;
-        }
-        if let Some(obj) = payload.get("project_labels").and_then(|v| v.as_object()) {
-            cfg.project_labels = sanitize_project_labels(obj);
-            dirty_cfg = true;
-        }
-        if let Some(obj) = payload.get("project_names").and_then(|v| v.as_object()) {
-            cfg.project_names = sanitize_project_names(obj);
-            dirty_cfg = true;
-        }
-        if let Some(obj) = payload.get("project_descriptions").and_then(|v| v.as_object()) {
-            cfg.project_descriptions = sanitize_project_descriptions(obj);
-            dirty_cfg = true;
-        }
-        if let Some(obj) = payload.get("project_bots").and_then(|v| v.as_object()) {
-            match sanitize_project_bots(obj, &app.root.join("projects")) {
-                Ok(bots) => {
-                    cfg.project_bots = bots;
-                    dirty_cfg = true;
-                }
-                Err(msg) => return write_http_err(&mut stream, 409, &msg).await,
+        let cfg_res: std::result::Result<RailConfig, (u16, String)> = (|| {
+            let _guard = RAIL_CFG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+            let cfg_path = app.root.join("plugins/rs-rail/config.json");
+            let mut cfg = RailConfig::load_for_write(&cfg_path)
+                .map_err(|e| (500, format!("Corrupt rail config: {e}")))?;
+            let mut dirty_cfg = false;
+            if let Some(show_rp) = payload.get("show_right_panel").and_then(|v| v.as_bool()) {
+                cfg.show_right_panel = show_rp;
+                dirty_cfg = true;
             }
-        }
-        if let Some(obj) = payload.get("project_providers").and_then(|v| v.as_object()) {
-            cfg.project_providers = sanitize_project_providers(obj, &app.root);
-            dirty_cfg = true;
-        }
-        if let Some(obj) = payload.get("project_collabs").and_then(|v| v.as_object()) {
-            cfg.project_collabs = sanitize_project_collabs(obj, &app.root);
-            dirty_cfg = true;
-        }
-        if let Some(obj) = payload.get("project_actions").and_then(|v| v.as_object()) {
-            cfg.project_actions = sanitize_project_actions(obj);
-            dirty_cfg = true;
-        }
-        if payload.get("auto_label").and_then(|v| v.as_bool()) == Some(true)
-            && apply_auto_labels(&app.root, &mut cfg) > 0
-        {
-            dirty_cfg = true;
-        }
-        if dirty_cfg {
-            cfg.save(&cfg_path)?;
-        }
+            if let Some(bm) = payload.get("bot_mode").and_then(|v| v.as_bool()) {
+                cfg.bot_mode = bm;
+                dirty_cfg = true;
+            }
+            if let Some(arr) = payload.get("hidden_projects").and_then(|v| v.as_array()) {
+                cfg.hidden_projects = sanitize_hidden_projects(arr);
+                dirty_cfg = true;
+            }
+            if let Some(obj) = payload.get("project_labels").and_then(|v| v.as_object()) {
+                cfg.project_labels = sanitize_project_labels(obj);
+                dirty_cfg = true;
+            }
+            if let Some(obj) = payload.get("project_names").and_then(|v| v.as_object()) {
+                cfg.project_names = sanitize_project_names(obj);
+                dirty_cfg = true;
+            }
+            if let Some(obj) = payload.get("project_descriptions").and_then(|v| v.as_object()) {
+                cfg.project_descriptions = sanitize_project_descriptions(obj);
+                dirty_cfg = true;
+            }
+            if let Some(obj) = payload.get("project_bots").and_then(|v| v.as_object()) {
+                cfg.project_bots = sanitize_project_bots(obj, &app.root.join("projects"))
+                    .map_err(|msg| (409, msg))?;
+                dirty_cfg = true;
+            }
+            if let Some(obj) = payload.get("project_providers").and_then(|v| v.as_object()) {
+                cfg.project_providers = sanitize_project_providers(obj, &app.root);
+                dirty_cfg = true;
+            }
+            if let Some(obj) = payload.get("project_collabs").and_then(|v| v.as_object()) {
+                cfg.project_collabs = sanitize_project_collabs(obj, &app.root);
+                dirty_cfg = true;
+            }
+            if let Some(obj) = payload.get("project_actions").and_then(|v| v.as_object()) {
+                cfg.project_actions = sanitize_project_actions(obj);
+                dirty_cfg = true;
+            }
+            if payload.get("auto_label").and_then(|v| v.as_bool()) == Some(true)
+                && apply_auto_labels(&app.root, &mut cfg) > 0
+            {
+                dirty_cfg = true;
+            }
+            if dirty_cfg {
+                cfg.save(&cfg_path).map_err(|e| (500, e.to_string()))?;
+            }
+            Ok(cfg)
+        })();
+        let cfg = match cfg_res {
+            Ok(c) => c,
+            Err((status, msg)) => return write_http_err(&mut stream, status, &msg).await,
+        };
         return write_http_json(
             &mut stream,
             200,
@@ -3183,13 +3218,12 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             return write_http_err(&mut stream, status, &msg).await;
         }
 
-        let (caller_ws, caller_ctx, history, cancel_flag, start_gen) = {
+        let (caller_ws, history, cancel_flag, start_gen) = {
             let mut lock = app.sessions.lock().await;
             let sess = lock.entry(active.clone()).or_insert_with(|| app.load_or_init_session(&active));
             sess.cancel_flag.store(false, Ordering::SeqCst);
             (
                 sess.workspace.clone(),
-                sess.ctx_override,
                 sess.llm_history.clone(),
                 sess.cancel_flag.clone(),
                 sess.generation,
@@ -3200,7 +3234,6 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             &app.root,
             &active,
             &caller_ws,
-            caller_ctx,
             target,
             mode,
             prompt,
@@ -3588,7 +3621,6 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                                     &app_clone.root,
                                     &active,
                                     &workspace,
-                                    ctx_override,
                                     &target,
                                     &collab_mode,
                                     &task,
@@ -4501,8 +4533,48 @@ hi").unwrap();
         let mut cfg = RailConfig::default();
         apply_auto_labels(&tmp, &mut cfg);
 
-        assert_eq!(cfg.project_labels.get("gem35").unwrap(), &vec!["cloud".to_string(), "microbot".to_string()]);
-        assert_eq!(cfg.project_labels.get("surogate37").unwrap(), &vec!["local".to_string(), "microbot".to_string()]);
+        assert_eq!(cfg.project_labels.get("gem35").unwrap(), &vec!["cloud".to_string(), "rs-bot".to_string()]);
+        assert_eq!(cfg.project_labels.get("surogate37").unwrap(), &vec!["local".to_string(), "rs-bot".to_string()]);
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_git_status_brief_handles_corrupt_git_and_grandparent_repo() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_git_guard_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join(".git")).unwrap(); // mimics ~/.git outside projects/
+        fs::create_dir_all(tmp.join("sub/projects/nogit")).unwrap();
+        assert_eq!(git_status_brief(&tmp.join("sub/projects/nogit")), (String::new(), false));
+
+        fs::create_dir_all(tmp.join("sub/projects/broken/.git")).unwrap();
+        assert_eq!(git_status_brief(&tmp.join("sub/projects/broken")), (String::new(), false));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_rail_config_load_for_write_rejects_corrupt_json_and_ctx_override_pure() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_cfg_err_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let cfg_p = tmp.join("config.json");
+        assert!(RailConfig::load_for_write(&cfg_p).is_ok());
+
+        atomic_write(&cfg_p, "{not valid json").unwrap();
+        assert!(RailConfig::load_for_write(&cfg_p).is_err());
+
+        let before = get_max_tokens();
+        let p = ProviderConfig {
+            base_url: "http://127.0.0.1:8080/v1/chat/completions".into(),
+            api_key: "k".into(),
+            model: "m".into(),
+            fallback_models: Vec::new(),
+            max_tokens: 8192,
+        };
+        assert_eq!(apply_ctx_override(p, Some(32768)).max_tokens, 32768);
+        assert_eq!(get_max_tokens(), before);
+        assert_eq!(default_bot_mask("chat"), CHAT_BOT_MASK);
+        assert_eq!(default_bot_mask("chatbot"), CHAT_BOT_MASK);
+        assert_eq!(parse_bot_val("b:8010"), Some(CHAT_BOT_MASK));
         let _ = fs::remove_dir_all(&tmp);
     }
 }

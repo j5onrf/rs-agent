@@ -4,28 +4,29 @@ def is_prime(n):
         return False
     if n <= 3:
         return True
-    if n % 2 == 0:
+    if n % 2 == 0 or n % 3 == 0:
         return False
-    i = 3
+    i = 5
     while i * i <= n:
-        if n % i == 0:
+        if n % i == 0 or n % (i + 2) == 0:
             return False
-        i += 2
+        i += 6
     return True
 
 
 if __name__ == "__main__":
-    # Inspect the file: print its path and content summary
+    # Inspect the script file itself
     import os
-    print(f"File: {os.path.abspath(__file__)}")
-    with open(__file__, "r") as f:
-        lines = f.readlines()
-        print(f"Number of lines: {len(lines)}")
-        # Print first 5 lines
-        for line in lines[:5]:
-            print(line.rstrip())
+    script_path = os.path.abspath(__file__)
+    print(f"Script path: {script_path}")
+    with open(script_path, "r") as f:
+        content = f.read()
+    print("First 50 lines of the script:")
+    for line in content.splitlines()[:50]:
+        print(line)
 
-    # Run the prime check on a few numbers
-    test_numbers = [1, 2, 3, 4, 17, 20, 97]
+    # Run some prime checks
+    test_numbers = [1, 2, 3, 4, 5, 10, 17, 19, 20]
     for num in test_numbers:
-        print(f"{num} is prime? {is_prime(num)}")
+        result = is_prime(num)
+        print(f"{num} is prime? {result}")
