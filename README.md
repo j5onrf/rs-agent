@@ -67,15 +67,15 @@
 | :--- |
 | [<img alt="RS Rail — Local-First Desktop & Web UI" src="assets/rail.png" />](https://j5onrf.github.io/rs-agent/) |
 
-| **rs-bot (Micro-Bot)** |
-| :--- |
-| <img alt="RS Rail — Local-First Desktop & Web UI" src="assets/rs-rail-next.png" /> |
-
 | Feature | Mechanism | Behavior |
 | :--- | :--- | :--- |
 | **Frameless App** | `rail` · `rr` | Dedicated standalone desktop app window (`--app=http://127.0.0.1:24243`) |
 | **Browser Tab** | `rail web` · `rr web` | Standard browser tab via `xdg-open` |
 | **Themes & Fonts** | Settings & Appearance | `Dark Default` fallback, live `Omarchy` & `Noctalia` desktop sync, `+ Noctalia` palette browser (Core & Community, `Dark`/`Light`), deletable `themes/*.json` (`Pure Light`, `Claude`, `DarkBot`), `JetBrains Mono` / `Geist` / `Fira Code`, syntax highlighting & ligatures |
+
+| **RailBot App** · [j5onrf.github.io/railbot](https://j5onrf.github.io/railbot/) |
+| :--- |
+| <img alt="RS Rail — Local-First Desktop & Web UI" src="assets/rs-rail-next.png" /> |
 
 ---
 
