@@ -24,3 +24,5 @@ __pycache__/
 # T3 Code ACP URI artifacts
 **/acp:*
 acp:*
+
+plugins/railbot/config.json

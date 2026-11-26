@@ -62,6 +62,10 @@ struct RailConfig {
     project_collabs: HashMap<String, Vec<String>>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     project_actions: HashMap<String, Vec<ActionItem>>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    project_paths: HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    project_security: HashMap<String, String>,
 }
 
 impl Default for RailConfig {
@@ -78,6 +82,8 @@ impl Default for RailConfig {
             project_providers: HashMap::new(),
             project_collabs: HashMap::new(),
             project_actions: HashMap::new(),
+            project_paths: HashMap::new(),
+            project_security: HashMap::new(),
         }
     }
 }
@@ -105,6 +111,79 @@ impl RailConfig {
     fn save(&self, path: &Path) -> Result<()> {
         atomic_write(path, &serde_json::to_string_pretty(self)?)
     }
+}
+
+fn project_dir_in(root: &Path, cfg: &RailConfig, name: &str) -> PathBuf {
+    if name != "chat" {
+        if let Some(p) = cfg.project_paths.get(name) {
+            return PathBuf::from(p);
+        }
+    }
+    root.join("projects").join(name)
+}
+
+fn list_all_project_dirs(root: &Path, cfg: &RailConfig) -> Vec<(String, PathBuf, bool)> {
+    let mut map: HashMap<String, (PathBuf, bool)> = HashMap::new();
+    if let Ok(rd) = fs::read_dir(root.join("projects")) {
+        for ent in rd.flatten() {
+            let p = ent.path();
+            if !p.is_dir() {
+                continue;
+            }
+            if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
+                if !name.starts_with('.') {
+                    map.insert(name.to_string(), (p, false));
+                }
+            }
+        }
+    }
+    for (name, raw) in &cfg.project_paths {
+        if is_valid_slug(name) && name != "chat" {
+            let p = PathBuf::from(raw);
+            if p.is_dir() {
+                map.insert(name.clone(), (p, true));
+            }
+        }
+    }
+    let mut out: Vec<(String, PathBuf, bool)> = map.into_iter().map(|(n, (p, ext))| (n, p, ext)).collect();
+    out.sort_by(|a, b| a.0.cmp(&b.0));
+    out
+}
+
+fn is_forbidden_sys_path(p: &Path) -> bool {
+    const FORBIDDEN: &[&str] = &["/etc", "/usr", "/var", "/bin", "/sbin", "/opt", "/root", "/boot", "/sys", "/proc", "/dev"];
+    FORBIDDEN.iter().any(|d| p == Path::new(d) || p.starts_with(d))
+}
+
+fn expand_user_path(raw: &str) -> PathBuf {
+    let clean = raw.trim().trim_matches(|c| c == '"' || c == char::from(39));
+    if clean == "~" {
+        dirs::home_dir().unwrap_or_else(|| PathBuf::from(clean))
+    } else if let Some(rest) = clean.strip_prefix("~/") {
+        dirs::home_dir().map(|h| h.join(rest)).unwrap_or_else(|| PathBuf::from(clean))
+    } else {
+        PathBuf::from(clean)
+    }
+}
+
+fn validate_external_workspace_path(raw: &str, app_root: &Path) -> std::result::Result<PathBuf, String> {
+    let p = expand_user_path(raw);
+    if !p.is_absolute() || !p.is_dir() {
+        return Err("Folder does not exist or is not an absolute directory".into());
+    }
+    let canon = p.canonicalize().map_err(|e| e.to_string())?;
+    if canon == Path::new("/") || is_forbidden_sys_path(&canon) {
+        return Err("Cannot use root or system directory as workspace".into());
+    }
+    if dirs::home_dir().and_then(|h| h.canonicalize().ok()).is_some_and(|h| canon == h) {
+        return Err("Pick a subfolder instead of your entire home directory".into());
+    }
+    if let Ok(ar) = app_root.canonicalize() {
+        if canon == ar || canon == ar.join("projects") || canon.starts_with(ar.join("projects")) {
+            return Err("Folder is inside rs-agent internals; create a normal workspace instead".into());
+        }
+    }
+    Ok(canon)
 }
 
 fn sanitize_label(raw: &str) -> Option<String> {
@@ -204,9 +283,18 @@ fn parse_bot_val(raw: &str) -> Option<u16> {
     u16::from_str_radix(hex, 16).ok().map(|n| (n & 0xffff) | (1 << 4))
 }
 
+#[cfg(test)]
 fn sanitize_project_bots(
     obj: &serde_json::Map<String, Value>,
     projects_dir: &Path,
+) -> Result<HashMap<String, String>, String> {
+    sanitize_project_bots_with_ext(obj, projects_dir, &HashMap::new())
+}
+
+fn sanitize_project_bots_with_ext(
+    obj: &serde_json::Map<String, Value>,
+    projects_dir: &Path,
+    ext_paths: &HashMap<String, String>,
 ) -> Result<HashMap<String, String>, String> {
     let mut parsed = Vec::new();
     for (proj, val) in obj {
@@ -232,11 +320,16 @@ fn sanitize_project_bots(
             owners.entry(default_bot_mask(&name)).or_insert(name);
         }
     }
+    for name in ext_paths.keys() {
+        if is_valid_slug(name) && !parsed.iter().any(|(p, _)| p == name) {
+            owners.entry(default_bot_mask(name)).or_insert_with(|| name.clone());
+        }
+    }
     let mut out = HashMap::new();
     for (proj, mask) in parsed {
         if let Some(prev) = owners.get(&mask) {
             if prev != &proj {
-                return Err(format!("rs-bot already used by '{prev}'"));
+                return Err(format!("RailBot already used by '{prev}'"));
             }
         }
         owners.insert(mask, proj.clone());
@@ -280,6 +373,46 @@ fn sanitize_project_actions(obj: &serde_json::Map<String, Value>) -> HashMap<Str
     out
 }
 
+fn sanitize_project_security(obj: &serde_json::Map<String, Value>) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    for (proj, val) in obj {
+        if is_valid_slug(proj) && val.as_str() == Some("allow") {
+            out.insert(proj.clone(), "allow".into());
+        }
+    }
+    out
+}
+
+fn is_env_path(p: &Path) -> bool {
+    p.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n == ".env" || n.starts_with(".env."))
+}
+
+fn is_env_tool_blocked(fn_name: &str, args: &Value, boundary: &SecurityBoundary) -> bool {
+    let env_file = get_env_path();
+    if fn_name == "run_command" {
+        let low = args.get("command").and_then(|v| v.as_str()).unwrap_or("").to_ascii_lowercase();
+        if low.contains(".env") {
+            return true;
+        }
+        let env_str = env_file.to_string_lossy().to_ascii_lowercase();
+        return !env_str.is_empty() && low.contains(&env_str);
+    }
+    if let Some(p_str) = args.get("path").and_then(|v| v.as_str()) {
+        let resolved = boundary.resolve_path(p_str);
+        if is_env_path(&resolved) || resolved.components().any(|c| c.as_os_str() == ".env") {
+            return true;
+        }
+        if let (Ok(ce), Ok(cr)) = (env_file.canonicalize(), resolved.canonicalize()) {
+            if ce == cr {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 fn is_valid_provider_slot(slot: &str) -> bool {
     matches!(slot, "DEFAULT" | "LOCAL" | "CUSTOM")
         || DIRECT_PROVIDERS.iter().any(|&(pfx, _, _, _)| pfx == slot)
@@ -301,9 +434,18 @@ fn effective_project_provider(
     }
 }
 
+#[cfg(test)]
 fn sanitize_project_providers(
     obj: &serde_json::Map<String, Value>,
     root: &Path,
+) -> HashMap<String, String> {
+    sanitize_project_providers_with_cfg(obj, root, &RailConfig::default())
+}
+
+fn sanitize_project_providers_with_cfg(
+    obj: &serde_json::Map<String, Value>,
+    root: &Path,
+    cfg: &RailConfig,
 ) -> HashMap<String, String> {
     let mut out = HashMap::new();
     for (proj, val) in obj {
@@ -312,7 +454,7 @@ fn sanitize_project_providers(
         }
         let raw = val.as_str().unwrap_or("").trim().to_ascii_uppercase();
         if raw.is_empty() || raw == "DEFAULT" {
-            let proj_dir = root.join("projects").join(proj);
+            let proj_dir = project_dir_in(root, cfg, proj);
             let prof = resolve_project_cfg(&root.join("profiles"), &proj_dir, proj).profile_name;
             let has_fm = find_profile_text_in(&root.join("profiles"), &prof)
                 .as_deref()
@@ -328,12 +470,20 @@ fn sanitize_project_providers(
     out
 }
 
+#[cfg(test)]
 fn sanitize_project_collabs(
     obj: &serde_json::Map<String, Value>,
     root: &Path,
 ) -> HashMap<String, Vec<String>> {
+    sanitize_project_collabs_with_cfg(obj, root, &RailConfig::default())
+}
+
+fn sanitize_project_collabs_with_cfg(
+    obj: &serde_json::Map<String, Value>,
+    root: &Path,
+    cfg: &RailConfig,
+) -> HashMap<String, Vec<String>> {
     let mut out = HashMap::new();
-    let projects_dir = root.join("projects");
     for (proj, val) in obj {
         if !is_valid_slug(proj) {
             continue;
@@ -342,7 +492,7 @@ fn sanitize_project_collabs(
         if let Some(arr) = val.as_array() {
             for item in arr {
                 if let Some(s) = item.as_str().map(str::trim) {
-                    if is_valid_slug(s) && s != proj && projects_dir.join(s).is_dir() && !list.contains(&s.to_string()) && list.len() < 8 {
+                    if is_valid_slug(s) && s != proj && project_dir_in(root, cfg, s).is_dir() && !list.contains(&s.to_string()) && list.len() < 8 {
                         list.push(s.to_string());
                     }
                 }
@@ -351,7 +501,7 @@ fn sanitize_project_collabs(
         if !list.is_empty() {
             out.insert(proj.clone(), list);
         } else {
-            let proj_dir = projects_dir.join(proj);
+            let proj_dir = project_dir_in(root, cfg, proj);
             let prof = resolve_project_cfg(&root.join("profiles"), &proj_dir, proj).profile_name;
             let has_fm = find_profile_text_in(&root.join("profiles"), &prof)
                 .is_some_and(|r| !parse_profile_collab_raw(&r, proj).0.is_empty());
@@ -472,34 +622,24 @@ fn derive_auto_labels_in(root: &Path, cfg: &RailConfig, project: &str, prof_name
         .unwrap_or_else(|| parse_profile_collab_raw(&raw, project).0);
     let has_collab = collab_src
         .iter()
-        .any(|s| s != project && root.join("projects").join(s).is_dir());
+        .any(|s| s != project && project_dir_in(root, cfg, s).is_dir());
     let has_prov = effective_project_provider(root, cfg, project, prof_name).is_some();
-    if (has_collab || has_prov) && !list.contains(&"rs-bot".to_string()) && list.len() < 8 {
-        list.push("rs-bot".into());
+    if (has_collab || has_prov) && !list.contains(&"railbot".to_string()) && list.len() < 8 {
+        list.push("railbot".into());
     }
     list
 }
 
 fn apply_auto_labels(root: &Path, cfg: &mut RailConfig) -> usize {
     let mut added = 0;
-    let Ok(rd) = fs::read_dir(root.join("projects")) else {
-        return 0;
-    };
-    for ent in rd.flatten() {
-        let p = ent.path();
-        if !p.is_dir() {
-            continue;
-        }
-        let Some(name) = p.file_name().and_then(|n| n.to_str()).map(ToString::to_string) else {
-            continue;
-        };
-        if name.starts_with('.') || name == "chat" {
+    for (name, p, _) in list_all_project_dirs(root, cfg) {
+        if name == "chat" {
             continue;
         }
         let allow_refresh = cfg
             .project_labels
             .get(&name)
-            .map(|cur| !cur.is_empty() && cur.iter().all(|l| matches!(l.as_str(), "mcp" | "purebash" | "cloud" | "local" | "microbot" | "rs-bot" | "rsbot")))
+            .map(|cur| !cur.is_empty() && cur.iter().all(|l| matches!(l.as_str(), "mcp" | "purebash" | "cloud" | "local" | "microbot" | "rs-bot" | "rsbot" | "railbot")))
             .unwrap_or(true);
         if !allow_refresh {
             continue;
@@ -627,14 +767,16 @@ impl AppRuntime {
     }
 
     fn new_in(root: PathBuf) -> Self {
-        let rcfg = RailConfig::load(&root.join("plugins/rs-rail/config.json"));
+        let rcfg = RailConfig::load(&root.join("plugins/railbot/config.json"));
         let initial = rcfg
             .last_project
-            .filter(|p| is_valid_slug(p) && !rcfg.hidden_projects.contains(p) && root.join("projects").join(p).is_dir())
+            .as_ref()
+            .filter(|p| is_valid_slug(p) && !rcfg.hidden_projects.contains(p) && project_dir_in(&root, &rcfg, p).is_dir())
+            .cloned()
             .unwrap_or_else(|| "chat".into());
         let http = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(12))
-            .user_agent("rs-rail")
+            .user_agent("railbot")
             .build()
             .unwrap_or_default();
         Self {
@@ -652,7 +794,8 @@ impl AppRuntime {
     }
 
     fn load_or_init_session(&self, project: &str) -> SessionState {
-        let proj_dir = self.root.join("projects").join(project);
+        let rcfg = RailConfig::load(&self.root.join("plugins/railbot/config.json"));
+        let proj_dir = project_dir_in(&self.root, &rcfg, project);
         let _ = fs::create_dir_all(&proj_dir);
         let is_agent = project != "chat";
         let mut cfg = resolve_project_cfg(&self.root.join("profiles"), &proj_dir, project);
@@ -1677,7 +1820,7 @@ async fn install_noctalia_theme(app: &AppRuntime, name: &str, mode: &str) -> Res
     if !is_valid_slug(&slug) {
         anyhow::bail!("Invalid generated theme slug");
     }
-    let path = app.root.join("plugins/rs-rail/themes").join(format!("{slug}.json"));
+    let path = app.root.join("plugins/railbot/themes").join(format!("{slug}.json"));
     atomic_write(&path, &(serde_json::to_string_pretty(&theme)? + "\n"))?;
     Ok(json!({ "id": format!("custom:{slug}"), "slug": slug, "theme": theme }))
 }
@@ -1791,7 +1934,7 @@ fn clean_project_dir(proj_dir: &Path) -> Result<usize> {
 fn export_session_markdown(sess: &SessionState) -> Result<(String, String)> {
     let filename = "chat.md";
     let file_path = sess.workspace.join(".rs/transcripts").join(filename);
-    let mut md = format!("# rs-rail Transcript — {}\n\n", sess.project_name);
+    let mut md = format!("# RailBot Transcript — {}\n\n", sess.project_name);
     for item in &sess.ui_history {
         match item.role.as_str() {
             "user" => {
@@ -1917,7 +2060,7 @@ fn save_rail_session(sess: &SessionState) {
 
 fn set_last_project(root: &Path, name: &str) {
     let _guard = RAIL_CFG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-    let cfg_path = root.join("plugins/rs-rail/config.json");
+    let cfg_path = root.join("plugins/railbot/config.json");
     if let Ok(mut cfg) = RailConfig::load_for_write(&cfg_path) {
         if cfg.last_project.as_deref() != Some(name) {
             cfg.last_project = Some(name.to_string());
@@ -2034,7 +2177,7 @@ fn parse_profile_provider_raw(raw: &str) -> Option<String> {
 }
 
 fn resolve_collaborators(root: &Path, active_project: &str, prof_name: &str) -> (Vec<String>, String) {
-    let cfg = RailConfig::load(&root.join("plugins/rs-rail/config.json"));
+    let cfg = RailConfig::load(&root.join("plugins/railbot/config.json"));
     let (fm_collabs, mode) = find_profile_text_in(&root.join("profiles"), prof_name)
         .as_deref()
         .map(|r| parse_profile_collab_raw(r, active_project))
@@ -2042,7 +2185,7 @@ fn resolve_collaborators(root: &Path, active_project: &str, prof_name: &str) -> 
     let source = cfg.project_collabs.get(active_project).cloned().unwrap_or(fm_collabs);
     let collabs = source
         .into_iter()
-        .filter(|s| s != active_project && root.join("projects").join(s).is_dir())
+        .filter(|s| s != active_project && project_dir_in(root, &cfg, s).is_dir())
         .collect();
     (collabs, mode)
 }
@@ -2307,7 +2450,8 @@ fn validate_peer_target(root: &Path, caller: &str, target: &str) -> std::result:
     if !is_valid_slug(target) || target == caller {
         return Err((400, "Invalid target project".into()));
     }
-    let dir = root.join("projects").join(target);
+    let rcfg = RailConfig::load(&root.join("plugins/railbot/config.json"));
+    let dir = project_dir_in(root, &rcfg, target);
     if !dir.is_dir() {
         return Err((404, "Target project not found".into()));
     }
@@ -2354,7 +2498,7 @@ async fn run_peer_call(
     let t0 = Instant::now();
     let target_is_agent = target_project != "chat";
     let target_cfg = resolve_project_cfg(&root.join("profiles"), &target_dir, target_project);
-    let rail_cfg = RailConfig::load(&root.join("plugins/rs-rail/config.json"));
+    let rail_cfg = RailConfig::load(&root.join("plugins/railbot/config.json"));
     let target_raw = find_profile_text_in(&root.join("profiles"), &target_cfg.profile_name);
     let target_provider_slot = effective_project_provider(root, &rail_cfg, target_project, &target_cfg.profile_name);
     let target_prof = target_raw
@@ -2461,14 +2605,20 @@ async fn run_peer_call(
                 } else {
                     raw_a.to_string()
                 };
-                let brief = serde_json::from_str::<Value>(&args)
-                    .ok()
-                    .and_then(|v| {
-                        v.get("path")
-                            .or_else(|| v.get("pattern"))
-                            .and_then(|x| x.as_str())
-                            .map(ToString::to_string)
-                    })
+                let parsed_peer = serde_json::from_str::<Value>(&args).unwrap_or_else(|_| json!({}));
+                if is_env_tool_blocked(cname, &parsed_peer, &boundary) {
+                    trace.push(format!("{cname}: denied (.env is zero-trust)"));
+                    peer_history.push(ChatMessage::tool_response(
+                        cid,
+                        "[denied] .env is always zero-trust.".into(),
+                    ));
+                    continue;
+                }
+                let brief = parsed_peer
+                    .get("path")
+                    .or_else(|| parsed_peer.get("pattern"))
+                    .and_then(|x| x.as_str())
+                    .map(ToString::to_string)
                     .unwrap_or_default();
                 let resp_txt = match tools::execute_tool_with_auth(cname, &args, caller_workspace, &boundary, false).await {
                     Ok(o) => {
@@ -2651,7 +2801,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
     }
 
     if method == "GET" && path == "/api/themes" {
-        return write_http_json(&mut stream, 200, &json!({ "themes": load_themes(&app.root.join("plugins/rs-rail/themes")) })).await;
+        return write_http_json(&mut stream, 200, &json!({ "themes": load_themes(&app.root.join("plugins/railbot/themes")) })).await;
     }
 
     if method == "GET" && path == "/api/noctalia/catalog" {
@@ -2671,10 +2821,66 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
     }
 
 
+    if method == "GET" && path == "/api/fs/dirs" {
+        let raw_p = query.split('&').find_map(|p| p.strip_prefix("path=")).map(url_decode).unwrap_or_default();
+        let base = if raw_p.trim().is_empty() {
+            dirs::home_dir().unwrap_or_else(|| PathBuf::from("/"))
+        } else {
+            expand_user_path(&raw_p)
+        };
+        let Ok(canon) = base.canonicalize() else {
+            return write_http_err(&mut stream, 404, "Directory not found").await;
+        };
+        if !canon.is_dir() || is_forbidden_sys_path(&canon) {
+            return write_http_err(&mut stream, 403, "Restricted directory").await;
+        }
+        let mut dirs_out = Vec::new();
+        if let Ok(rd) = fs::read_dir(&canon) {
+            let mut ents: Vec<_> = rd.flatten().collect();
+            ents.sort_by_key(|e| e.file_name());
+            for ent in ents {
+                let name = ent.file_name().to_string_lossy().into_owned();
+                if name.starts_with('.') {
+                    continue;
+                }
+                let p = ent.path();
+                let Ok(meta) = fs::symlink_metadata(&p) else { continue };
+                if meta.file_type().is_symlink() || !meta.is_dir() || is_forbidden_sys_path(&p) {
+                    continue;
+                }
+                dirs_out.push(json!({
+                    "name": name,
+                    "path": p.display().to_string(),
+                    "has_git": p.join(".git").exists()
+                }));
+                if dirs_out.len() >= 200 {
+                    break;
+                }
+            }
+        }
+        let parent = canon
+            .parent()
+            .filter(|pr| !is_forbidden_sys_path(pr))
+            .map(|pr| pr.display().to_string());
+        let selectable = validate_external_workspace_path(&canon.display().to_string(), &app.root).is_ok();
+        return write_http_json(
+            &mut stream,
+            200,
+            &json!({
+                "path": canon.display().to_string(),
+                "parent": parent,
+                "selectable": selectable,
+                "dirs": dirs_out
+            }),
+        )
+        .await;
+    }
+
     if method == "GET" && path == "/api/file" {
         let rel = query.split('&').find_map(|p| p.strip_prefix("path=")).map(url_decode).unwrap_or_default();
         let active = app.active_project.lock().await.clone();
-        let proj_dir = app.root.join("projects").join(&active);
+        let rcfg = RailConfig::load(&app.root.join("plugins/railbot/config.json"));
+        let proj_dir = project_dir_in(&app.root, &rcfg, &active);
         let bnd = SecurityBoundary::new_headless(&proj_dir);
         let target = bnd.resolve_path(&rel);
         if rel.is_empty() || bnd.is_outside(&target) || rel.split(['/', '\\']).any(|s| s == ".git" || s == ".env") {
@@ -2694,55 +2900,48 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
     }
 
     if method == "GET" && path == "/api/state" {
+        let rail_cfg = RailConfig::load(&app.root.join("plugins/railbot/config.json"));
         if let Some(sel) = query.split('&').find_map(|p| p.strip_prefix("project=")).map(url_decode).filter(|s| !s.is_empty()) {
-            if is_valid_slug(&sel) && app.root.join("projects").join(&sel).is_dir() {
+            if is_valid_slug(&sel) && project_dir_in(&app.root, &rail_cfg, &sel).is_dir() {
                 set_last_project(&app.root, &sel);
                 *app.active_project.lock().await = sel;
             }
         }
 
         let active_name = app.active_project.lock().await.clone();
-        let rail_cfg = RailConfig::load(&app.root.join("plugins/rs-rail/config.json"));
+        let active_dir = project_dir_in(&app.root, &rail_cfg, &active_name);
+        let (active_git, active_dirty) = tokio::task::spawn_blocking(move || git_status_brief(&active_dir))
+            .await
+            .unwrap_or_default();
         let mut proj_entries = Vec::new();
         let mut active_files = Vec::new();
-        if let Ok(rd) = fs::read_dir(app.root.join("projects")) {
-            for ent in rd.flatten() {
-                let p = ent.path();
-                if !p.is_dir() {
-                    continue;
-                }
-                let Some(name) = p.file_name().and_then(|n| n.to_str()).map(ToString::to_string) else {
-                    continue;
-                };
-                if name.starts_with('.') {
-                    continue;
-                }
-                let cfg = resolve_project_cfg(&app.root.join("profiles"), &p, &name);
-                let prof = cfg.profile_name;
-                let hud = Profile::load(&prof)
-                    .map(|pr| rail_hud_summary(&pr, name != "chat"))
-                    .unwrap_or_default();
-                let has_git = p.join(".git").exists();
-                let dirty = has_git && git_status_brief(&p).1;
-                let mut files = Vec::new();
-                list_workspace_files(&p, &p, false, &mut files);
-                let file_count = files.len();
-                if name == active_name {
-                    active_files = files;
-                }
-                let peer_prov = effective_project_provider(&app.root, &rail_cfg, &name, &prof).unwrap_or_default();
-                proj_entries.push(json!({
-                    "name": name,
-                    "profile_name": prof,
-                    "hud_summary": hud,
-                    "peer_provider": peer_prov,
-                    "has_git": has_git,
-                    "dirty": dirty,
-                    "file_count": file_count
-                }));
+        for (name, p, is_external) in list_all_project_dirs(&app.root, &rail_cfg) {
+            let cfg = resolve_project_cfg(&app.root.join("profiles"), &p, &name);
+            let prof = cfg.profile_name;
+            let hud = Profile::load(&prof)
+                .map(|pr| rail_hud_summary(&pr, name != "chat"))
+                .unwrap_or_default();
+            let has_git = p.join(".git").exists();
+            let dirty = name == active_name && active_dirty;
+            let mut files = Vec::new();
+            list_workspace_files(&p, &p, false, &mut files);
+            let file_count = files.len();
+            if name == active_name {
+                active_files = files;
             }
+            let peer_prov = effective_project_provider(&app.root, &rail_cfg, &name, &prof).unwrap_or_default();
+            proj_entries.push(json!({
+                "name": name,
+                "profile_name": prof,
+                "hud_summary": hud,
+                "peer_provider": peer_prov,
+                "has_git": has_git,
+                "dirty": dirty,
+                "file_count": file_count,
+                "external": is_external,
+                "path": p.display().to_string()
+            }));
         }
-        proj_entries.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
 
         let profiles = Profile::list_available();
         let profiles_dir = app.root.join("profiles");
@@ -2758,7 +2957,6 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             let mut lock = app.sessions.lock().await;
             let sess = lock.entry(active_name.clone()).or_insert_with(|| app.load_or_init_session(&active_name));
             set_profile_max_tokens(sess.ctx_override);
-            let (git, _) = git_status_brief(&sess.workspace);
             let task_md = tools::read_task_spec(&sess.workspace);
             let memory = fs::read_to_string(sess.workspace.join(".rs/memory.md")).unwrap_or_default();
             let r_str = reasoning_to_string(&sess.reasoning);
@@ -2775,7 +2973,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "is_agent": sess.is_agent,
                 "hud_summary": sess.hud_summary,
                 "tagline": tagline,
-                "git": git,
+                "git": active_git,
                 "task_md": task_md,
                 "memory": memory,
                 "files": active_files,
@@ -2802,6 +3000,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             &mut stream,
             200,
             &json!({
+                "version": env!("CARGO_PKG_VERSION"),
                 "projects": proj_entries,
                 "active_project": sess_val,
                 "profiles": profiles,
@@ -2816,11 +3015,10 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     "env_max_tokens": env_tok,
                     "max_rounds": max_rounds
                 },
-                "themes": load_themes(&app.root.join("plugins/rs-rail/themes")),
+                "themes": load_themes(&app.root.join("plugins/railbot/themes")),
                 "mcp_servers": mcp_list,
                 "ui_prefs": {
                     "pad": state::get_pad(),
-                    "show_thinking": state::get_show_thinking_summaries(),
                     "show_right_panel": rail_cfg.show_right_panel,
                     "bot_mode": rail_cfg.bot_mode,
                     "hidden_projects": rail_cfg.hidden_projects,
@@ -2830,7 +3028,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     "project_bots": rail_cfg.project_bots,
                     "project_providers": rail_cfg.project_providers,
                     "project_collabs": rail_cfg.project_collabs,
-                    "project_actions": rail_cfg.project_actions
+                    "project_actions": rail_cfg.project_actions,
+                    "project_security": rail_cfg.project_security
                 }
             }),
         )
@@ -2854,7 +3053,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
 
     if method == "POST" && path == "/api/themes/delete" {
         let id = payload.get("id").and_then(|v| v.as_str()).unwrap_or("");
-        return match delete_custom_theme(&app.root.join("plugins/rs-rail/themes"), id) {
+        return match delete_custom_theme(&app.root.join("plugins/railbot/themes"), id) {
             Ok(()) => write_http_json(&mut stream, 200, &json!({ "ok": true })).await,
             Err(e) => write_http_err(&mut stream, 400, &e.to_string()).await,
         };
@@ -2888,7 +3087,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
 
     if method == "POST" && path == "/api/reset" {
         let active = app.active_project.lock().await.clone();
-        state::clear_workspace_session(&app.root.join("projects").join(&active));
+        let rcfg = RailConfig::load(&app.root.join("plugins/railbot/config.json"));
+        state::clear_workspace_session(&project_dir_in(&app.root, &rcfg, &active));
         let mut lock = app.sessions.lock().await;
         let next_gen = lock
             .get(&active)
@@ -2931,13 +3131,45 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
     if method == "POST" && path == "/api/project/create" {
         let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("").trim().to_ascii_lowercase();
         let prof_name = payload.get("profile").and_then(|v| v.as_str()).unwrap_or("lfm3").trim();
+        let raw_ext = payload.get("path").and_then(|v| v.as_str()).map(str::trim).unwrap_or("");
         if !is_valid_slug(&name) || name == "chat" {
             return write_http_err(&mut stream, 400, "Invalid project slug").await;
         }
-        let proj_dir = app.root.join("projects").join(&name);
-        if proj_dir.join(".rs/config.json").exists() {
-            return write_http_err(&mut stream, 409, "Project already exists").await;
-        }
+        let ext_canon = if raw_ext.is_empty() {
+            None
+        } else {
+            match validate_external_workspace_path(raw_ext, &app.root) {
+                Ok(p) => Some(p),
+                Err(e) => return write_http_err(&mut stream, 400, &e).await,
+            }
+        };
+        let proj_res: std::result::Result<PathBuf, (u16, String)> = (|| {
+            let mut d = app.root.join("projects").join(&name);
+            let _guard = RAIL_CFG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+            let cfg_path = app.root.join("plugins/railbot/config.json");
+            let mut rcfg = RailConfig::load_for_write(&cfg_path)
+                .map_err(|e| (500, format!("Corrupt rail config: {e}")))?;
+            if let Some(ref canon) = ext_canon {
+                let canon_str = canon.display().to_string();
+                if rcfg.project_paths.contains_key(&name) || d.exists() {
+                    return Err((409, "Project name already exists".into()));
+                }
+                if let Some((other, _)) = rcfg.project_paths.iter().find(|(_, p)| p.as_str() == canon_str) {
+                    return Err((409, format!("Folder already linked as '{other}'")));
+                }
+                d = canon.clone();
+                rcfg.project_paths.insert(name.clone(), canon_str);
+                rcfg.last_project = Some(name.clone());
+                rcfg.save(&cfg_path).map_err(|e| (500, e.to_string()))?;
+            } else if rcfg.project_paths.contains_key(&name) || d.join(".rs/config.json").exists() {
+                return Err((409, "Project already exists".into()));
+            }
+            Ok(d)
+        })();
+        let proj_dir = match proj_res {
+            Ok(d) => d,
+            Err((status, msg)) => return write_http_err(&mut stream, status, &msg).await,
+        };
         let prof = Profile::load(prof_name).unwrap_or_else(|| Profile::parse("ROLE: Assistant."));
         let cfg = WorkspaceConfig {
             profile_name: prof_name.to_string(),
@@ -2947,10 +3179,47 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             delegate: prof.delegate,
         };
         cfg.save(&proj_dir)?;
-        set_last_project(&app.root, &name);
+        if ext_canon.is_none() {
+            set_last_project(&app.root, &name);
+        }
         app.sessions.lock().await.remove(&name);
         *app.active_project.lock().await = name.clone();
         return write_http_json(&mut stream, 200, &json!({ "name": name })).await;
+    }
+
+    if method == "POST" && path == "/api/project/unlink" {
+        let name = payload.get("name").and_then(|v| v.as_str()).unwrap_or("").trim();
+        if !is_valid_slug(name) {
+            return write_http_err(&mut stream, 400, "Invalid project slug").await;
+        }
+        let unlink_res: std::result::Result<bool, (u16, String)> = (|| {
+            let _guard = RAIL_CFG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+            let cfg_path = app.root.join("plugins/railbot/config.json");
+            let mut rcfg = RailConfig::load_for_write(&cfg_path)
+                .map_err(|e| (500, format!("Corrupt rail config: {e}")))?;
+            let had = rcfg.project_paths.remove(name).is_some();
+            if had {
+                rcfg.hidden_projects.retain(|x| x != name);
+                if rcfg.last_project.as_deref() == Some(name) {
+                    rcfg.last_project = Some("chat".into());
+                }
+                rcfg.save(&cfg_path).map_err(|e| (500, e.to_string()))?;
+            }
+            Ok(had)
+        })();
+        let removed = match unlink_res {
+            Ok(r) => r,
+            Err((status, msg)) => return write_http_err(&mut stream, status, &msg).await,
+        };
+        if !removed {
+            return write_http_err(&mut stream, 404, "External project not found").await;
+        }
+        app.sessions.lock().await.remove(name);
+        let mut active = app.active_project.lock().await;
+        if *active == name {
+            *active = "chat".into();
+        }
+        return write_http_json(&mut stream, 200, &json!({ "ok": true })).await;
     }
 
     if method == "POST" && path == "/api/project/git" {
@@ -2961,9 +3230,22 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         if !is_valid_slug(name) {
             return write_http_err(&mut stream, 400, "Invalid project slug").await;
         }
-        let projects_root = app.root.join("projects").canonicalize()?;
-        let proj_dir = projects_root.join(name);
-        if !proj_dir.is_dir() || !proj_dir.canonicalize().is_ok_and(|c| c.starts_with(&projects_root)) {
+        let rcfg = RailConfig::load(&app.root.join("plugins/railbot/config.json"));
+        let is_ext = rcfg.project_paths.contains_key(name);
+        if is_ext && !enable {
+            return write_http_err(&mut stream, 403, "Cannot remove .git of an external folder").await;
+        }
+        let proj_dir = if is_ext {
+            project_dir_in(&app.root, &rcfg, name)
+        } else {
+            let projects_root = app.root.join("projects").canonicalize()?;
+            let d = projects_root.join(name);
+            if !d.canonicalize().is_ok_and(|c| c.starts_with(&projects_root)) {
+                return write_http_err(&mut stream, 404, "Project not found").await;
+            }
+            d
+        };
+        if !proj_dir.is_dir() {
             return write_http_err(&mut stream, 404, "Project not found").await;
         }
         return match set_project_git(&proj_dir, enable) {
@@ -2977,6 +3259,10 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         if !is_valid_slug(name) {
             return write_http_err(&mut stream, 400, "Invalid project slug").await;
         }
+        let rcfg = RailConfig::load(&app.root.join("plugins/railbot/config.json"));
+        if rcfg.project_paths.contains_key(name) {
+            return write_http_err(&mut stream, 403, "Cannot wipe an external folder; unlink it instead").await;
+        }
         let projects_root = app.root.join("projects").canonicalize()?;
         let proj_dir = projects_root.join(name);
         if !proj_dir.is_dir() || !proj_dir.canonicalize().is_ok_and(|c| c.starts_with(&projects_root)) {
@@ -2989,7 +3275,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
     if method == "POST" && path == "/api/file/delete" {
         let rel = payload.get("path").and_then(|v| v.as_str()).unwrap_or("").trim();
         let active = app.active_project.lock().await.clone();
-        let proj_dir = app.root.join("projects").join(&active);
+        let rcfg = RailConfig::load(&app.root.join("plugins/railbot/config.json"));
+        let proj_dir = project_dir_in(&app.root, &rcfg, &active);
         let bnd = SecurityBoundary::new_headless(&proj_dir);
         let target = bnd.resolve_path(rel);
         if bnd.is_outside(&target) || is_protected_delete_path(rel, &target, &bnd.root) {
@@ -3089,12 +3376,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
     }
 
     if method == "POST" && path == "/api/settings/ui" {
-        if let Some(show) = payload.get("show_thinking").and_then(|v| v.as_bool()) {
-            state::set_show_thinking_summaries(Some(show));
-        }
         let cfg_res: std::result::Result<RailConfig, (u16, String)> = (|| {
             let _guard = RAIL_CFG_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-            let cfg_path = app.root.join("plugins/rs-rail/config.json");
+            let cfg_path = app.root.join("plugins/railbot/config.json");
             let mut cfg = RailConfig::load_for_write(&cfg_path)
                 .map_err(|e| (500, format!("Corrupt rail config: {e}")))?;
             let mut dirty_cfg = false;
@@ -3123,20 +3407,24 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 dirty_cfg = true;
             }
             if let Some(obj) = payload.get("project_bots").and_then(|v| v.as_object()) {
-                cfg.project_bots = sanitize_project_bots(obj, &app.root.join("projects"))
+                cfg.project_bots = sanitize_project_bots_with_ext(obj, &app.root.join("projects"), &cfg.project_paths)
                     .map_err(|msg| (409, msg))?;
                 dirty_cfg = true;
             }
             if let Some(obj) = payload.get("project_providers").and_then(|v| v.as_object()) {
-                cfg.project_providers = sanitize_project_providers(obj, &app.root);
+                cfg.project_providers = sanitize_project_providers_with_cfg(obj, &app.root, &cfg);
                 dirty_cfg = true;
             }
             if let Some(obj) = payload.get("project_collabs").and_then(|v| v.as_object()) {
-                cfg.project_collabs = sanitize_project_collabs(obj, &app.root);
+                cfg.project_collabs = sanitize_project_collabs_with_cfg(obj, &app.root, &cfg);
                 dirty_cfg = true;
             }
             if let Some(obj) = payload.get("project_actions").and_then(|v| v.as_object()) {
                 cfg.project_actions = sanitize_project_actions(obj);
+                dirty_cfg = true;
+            }
+            if let Some(obj) = payload.get("project_security").and_then(|v| v.as_object()) {
+                cfg.project_security = sanitize_project_security(obj);
                 dirty_cfg = true;
             }
             if payload.get("auto_label").and_then(|v| v.as_bool()) == Some(true)
@@ -3166,6 +3454,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "project_providers": cfg.project_providers,
                 "project_collabs": cfg.project_collabs,
                 "project_actions": cfg.project_actions,
+                "project_security": cfg.project_security,
                 "bot_mode": cfg.bot_mode
             }),
         )
@@ -3210,7 +3499,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
         if prompt.is_empty() {
             return write_http_err(&mut stream, 400, "Empty prompt").await;
         }
-        if !RailConfig::load(&app.root.join("plugins/rs-rail/config.json")).bot_mode {
+        if !RailConfig::load(&app.root.join("plugins/railbot/config.json")).bot_mode {
             return write_http_err(&mut stream, 403, "Bot mode is disabled").await;
         }
         let active = app.active_project.lock().await.clone();
@@ -3405,7 +3694,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             history.push(build_user_chat_message(&effective_prompt, &images));
             let client = LlmClient::new(provider);
             let boundary = SecurityBoundary::new_headless(&workspace);
-            let bot_mode = RailConfig::load(&app_clone.root.join("plugins/rs-rail/config.json")).bot_mode;
+            let rail_cfg_chat = RailConfig::load(&app_clone.root.join("plugins/railbot/config.json"));
+            let bot_mode = rail_cfg_chat.bot_mode;
+            let allow_all = rail_cfg_chat.project_security.get(&active).is_some_and(|s| s == "allow");
             let (collabs, collab_mode) = if is_agent && bot_mode {
                 resolve_collaborators(&app_clone.root, &active, &profile_name)
             } else {
@@ -3555,20 +3846,23 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                             let c_name = c["function"]["name"].as_str().unwrap_or("tool").to_string();
                             let raw_a = c["function"]["arguments"].as_str().unwrap_or("{}");
                             let args = if adapters { adapter::repair_tool_args(&c_name, raw_a) } else { raw_a.into() };
-                            let brief = serde_json::from_str::<Value>(&args)
-                                .ok()
-                                .and_then(|v| {
-                                    v.get("path")
-                                        .or_else(|| v.get("pattern"))
-                                        .and_then(|x| x.as_str())
-                                        .map(ToString::to_string)
-                                })
+                            let parsed_ro = serde_json::from_str::<Value>(&args).unwrap_or_else(|_| json!({}));
+                            let brief = parsed_ro
+                                .get("path")
+                                .or_else(|| parsed_ro.get("pattern"))
+                                .and_then(|x| x.as_str())
+                                .map(ToString::to_string)
                                 .unwrap_or_default();
                             let ws = workspace.clone();
                             let bnd = SecurityBoundary::new_headless(&ws);
+                            let env_blocked = is_env_tool_blocked(&c_name, &parsed_ro, &bnd);
                             futs.push(async move {
                                 let t0 = Instant::now();
-                                let out = tools::execute_tool_with_auth(&c_name, &args, &ws, &bnd, false).await;
+                                let out = if env_blocked {
+                                    Err(".env is always zero-trust".into())
+                                } else {
+                                    tools::execute_tool_with_auth(&c_name, &args, &ws, &bnd, false).await
+                                };
                                 (c_id, c_name, brief, out, t0.elapsed().as_secs_f64())
                             });
                         }
@@ -3672,49 +3966,86 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     let brief = parsed_args
                         .get("path")
                         .or_else(|| parsed_args.get("command"))
+                        .or_else(|| parsed_args.get("goal"))
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string();
 
+                    if is_env_tool_blocked(fn_name, &parsed_args, &boundary) {
+                        let msg = "Blocked: .env is always zero-trust".to_string();
+                        let item = UiTurnItem {
+                            role: "tool_card".into(),
+                            name: Some(fn_name.into()),
+                            brief: Some(brief),
+                            ok: Some(false),
+                            summary: Some(msg.clone()),
+                            elapsed_s: Some(0.0),
+                            ..Default::default()
+                        };
+                        let _ = tx.send(emit("tool_result", serde_json::to_value(&item).unwrap_or(json!({}))));
+                        new_ui_items.push(item);
+                        history.push(ChatMessage::tool_response(call_id, format!("[denied] {msg}")));
+                        idx += 1;
+                        continue;
+                    }
+
                     let mut preauthorized = false;
-                    if fn_name == "run_command" {
-                        if let Some(cmd_str) = parsed_args.get("command").and_then(|v| v.as_str()) {
-                            if let Some(reason) = boundary.check_command(cmd_str) {
-                                let req_id = app_clone.next_perm_id.fetch_add(1, Ordering::SeqCst);
-                                let (ptx, prx) = oneshot::channel();
-                                app_clone.pending_perms.lock().await.insert(req_id, ptx);
-                                let _ = tx.send(emit(
-                                    "permission",
-                                    json!({ "req_id": req_id, "tool": fn_name, "title": reason, "detail": cmd_str }),
-                                ));
-                                let approved = tokio::select! {
-                                    _ = async {
-                                        while !cancel_flag.load(Ordering::Relaxed) {
-                                            tokio::time::sleep(std::time::Duration::from_millis(80)).await;
-                                        }
-                                    } => false,
-                                    r = prx => r.unwrap_or(false),
-                                };
-                                app_clone.pending_perms.lock().await.remove(&req_id);
-                                if !approved {
-                                    let msg = format!("Denied by user ({reason})");
-                                    let item = UiTurnItem {
-                                        role: "tool_card".into(),
-                                        name: Some(fn_name.into()),
-                                        brief: Some(brief),
-                                        ok: Some(false),
-                                        summary: Some(msg.clone()),
-                                        elapsed_s: Some(0.0),
-                                        ..Default::default()
-                                    };
-                                    let _ = tx.send(emit("tool_result", serde_json::to_value(&item).unwrap_or(json!({}))));
-                                    new_ui_items.push(item);
-                                    history.push(ChatMessage::tool_response(call_id, format!("[denied] {msg}")));
-                                    idx += 1;
-                                    continue;
+                    let gate_info: Option<(&str, String, bool)> = if fn_name == "run_command" {
+                        let cmd_str = parsed_args.get("command").and_then(|v| v.as_str()).unwrap_or("");
+                        if let Some(reason) = boundary.check_command(cmd_str) {
+                            Some((reason, cmd_str.to_string(), true))
+                        } else if !allow_all {
+                            Some(("Zero Trust: run command", cmd_str.to_string(), false))
+                        } else {
+                            None
+                        }
+                    } else if !allow_all && matches!(fn_name, "edit_file" | "write_file" | "delegate_task") {
+                        let title = match fn_name {
+                            "edit_file" => "Zero Trust: edit file",
+                            "write_file" => "Zero Trust: write file",
+                            _ => "Zero Trust: delegate sub-agent",
+                        };
+                        Some((title, brief.clone(), false))
+                    } else {
+                        None
+                    };
+
+                    if let Some((reason, detail, set_preauth)) = gate_info {
+                        let req_id = app_clone.next_perm_id.fetch_add(1, Ordering::SeqCst);
+                        let (ptx, prx) = oneshot::channel();
+                        app_clone.pending_perms.lock().await.insert(req_id, ptx);
+                        let _ = tx.send(emit(
+                            "permission",
+                            json!({ "req_id": req_id, "tool": fn_name, "title": reason, "detail": detail }),
+                        ));
+                        let approved = tokio::select! {
+                            _ = async {
+                                while !cancel_flag.load(Ordering::Relaxed) {
+                                    tokio::time::sleep(std::time::Duration::from_millis(80)).await;
                                 }
-                                preauthorized = true;
-                            }
+                            } => false,
+                            r = prx => r.unwrap_or(false),
+                        };
+                        app_clone.pending_perms.lock().await.remove(&req_id);
+                        if !approved {
+                            let msg = format!("Denied by user ({reason})");
+                            let item = UiTurnItem {
+                                role: "tool_card".into(),
+                                name: Some(fn_name.into()),
+                                brief: Some(brief),
+                                ok: Some(false),
+                                summary: Some(msg.clone()),
+                                elapsed_s: Some(0.0),
+                                ..Default::default()
+                            };
+                            let _ = tx.send(emit("tool_result", serde_json::to_value(&item).unwrap_or(json!({}))));
+                            new_ui_items.push(item);
+                            history.push(ChatMessage::tool_response(call_id, format!("[denied] {msg}")));
+                            idx += 1;
+                            continue;
+                        }
+                        if set_preauth {
+                            preauthorized = true;
                         }
                     }
 
@@ -3804,10 +4135,10 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let port = std::env::var("RS_RAIL_PORT").unwrap_or_else(|_| "24243".into());
+    let port = std::env::var("RAILBOT_PORT").or_else(|_| std::env::var("RS_RAIL_PORT")).unwrap_or_else(|_| "24243".into());
     let addr = format!("127.0.0.1:{port}");
     let listener = TcpListener::bind(&addr).await?;
-    println!("● rs-rail listening on http://{addr}");
+    println!("● railbot listening on http://{addr}");
 
     let app = Arc::new(AppRuntime::new());
     loop {
@@ -3992,7 +4323,7 @@ mod tests {
         };
         let (rel, md) = export_session_markdown(&sess).unwrap();
         assert_eq!(rel, ".rs/transcripts/chat.md");
-        assert!(md.contains("# rs-rail Transcript"));
+        assert!(md.contains("# RailBot Transcript"));
         assert!(tmp.join(&rel).is_file());
         let _ = fs::remove_dir_all(&tmp);
     }
@@ -4390,7 +4721,7 @@ mod tests {
         fs::create_dir_all(tmp.join("projects/surogate37")).unwrap();
         fs::create_dir_all(tmp.join("projects/gem35")).unwrap();
         fs::create_dir_all(tmp.join("projects/flint")).unwrap();
-        fs::create_dir_all(tmp.join("plugins/rs-rail")).unwrap();
+        fs::create_dir_all(tmp.join("plugins/railbot")).unwrap();
 
         fs::write(tmp.join("profiles/gem35.md"), "---\nprovider: GEMINI\n---\nROLE: Reviewer.").unwrap();
         fs::write(tmp.join("profiles/surogate37.md"), "---\ncollaborators: [gem35]\n---\nROLE: Coder.").unwrap();
@@ -4410,9 +4741,9 @@ mod tests {
         let mut cfg = RailConfig::default();
         cfg.project_providers = sanitize_project_providers(&prov_map, &tmp);
         cfg.project_collabs = sanitize_project_collabs(&col_map, &tmp);
-        cfg.save(&tmp.join("plugins/rs-rail/config.json")).unwrap();
+        cfg.save(&tmp.join("plugins/railbot/config.json")).unwrap();
 
-        let reloaded = RailConfig::load(&tmp.join("plugins/rs-rail/config.json"));
+        let reloaded = RailConfig::load(&tmp.join("plugins/railbot/config.json"));
         assert_eq!(effective_project_provider(&tmp, &reloaded, "gem35", "gem35"), None);
         assert_eq!(effective_project_provider(&tmp, &reloaded, "flint", "flint").as_deref(), Some("CUSTOM2"));
         assert_eq!(resolve_collaborators(&tmp, "surogate37", "surogate37").0, Vec::<String>::new());
@@ -4426,9 +4757,9 @@ mod tests {
         fs::create_dir_all(tmp.join("profiles")).unwrap();
         fs::create_dir_all(tmp.join("projects/surogate37")).unwrap();
         fs::create_dir_all(tmp.join("projects/gem35")).unwrap();
-        fs::create_dir_all(tmp.join("plugins/rs-rail")).unwrap();
+        fs::create_dir_all(tmp.join("plugins/railbot")).unwrap();
 
-        let p = tmp.join("plugins/rs-rail/config.json");
+        let p = tmp.join("plugins/railbot/config.json");
         assert!(RailConfig::load(&p).bot_mode);
         let mut cfg = RailConfig::default();
         cfg.bot_mode = false;
@@ -4533,8 +4864,8 @@ hi").unwrap();
         let mut cfg = RailConfig::default();
         apply_auto_labels(&tmp, &mut cfg);
 
-        assert_eq!(cfg.project_labels.get("gem35").unwrap(), &vec!["cloud".to_string(), "rs-bot".to_string()]);
-        assert_eq!(cfg.project_labels.get("surogate37").unwrap(), &vec!["local".to_string(), "rs-bot".to_string()]);
+        assert_eq!(cfg.project_labels.get("gem35").unwrap(), &vec!["cloud".to_string(), "railbot".to_string()]);
+        assert_eq!(cfg.project_labels.get("surogate37").unwrap(), &vec!["local".to_string(), "railbot".to_string()]);
         let _ = fs::remove_dir_all(&tmp);
     }
 
@@ -4575,6 +4906,60 @@ hi").unwrap();
         assert_eq!(default_bot_mask("chat"), CHAT_BOT_MASK);
         assert_eq!(default_bot_mask("chatbot"), CHAT_BOT_MASK);
         assert_eq!(parse_bot_val("b:8010"), Some(CHAT_BOT_MASK));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_external_workspace_validation_and_security_root() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_ext_ws_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        let app_root = tmp.join("rs-agent");
+        let ext_dir = tmp.join("my-rust-app");
+        let outside = tmp.join("secret.txt");
+        fs::create_dir_all(app_root.join("projects")).unwrap();
+        fs::create_dir_all(&ext_dir).unwrap();
+        fs::write(&outside, "secret").unwrap();
+
+        assert!(validate_external_workspace_path("/", &app_root).is_err());
+        assert!(validate_external_workspace_path("/etc", &app_root).is_err());
+        assert!(validate_external_workspace_path(&app_root.display().to_string(), &app_root).is_err());
+        if let Some(h) = dirs::home_dir() {
+            assert!(validate_external_workspace_path(&h.display().to_string(), &app_root).is_err());
+        }
+
+        let canon_ext = validate_external_workspace_path(&ext_dir.display().to_string(), &app_root).unwrap();
+        let mut cfg = RailConfig::default();
+        cfg.project_paths.insert("my-rust-app".into(), canon_ext.display().to_string());
+        assert_eq!(project_dir_in(&app_root, &cfg, "my-rust-app"), canon_ext);
+        assert!(list_all_project_dirs(&app_root, &cfg).iter().any(|(n, _, ext)| n == "my-rust-app" && *ext));
+
+        let bnd = SecurityBoundary::new_headless(&canon_ext);
+        assert!(bnd.is_outside(&bnd.resolve_path("../secret.txt")));
+        assert!(!bnd.is_outside(&bnd.resolve_path("src/main.rs")));
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_env_tool_blocked_and_project_security_sanitize() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_env_sec_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&tmp).unwrap();
+        let bnd = SecurityBoundary::new_headless(&tmp);
+
+        assert!(is_env_tool_blocked("read_file", &json!({ "path": ".env" }), &bnd));
+        assert!(is_env_tool_blocked("edit_file", &json!({ "path": "./.env.local" }), &bnd));
+        assert!(is_env_tool_blocked("run_command", &json!({ "command": "cat ~/.config/rs-agent/.env" }), &bnd));
+        assert!(!is_env_tool_blocked("read_file", &json!({ "path": "src/main.rs" }), &bnd));
+        assert!(!is_env_tool_blocked("run_command", &json!({ "command": "cargo test" }), &bnd));
+
+        let mut sec_map = serde_json::Map::new();
+        sec_map.insert("flint".into(), json!("allow"));
+        sec_map.insert("nemo".into(), json!("zero"));
+        sec_map.insert("../bad".into(), json!("allow"));
+        let clean = sanitize_project_security(&sec_map);
+        assert_eq!(clean.get("flint").map(String::as_str), Some("allow"));
+        assert!(!clean.contains_key("nemo"));
+        assert!(!clean.contains_key("../bad"));
         let _ = fs::remove_dir_all(&tmp);
     }
 }

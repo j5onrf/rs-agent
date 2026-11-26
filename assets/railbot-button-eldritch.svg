@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <!-- Eldritch Squircle Button Tile: deep indigo-slate (no straight black) -->
+    <linearGradient id="tileBg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#24283D" />
+      <stop offset="100%" stop-color="#141522" />
+    </linearGradient>
+    <linearGradient id="tileRim" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#49537A" />
+      <stop offset="100%" stop-color="#1F2335" />
+    </linearGradient>
+
+    <!-- Eldritch Octagon & Rails: Mint-to-Cyan neon -->
+    <linearGradient id="eldritchFrame" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#37F499" />
+      <stop offset="100%" stop-color="#04D1F9" />
+    </linearGradient>
+    <linearGradient id="eldritchArmor" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#2D324E" />
+      <stop offset="100%" stop-color="#1B1D2E" />
+    </linearGradient>
+
+    <filter id="eldritchGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <mask id="railCutout">
+      <rect width="256" height="256" fill="white" />
+      <rect x="91" y="152" width="26" height="65" fill="black" />
+      <rect x="139" y="152" width="26" height="65" fill="black" />
+    </mask>
+  </defs>
+
+  <!-- Matching squircle app-button tile -->
+  <rect x="4" y="4" width="248" height="248" rx="54" fill="url(#tileBg)" stroke="url(#tileRim)" stroke-width="6" />
+
+  <!-- Centered Eldritch RailBot emblem -->
+  <g transform="translate(128, 128) scale(0.76) translate(-128, -132)">
+    <g mask="url(#railCutout)">
+      <polygon
+        points="94,26 162,26 212,76 212,144 162,194 94,194 44,144 44,76"
+        fill="url(#eldritchArmor)"
+        stroke="url(#eldritchFrame)"
+        stroke-width="14"
+        stroke-linejoin="miter"
+      />
+      <path d="M 102 36 L 154 36 L 148 90 L 108 90 Z" fill="#04D1F9" opacity="0.08" />
+    </g>
+
+    <!-- Deep Eldritch midnight-indigo recessed visor -->
+    <path
+      d="M 64 80 Q 128 100 192 80 C 194 128 166 150 128 150 C 90 150 62 128 64 80 Z"
+      fill="#12131F"
+    />
+
+    <!-- Glowing fierce mint visor eyes -->
+    <g filter="url(#eldritchGlow)">
+      <path d="M 79 107 Q 99 115 116 127 Q 92 133 79 107 Z" fill="#37F499" />
+      <path d="M 177 107 Q 157 115 140 127 Q 164 133 177 107 Z" fill="#37F499" />
+    </g>
+
+    <!-- Vertical neon rail tracks -->
+    <rect x="96" y="156" width="16" height="82" rx="1.5" fill="url(#eldritchFrame)" />
+    <rect x="144" y="156" width="16" height="82" rx="1.5" fill="url(#eldritchFrame)" />
+  </g>
+</svg>

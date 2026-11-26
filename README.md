@@ -6,6 +6,7 @@
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=secondary&logo=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT.svg?variant=secondary" alt="License"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/status-beta.svg?variant=secondary" alt="Status"></a>
+      <a href="https://j5onrf.github.io/railbot/"><img src="https://shieldcn.dev/badge/demo-live-22c55e.svg?variant=secondary" alt="Live Demo"></a>
   </p>
 
   <p>
@@ -59,23 +60,19 @@
 
 ---
 
-## <img alt="rs-rail" src="assets/rs-rail.svg" width="26" height="26" /> RS Rail (Desktop & Web)
+## <img alt="rs-rail" src="assets/railbot-button.svg" width="27" height="27" /> RailBot (plugin / app)
 
-**rs-rail** is a native web and desktop UI in a single Rust binary with `ui.html` compiled in, running on `http://127.0.0.1:24243` and built directly on `rs-agent`.
+**railbot** is a native web and desktop UI in a single Rust binary with `ui.html` compiled in, running on `http://127.0.0.1:24243` and built directly on `rs-agent`.
 
-| **Interactive Demo** · [j5onrf.github.io/rs-agent](https://j5onrf.github.io/rs-agent/) |
+| **Interactive Demo** · [j5onrf.github.io/railbot](https://j5onrf.github.io/rs-agent/) |
 | :--- |
-| [<img alt="RS Rail — Local-First Desktop & Web UI" src="assets/rail.png" />](https://j5onrf.github.io/rs-agent/) |
+| [<img alt="RailBot — Local-First Desktop & Web UI" src="assets/railbot-demo.png" />](https://j5onrf.github.io/rs-agent/) |
 
 | Feature | Mechanism | Behavior |
 | :--- | :--- | :--- |
 | **Frameless App** | `rail` · `rr` | Dedicated standalone desktop app window (`--app=http://127.0.0.1:24243`) |
 | **Browser Tab** | `rail web` · `rr web` | Standard browser tab via `xdg-open` |
-| **Themes & Fonts** | Settings & Appearance | `Dark Default` fallback, live `Omarchy` & `Noctalia` desktop sync, `+ Noctalia` palette browser (Core & Community, `Dark`/`Light`), deletable `themes/*.json` (`Pure Light`, `Claude`, `DarkBot`), `JetBrains Mono` / `Geist` / `Fira Code`, syntax highlighting & ligatures |
-
-| **RailBot App** · [j5onrf.github.io/railbot](https://j5onrf.github.io/railbot/) |
-| :--- |
-| <img alt="RS Rail — Local-First Desktop & Web UI" src="assets/rs-rail-next.png" /> |
+| **Themes & Appearance** | Settings & Controls | live `Omarchy` & `Noctalia` desktop sync, `+ Noctalia` catalog browser (Core & Community, `Dark`/`Light`), custom JSON palettes (`Claude`, `DarkBot`), Vector / Pixel / Letter bot badges, and `JetBrains Mono` / `Geist` fonts |
 
 ---
 

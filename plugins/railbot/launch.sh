@@ -1,34 +1,36 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PLUGIN_DIR="$HOME/.config/rs-agent/plugins/rs-rail"
+PLUGIN_DIR="$HOME/.config/rs-agent/plugins/railbot"
+ICON_SRC="$PLUGIN_DIR/../../assets/railbot.svg"
+[ -f "$ICON_SRC" ] || ICON_SRC="$PLUGIN_DIR/../../assets/rs-rail.svg"
 
-# Auto-register XDG desktop entry & icon for current user on launch
 DESKTOP_DIR="$HOME/.local/share/applications"
 ICON_DIR="$HOME/.local/share/icons/hicolor/scalable/apps"
 mkdir -p "$DESKTOP_DIR" "$ICON_DIR"
+rm -f "$DESKTOP_DIR/rs-rail.desktop"
 
-if [ ! -f "$DESKTOP_DIR/rs-rail.desktop" ] || ! grep -q "$PLUGIN_DIR" "$DESKTOP_DIR/rs-rail.desktop" 2>/dev/null; then
-    cat <<DESKTOP > "$DESKTOP_DIR/rs-rail.desktop"
+if [ ! -f "$DESKTOP_DIR/railbot.desktop" ] || ! grep -q "$PLUGIN_DIR" "$DESKTOP_DIR/railbot.desktop" 2>/dev/null; then
+    cat <<DESKTOP > "$DESKTOP_DIR/railbot.desktop"
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=rs-rail
+Name=RailBot
 GenericName=AI Agent Surface
 Comment=Native Rust web and desktop surface for rs-agent
 Exec=$PLUGIN_DIR/launch.sh
-Icon=$PLUGIN_DIR/../../assets/rs-rail.svg
+Icon=$ICON_SRC
 Terminal=false
 StartupNotify=true
 Categories=Development;IDE;Utility;
-Keywords=ai;agent;llm;rust;rs-agent;rail;
+Keywords=ai;agent;llm;rust;rs-agent;railbot;
 DESKTOP
-    ln -sf "$PLUGIN_DIR/../../assets/rs-rail.svg" "$ICON_DIR/rs-rail.svg"
+    [ -f "$ICON_SRC" ] && ln -sf "$ICON_SRC" "$ICON_DIR/railbot.svg"
     update-desktop-database "$DESKTOP_DIR" >/dev/null 2>&1 || true
 fi
 
-BIN="$PLUGIN_DIR/target/release/rs-rail"
-PORT="${RS_RAIL_PORT:-24243}"
+BIN="$PLUGIN_DIR/target/release/railbot"
+PORT="${RAILBOT_PORT:-${RS_RAIL_PORT:-24243}}"
 MODE="app"
 TARGET_PATH="$PWD"
 
@@ -44,7 +46,7 @@ if [ ! -f "$BIN" ]; then
 fi
 
 if ! curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then
-    nohup "$BIN" >"${XDG_RUNTIME_DIR:-/tmp}/rs-rail-$(id -u).log" 2>&1 &
+    nohup "$BIN" >"${XDG_RUNTIME_DIR:-/tmp}/railbot-$(id -u).log" 2>&1 &
     for _ in $(seq 1 20); do
         curl -sf "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1 && break
         sleep 0.1

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="color-scheme" content="dark light" />
 <meta name="darkreader-lock" />
-<title>RS Rail</title>
+<title>RailBot</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Fira+Code:wght@400;500;600&display=swap" />
 <style>
   :root {
@@ -116,13 +116,12 @@
   .proj-item.active { background: var(--active-bg, var(--user-bg)); border-color: var(--active-border, var(--user-border)); }
   .proj-left { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; min-height: 18px; }
   .proj-badge { width: 18px; height: 18px; border-radius: 4px; background: var(--card); border: 1px solid var(--border); color: var(--muted); font-size: 9.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase; }
-  .proj-badge.bot { background: transparent; border: none; border-radius: 0; }
-  .proj-item:not(.active):hover .proj-badge.bot { color: var(--text); }
-  .proj-item.active .proj-badge.bot { background: transparent; border-color: transparent; }
+  .proj-badge.bot { border-radius: 999px; }
+  .proj-badge.bot.lg { background: transparent; border: none; border-radius: 0; }
   .proj-badge.lg { width: 28px; height: 28px; font-size: 11px; }
   .proj-item:not(.active):hover .proj-badge.bot { color: var(--text); }
   .proj-item.active .proj-badge { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
-  .proj-item.active .proj-badge.bot { background: transparent; border-color: transparent; }
+  .proj-item.active .proj-badge.bot.lg { background: transparent; border-color: transparent; }
   .proj-name { font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .proj-meta { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
   .proj-sub { font-size: 10px; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.25; transition: color .12s; }
@@ -222,10 +221,10 @@
   /* Center Chat */
   .center { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   .stream { flex: 1; overflow-y: auto; padding: 18px 24px; display: flex; flex-direction: column; gap: 14px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 35%, transparent) transparent; }
-  .stream::-webkit-scrollbar, .proj-list::-webkit-scrollbar, .file-list::-webkit-scrollbar, .modal-pane::-webkit-scrollbar { width: 6px; }
-  .stream::-webkit-scrollbar-track, .proj-list::-webkit-scrollbar-track, .file-list::-webkit-scrollbar-track, .modal-pane::-webkit-scrollbar-track { background: transparent; }
-  .stream::-webkit-scrollbar-thumb, .proj-list::-webkit-scrollbar-thumb, .file-list::-webkit-scrollbar-thumb, .modal-pane::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 35%, transparent); border-radius: 99px; }
-  .stream::-webkit-scrollbar-thumb:hover, .proj-list::-webkit-scrollbar-thumb:hover, .file-list::-webkit-scrollbar-thumb:hover, .modal-pane::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--muted) 65%, transparent); }
+  .stream::-webkit-scrollbar, .proj-list::-webkit-scrollbar, .file-list::-webkit-scrollbar, .modal-pane::-webkit-scrollbar, .dir-list::-webkit-scrollbar { width: 6px; }
+  .stream::-webkit-scrollbar-track, .proj-list::-webkit-scrollbar-track, .file-list::-webkit-scrollbar-track, .modal-pane::-webkit-scrollbar-track, .dir-list::-webkit-scrollbar-track { background: transparent; }
+  .stream::-webkit-scrollbar-thumb, .proj-list::-webkit-scrollbar-thumb, .file-list::-webkit-scrollbar-thumb, .modal-pane::-webkit-scrollbar-thumb, .dir-list::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--muted) 35%, transparent); border-radius: 99px; }
+  .stream::-webkit-scrollbar-thumb:hover, .proj-list::-webkit-scrollbar-thumb:hover, .file-list::-webkit-scrollbar-thumb:hover, .modal-pane::-webkit-scrollbar-thumb:hover, .dir-list::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--muted) 65%, transparent); }
   .turn-wrap { max-width: 820px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
   .msg-user { align-self: flex-end; background: var(--user-bg); border: 1px solid var(--user-border); color: var(--user-text); padding: 8px 12px; border-radius: 8px; max-width: 74%; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
   .msg-assistant { display: flex; flex-direction: column; gap: 8px; }
@@ -307,13 +306,15 @@
   .comp-left { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; min-height: 30px; }
   .comp-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   #skills-bar { display: contents; }
-  #btn-model-pill { max-width: min(340px, 100%); gap: 1.5ch; overflow: hidden; }
+  #btn-model-pill { max-width: min(340px, 100%); gap: 0.75ch; overflow: hidden; }
   .mp-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); font-weight: 500; }
+  .mp-sep { color: color-mix(in srgb, var(--muted) 55%, transparent); flex-shrink: 0; user-select: none; }
   .mp-ext { color: var(--muted); flex-shrink: 0; }
   .micro-pill { height: 26px; background: var(--panel); border: 1px solid var(--border); border-radius: 999px; padding: 0 10px; font: inherit; font-size: 12px; color: var(--text); cursor: pointer; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; user-select: none; transition: background .12s, border-color .12s, color .12s; }
   .micro-pill:hover, .micro-pill.open { background: var(--hover); }
   .micro-pill.muted { color: var(--muted); }
   .micro-pill.muted:hover, .micro-pill.muted.open { color: var(--text); }
+  .micro-pill.warn { color: var(--warn-text); border-color: var(--warn-border); background: var(--warn-bg); }
   .pop-wrap { position: relative; display: inline-flex; }
   .pop { position: absolute; bottom: calc(100% + 6px); left: 0; min-width: 168px; max-height: min(320px, 55vh); overflow-y: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px; display: none; flex-direction: column; gap: 1px; box-shadow: 0 12px 28px rgba(0,0,0,.32); z-index: 30; }
   .pop.open { display: flex; }
@@ -381,12 +382,15 @@
   .noc-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--border); }
   .theme-del:hover, .theme-del.arm { color: var(--err-text); background: var(--del-bg); }
   .file-view-pre { flex: 1; margin: 0; padding: 12px; background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; overflow: auto; font-family: var(--mono); font-size: var(--code-size); line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+  .dir-box { display: none; flex-direction: column; gap: 6px; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+  .dir-box.open { display: flex; }
+  .dir-bar { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .dir-cur { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dir-list { max-height: 155px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--muted) 35%, transparent) transparent; }
+  .dir-row { background: transparent; border: none; border-radius: 5px; padding: 4px 7px; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11.5px; color: var(--text); }
+  .dir-row:hover { background: var(--hover); }
   .muted { color: var(--muted); font-size: 12px; }
-  .center.is-empty { overflow-y: auto; }
-  .center.is-empty .stream { flex: 0 0 auto; overflow: visible; margin-top: auto; padding: 24px 24px 20px; scrollbar-gutter: auto; }
-  .center.is-empty .composer-wrap { margin-bottom: auto; padding: 0 24px 38px; }
-  .center.is-empty .composer { max-width: 720px; }
-  .empty-state { margin: 0 auto; text-align: center; color: var(--muted); max-width: 560px; line-height: 1.55; }
+  .empty-state { margin: auto; padding-bottom: 8vh; text-align: center; color: var(--muted); max-width: 560px; line-height: 1.55; }
   .empty-title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); text-wrap: balance; }
   .empty-sub { font-size: 12px; color: var(--muted); opacity: 0.68; margin-top: 6px; text-wrap: balance; }
 </style>
@@ -396,7 +400,7 @@
   <header class="topbar">
     <div class="tb-left">
       <button class="btn btn-sm btn-icon" id="btn-toggle-proj" aria-label="Toggle sidebar"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="6" y1="2.5" x2="6" y2="13.5"/></svg></button>
-      <button type="button" class="brand" id="btn-brand-settings"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><defs><linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="var(--text)"/><stop offset="100%" stop-color="var(--accent)"/></linearGradient></defs><path id="brand-path" d="M 7.2 3.5 L 12.7 8 L 7.2 12.5 L 3.7 12.5" stroke="url(#brandGrad)"/></svg></button>
+      <button type="button" class="brand" id="btn-brand-settings"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path id="brand-path" d="M 7.2 3.5 L 12.7 8 L 7.2 12.5 L 3.7 12.5" stroke="currentColor"/></svg></button>
       <span class="tele" id="tb-profile">—</span>
       <span class="tele" id="tb-git" style="display:none;"><span class="git-dot" id="tb-git-dot"></span><span id="tb-git-txt"></span></span>
     </div>
@@ -408,7 +412,7 @@
         <span class="ctx-tip" id="tb-ctx-tip"></span>
       </span>
       <button class="btn btn-sm btn-icon" id="btn-toggle-task" aria-label="Toggle workspace panel"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><line x1="10" y1="2.5" x2="10" y2="13.5"/></svg></button>
-      <button class="btn btn-sm btn-icon" id="btn-close-app" aria-label="Close RS Rail"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button>
+      <button class="btn btn-sm btn-icon" id="btn-close-app" aria-label="Close RailBot"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button>
     </div>
   </header>
 
@@ -447,6 +451,10 @@
               <div class="pop-wrap">
                 <button type="button" class="micro-pill muted" id="btn-reasoning-pill" aria-haspopup="menu" aria-expanded="false"><span id="reasoning-val">Default</span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg></button>
                 <div class="pop" id="pop-reasoning" role="menu"></div>
+              </div>
+              <div class="pop-wrap" id="sec-pop-wrap">
+                <button type="button" class="micro-pill muted" id="btn-sec-pill" aria-haspopup="menu" aria-expanded="false" title="Security: Zero Trust" style="padding:0 8px;gap:3px;"><span id="sec-val" style="display:inline-flex;align-items:center;"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8l5 2v4.1c0 3.1-2.1 5.2-5 6.1-2.9-.9-5-3-5-6.1V3.8l5-2z"/><path d="M6 8.2l1.4 1.4 2.8-2.8"/></svg></span><svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4.5 6.5L8 10l3.5-3.5"/></svg></button>
+                <div class="pop" id="pop-sec" role="menu" style="min-width:210px;"></div>
               </div>
               <button type="button" class="micro-pill muted" id="btn-img" aria-label="Attach image" style="display:none;padding:0 8px;"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2.5" width="12" height="11" rx="2"/><circle cx="5.7" cy="6" r="1"/><path d="M2.5 11.5l3.2-3.2 2.4 2.4 2.1-2.1 3.3 2.9"/></svg></button>
               <div id="skills-bar"></div>
@@ -498,12 +506,15 @@
 <div class="modal-backdrop" id="modal-settings">
   <div class="modal">
     <div class="modal-head">
-      <span>Settings</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span>Settings</span>
+        <span class="tele" id="settings-ver" style="font-size:11px;padding:1px 7px;display:none;"></span>
+      </div>
       <button class="btn btn-sm" id="btn-close-settings">✕</button>
     </div>
     <div class="modal-body">
       <nav class="modal-nav">
-        <div class="nav-group">RS-AGENT</div>
+        <div class="nav-group">RAILBOT</div>
         <button class="nav-btn active" data-tab="providers">Providers & Models</button>
         <button class="nav-btn" data-tab="projects">Projects</button>
         <button class="nav-btn" data-tab="profiles">Profiles</button>
@@ -548,12 +559,27 @@
 
 <!-- New Project Modal -->
 <div class="modal-backdrop" id="modal-new-proj">
-  <div class="modal" style="width:420px;height:auto;">
+  <div class="modal" style="width:460px;height:auto;max-height:86vh;">
     <div class="modal-head">
       <span>New Workspace</span>
       <button class="btn btn-sm" id="btn-close-new-proj">✕</button>
     </div>
     <div class="modal-pane">
+      <div class="field">
+        <label class="muted">Folder Path (optional — leave blank for sandbox)</label>
+        <div style="display:flex;gap:6px;">
+          <input id="np-path" placeholder="e.g. ~/dev/my-app" style="flex:1;min-width:0;font-family:var(--mono);font-size:12px;" />
+          <button type="button" class="btn btn-sm" id="btn-np-browse">Browse</button>
+        </div>
+      </div>
+      <div class="dir-box" id="np-browser">
+        <div class="dir-bar">
+          <button type="button" class="btn btn-sm" id="btn-np-up" title="Parent folder">↑</button>
+          <span class="dir-cur" id="np-dir-cur">~</span>
+          <button type="button" class="btn btn-sm btn-primary" id="btn-np-use">Use</button>
+        </div>
+        <div class="dir-list" id="np-dir-list"></div>
+      </div>
       <div class="field">
         <label class="muted">Project Name (lowercase slug)</label>
         <input id="np-name" placeholder="e.g. rust-cli" />
@@ -562,8 +588,9 @@
         <label class="muted">Profile</label>
         <select id="np-prof"></select>
       </div>
+      <div class="muted" style="font-size:11px;">File tools stay locked inside the workspace folder; dangerous shell commands prompt first.</div>
       <div class="tool-err" id="np-err"></div>
-      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:6px;">
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px;">
         <button class="btn" id="btn-cancel-np">Cancel</button>
         <button class="btn btn-primary" id="btn-create-np">Create</button>
       </div>
@@ -575,7 +602,7 @@
 <div class="modal-backdrop" id="modal-bot">
   <div class="modal" style="width:460px;height:auto;max-height:84vh;">
     <div class="modal-head">
-      <span id="mb-title">rs-bot</span>
+      <span id="mb-title">RailBot</span>
       <button class="btn btn-sm" id="btn-close-bot">✕</button>
     </div>
     <div class="modal-pane" style="gap:12px;">
@@ -584,7 +611,7 @@
           <span id="mb-cur" style="width:34px;height:34px;border-radius:8px;background:var(--card);border:1px solid var(--border);display:inline-flex;align-items:center;justify-content:center;"></span>
           <div>
             <div style="font-weight:600;font-size:12.5px;" id="mb-proj">—</div>
-            <div class="muted" id="mb-sub">Pick a unique rs-bot</div>
+            <div class="muted" id="mb-sub">Pick a unique RailBot</div>
           </div>
         </div>
         <div style="display:flex;gap:6px;">
@@ -680,7 +707,8 @@ const DEFAULT_APPEARANCE = {
   codeSize: 12,
   logoStyle: "a",
   microBots: "vector",
-  showDesc: true
+  showDesc: true,
+  showThink: false
 };
 
 function hexLum(hex) {
@@ -692,7 +720,7 @@ function hexLum(hex) {
 
 function getAppearance() {
   try {
-    const c = { ...DEFAULT_APPEARANCE, ...JSON.parse(localStorage.getItem("rs_rail_appearance") || "{}") };
+    const c = { ...DEFAULT_APPEARANCE, ...JSON.parse((localStorage.getItem("railbot_appearance") ?? localStorage.getItem("rs_rail_appearance")) || "{}") };
     if (c.theme === "pitch-dark") c.theme = "dark-default";
     if (c.theme === "pure-light") c.theme = "custom:pure-light";
     return c;
@@ -703,8 +731,6 @@ function getAppearance() {
 function allThemes() {
   return [...BUILTIN_THEMES, ...(STATE?.themes || [])];
 }
-
-const BRAND_GRAD_DEFS = `<defs><linearGradient id="brandGrad" gradientUnits="userSpaceOnUse" x1="3" y1="3" x2="13" y2="13"><stop offset="0%" stop-color="var(--text)"/><stop offset="100%" stop-color="var(--accent)"/></linearGradient></defs>`;
 
 function getBadgeMode(cfg) {
   const b = (cfg || getAppearance()).microBots;
@@ -729,33 +755,41 @@ function renderBrandLogo(cfg) {
   btn.classList.toggle("clickable", canPick);
   btn.tabIndex = canPick ? 0 : -1;
   if (canPick) {
-    btn.title = "Bot Setup & rs-bot";
-    btn.setAttribute("aria-label", "Bot Setup & rs-bot");
+    btn.title = "Bot Setup & RailBot";
+    btn.setAttribute("aria-label", "Bot Setup & RailBot");
   } else {
     btn.removeAttribute("title");
     btn.removeAttribute("aria-label");
   }
   if (ap && badgeMode === "bots") {
-    btn.innerHTML = botSvg(ap.name, 17, isMono ? "currentColor" : "url(#brandGrad)", isMono ? "" : BRAND_GRAD_DEFS);
+    btn.innerHTML = botSvg(ap.name, 17, isMono ? "currentColor" : "var(--accent)");
   } else {
-    const stroke = isMono ? "currentColor" : "url(#brandGrad)";
-    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${isMono ? "" : BRAND_GRAD_DEFS}<path id="brand-path" d="M 7.2 3.5 L 12.7 8 L 7.2 12.5 L 3.7 12.5" stroke="${stroke}"/></svg>`;
+    const stroke = isMono ? "currentColor" : "var(--accent)";
+    btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path id="brand-path" d="M 7.2 3.5 L 12.7 8 L 7.2 12.5 L 3.7 12.5" stroke="${stroke}"/></svg>`;
   }
 }
 
+let lastAppearanceSig = "";
+
 function applyAppearance(next) {
   const cfg = next ? { ...getAppearance(), ...next } : getAppearance();
-  localStorage.setItem("rs_rail_appearance", JSON.stringify(cfg));
+  if (next) localStorage.setItem("railbot_appearance", JSON.stringify(cfg));
   let t = allThemes().find((x) => x.id === cfg.theme);
   if (t) {
-    localStorage.setItem("rs_rail_theme_cache", JSON.stringify(t));
+    if (next) localStorage.setItem("railbot_theme_cache", JSON.stringify(t));
   } else {
     try {
-      const cached = JSON.parse(localStorage.getItem("rs_rail_theme_cache") || "null");
+      const cached = JSON.parse((localStorage.getItem("railbot_theme_cache") ?? localStorage.getItem("rs_rail_theme_cache")) || "null");
       if (cached && cached.id === cfg.theme) t = cached;
     } catch {}
   }
   if (!t) t = BUILTIN_THEMES[0];
+  const sig = JSON.stringify([cfg, t]);
+  if (sig === lastAppearanceSig) {
+    renderBrandLogo(cfg);
+    return;
+  }
+  lastAppearanceSig = sig;
 
   const isLight = t.mode === "light";
   const accentFg = hexLum(t.accent) > 145 ? "#05140a" : "#ffffff";
@@ -907,8 +941,11 @@ async function api(path, body) {
 
 function closeReasoningPop() {
   $("pop-reasoning")?.classList.remove("open");
-  const b = $("btn-reasoning-pill");
-  if (b) { b.classList.remove("open"); b.setAttribute("aria-expanded", "false"); }
+  $("pop-sec")?.classList.remove("open");
+  for (const id of ["btn-reasoning-pill", "btn-sec-pill"]) {
+    const b = $(id);
+    if (b) { b.classList.remove("open"); b.setAttribute("aria-expanded", "false"); }
+  }
 }
 
 async function loadState(project) {
@@ -940,17 +977,22 @@ async function lazyAutoLabelProjects() {
 function openSettings(tab) {
   if (tab) ACTIVE_TAB = tab;
   noctaliaBrowse = false;
+  const verEl = $("settings-ver");
+  if (verEl && STATE?.version) {
+    verEl.textContent = `v${STATE.version}`;
+    verEl.style.display = "inline-flex";
+  }
   $("modal-settings").classList.add("open");
   renderModalTab();
   if (ACTIVE_TAB === "projects") lazyAutoLabelProjects();
 }
 
 function loadPinnedMap() {
-  try { return JSON.parse(localStorage.getItem("rs_rail_pinned_skills") || "{}"); }
+  try { return JSON.parse((localStorage.getItem("railbot_pinned_skills") ?? localStorage.getItem("rs_rail_pinned_skills")) || "{}"); }
   catch { return {}; }
 }
 function savePinnedMap(map) {
-  localStorage.setItem("rs_rail_pinned_skills", JSON.stringify(map));
+  localStorage.setItem("railbot_pinned_skills", JSON.stringify(map));
 }
 function syncPinnedSkills(proj, activeSkills) {
   const map = loadPinnedMap();
@@ -975,37 +1017,45 @@ function unpinSkill(proj, sk) {
 
 const CHAT_BOT_MASK = 0x8010;
 const VEC_PRESETS = {
-  0x8010: `<path fill-rule="evenodd" d="M6.5 2.5h3A4.5 4.5 0 0 1 14 7v.5A4.5 4.5 0 0 1 9.5 12H6.8l-2.6 2.2V12A2.2 2.2 0 0 1 2 9.8V7a4.5 4.5 0 0 1 4.5-4.5ZM5.8 5.5a.8.8 0 0 1 .8.8v1.8a.8.8 0 0 1-1.6 0V6.3a.8.8 0 0 1 .8-.8Zm4.4 0a.8.8 0 0 1 .8.8v1.8a.8.8 0 0 1-1.6 0V6.3a.8.8 0 0 1 .8-.8Z"/>`,
-  0x8011: `<path fill-rule="evenodd" d="M7 3h2a4.5 4.5 0 0 1 4.5 4.5v1A4.5 4.5 0 0 1 9 13H7a4.5 4.5 0 0 1-4.5-4.5v-1A4.5 4.5 0 0 1 7 3ZM5.8 6.2a.8.8 0 0 1 .8.8v2a.8.8 0 0 1-1.6 0V7a.8.8 0 0 1 .8-.8Zm4.4 0a.8.8 0 0 1 .8.8v2a.8.8 0 0 1-1.6 0V7a.8.8 0 0 1 .8-.8Z"/>`,
-  0x8012: `<path fill-rule="evenodd" d="M6.5 3h3A4.5 4.5 0 0 1 14 7.5v1A4.5 4.5 0 0 1 9.5 13h-3A4.5 4.5 0 0 1 2 8.5v-1A4.5 4.5 0 0 1 6.5 3ZM5.6 5.8h4.8a1.6 1.6 0 0 1 0 3.2H5.6a1.6 1.6 0 0 1 0-3.2Z"/>`,
-  0x8013: `<circle cx="8" cy="2.1" r="1.1"/><rect x="7.4" y="2.8" width="1.2" height="1.8"/><path fill-rule="evenodd" d="M6.5 4.4h3a4 4 0 0 1 4 4v1a4 4 0 0 1-4 4h-3a4 4 0 0 1-4-4v-1a4 4 0 0 1 4-4ZM5.8 7.2a.8.8 0 0 1 .8.8v1.8a.8.8 0 0 1-1.6 0V8a.8.8 0 0 1 .8-.8Zm4.4 0a.8.8 0 0 1 .8.8v1.8a.8.8 0 0 1-1.6 0V8a.8.8 0 0 1 .8-.8Z"/>`,
-  0x8014: `<path fill-rule="evenodd" d="M4.5 12.8h7a2.9 2.9 0 0 0 -.3 -5.6a3.3 3.3 0 1 0 -6.4 0a2.9 2.9 0 0 0 -.3 5.6Zm1.4-5.8a.75.75 0 0 1 .75.75v1.7a.75.75 0 0 1-1.5 0v-1.7a.75.75 0 0 1 .75-.75Zm4.2 0a.75.75 0 0 1 .75.75v1.7a.75.75 0 0 1-1.5 0v-1.7a.75.75 0 0 1 .75-.75Z"/>`,
-  0x8015: `<path fill-rule="evenodd" d="M3.6 2.5q1.7 0 2.7 1.7h3.4q1-1.7 2.7-1.7 1.1 2.5 1.1 5.7A4.6 4.6 0 0 1 8.9 13H7.1a4.6 4.6 0 0 1-4.6-4.8q0-3.2 1.1-5.7Zm2.3 4.3a.75.75 0 0 1 .75.75v1.9a.75.75 0 0 1-1.5 0v-1.9a.75.75 0 0 1 .75-.75Zm4.2 0a.75.75 0 0 1 .75.75v1.9a.75.75 0 0 1-1.5 0v-1.9a.75.75 0 0 1 .75-.75Z"/>`,
-  0x8016: `<rect x="1.3" y="6" width="1.6" height="4.4" rx="0.8"/><rect x="13.1" y="6" width="1.6" height="4.4" rx="0.8"/><path fill-rule="evenodd" d="M6.8 3.2h2.4A3.8 3.8 0 0 1 13 7v2.2A3.8 3.8 0 0 1 9.2 13H6.8A3.8 3.8 0 0 1 3 9.2V7a3.8 3.8 0 0 1 3.8-3.8Zm-.7 3.3a.75.75 0 0 1 .75.75v1.9a.75.75 0 0 1-1.5 0v-1.9a.75.75 0 0 1 .75-.75Zm3.8 0a.75.75 0 0 1 .75.75v1.9a.75.75 0 0 1-1.5 0v-1.9a.75.75 0 0 1 .75-.75Z"/>`,
-  0x8017: `<path fill-rule="evenodd" d="M8 2.5a5 5 0 0 1 5 5v5.3q-1.2 1.2-2.4 0-1.3-1.2-2.6 0-1.3 1.2-2.6 0-1.2-1.2-2.4 0V7.5a5 5 0 0 1 5-5ZM6 5.8a.75.75 0 0 1 .75.75v1.9a.75.75 0 0 1-1.5 0v-1.9A.75.75 0 0 1 6 5.8Zm4 0a.75.75 0 0 1 .75.75v1.9a.75.75 0 0 1-1.5 0v-1.9A.75.75 0 0 1 10 5.8Z"/>`,
+  // 0x8010: Tactical Chat Bot (sharp chamfered hood + fierce swept eyes)
+  0x8010: `<path fill-rule="evenodd" d="M4.2 2.4h7.6L14 4.8v5l-2.4 2.2H6.2l-3 2.2V12L2 10.6V4.8ZM4.1 5.7q1.7.7 3 1.8-2 .6-3-1.8Zm7.8 0q-1.7.7-3 1.8 2 .6 3-1.8Z"/>`,
+  // 0x8011: Official RailBot (octagon shield + twin vertical rail fangs + fierce eyes)
+  0x8011: `<path fill-rule="evenodd" d="M5.7 1.8h4.6l3.2 3.2v4.4L11 11.9v3H9.4v-2.2H6.6v2.2H5v-3L2.5 9.4V5Zm-1.6 3.9q1.7.7 3.1 1.9-2.1.6-3.1-1.9Zm7.8 0q-1.7.7-3.1 1.9 2.1.6 3.1-1.9Z"/>`,
+  // 0x8012: Lead Speed-Pod (bullet-train helm + aggressive V-visor)
+  0x8012: `<path fill-rule="evenodd" d="M8 1.5 12.5 4.2 13.8 9.2 11.2 13.6H4.8L2.2 9.2 3.5 4.2ZM4 6.2 8 7.6 12 6.2 11.3 8.6 8 9.3 4.7 8.6Z"/>`,
+  // 0x8013: Pantograph Knight (swept twin brow fins + razor slit eyes)
+  0x8013: `<path fill-rule="evenodd" d="M3 2 5.8 4h4.4L13 2l.6 5.8-2 5.6H4.4L2.4 7.8Zm1.2 4.7 2.9 1.2-.3.9-2.6-1Zm7.6 0-2.9 1.2.3.9 2.6-1Z"/>`,
+  // 0x8014: Apex Stealth Interceptor (sharp diamond armor + swept eyes)
+  0x8014: `<path fill-rule="evenodd" d="M4.8 2.2h6.4l3 4-1.8 7L8 14.4 3.6 13.2 1.8 6.2Zm-.7 4.1q1.8.7 3.1 2-2.1.6-3.1-2Zm7.8 0q-1.8.7-3.1 2 2.1.6 3.1-2Z"/>`,
+  // 0x8015: Cyber Viper (predator swept ears + fierce eyes)
+  0x8015: `<path fill-rule="evenodd" d="M2.6 2 6 4.3h4L13.4 2l.4 6.6-3.2 5H5.4l-3.2-5Zm1.5 4.8q1.7.7 3 1.8-2 .5-3-1.8Zm7.8 0q-1.7.7-3 1.8 2 .5 3-1.8Z"/>`,
+  // 0x8016: Heavy Rail-Mech (angled side armor guards + razor visor slits)
+  0x8016: `<path d="M1.2 5.2 2.7 4.4v7l-1.5-.8Zm13.6 0-1.5-.8v7l1.5-.8Z"/><path fill-rule="evenodd" d="M5 2.6h6L12.9 5v6l-2.5 2.6H5.6L3.1 11V5Zm-.8 4.1 2.9 1.2-.3.9-2.6-1Zm7.6 0-2.9 1.2.3.9 2.6-1Z"/>`,
+  // 0x8017: Phantom Rail-Spectre (jagged cloaked crest + fierce eyes)
+  0x8017: `<path fill-rule="evenodd" d="M8 1.8 13.2 5.2l.4 8.6-2.4-2.2-1.8 2.2L8 12l-1.4 1.8-1.8-2.2-2.4 2.2.4-8.6ZM4.1 6.5q1.7.7 3.1 1.9-2.1.6-3.1-1.9Zm7.8 0q-1.7.7-3.1 1.9 2.1.6 3.1-1.9Z"/>`,
 };
 const VEC_PRESET_IDS = Object.keys(VEC_PRESETS).map(Number);
 const VEC_BASES = [
-  { d: "M7 3.2h2a4.5 4.5 0 0 1 4.5 4.5v1A4.5 4.5 0 0 1 9 13.2H7a4.5 4.5 0 0 1-4.5-4.5v-1A4.5 4.5 0 0 1 7 3.2Z", ey: 8.2, top: 1 },
-  { d: "M5.7 3.6h4.6a3.2 3.2 0 0 1 3.2 3.2v3.6a3.2 3.2 0 0 1-3.2 3.2H5.7a3.2 3.2 0 0 1-3.2-3.2V6.8a3.2 3.2 0 0 1 3.2-3.2Z", ey: 8.6, top: 1 },
-  { d: "M8 3a5.2 5.2 0 1 1 0 10.4A5.2 5.2 0 1 1 8 3Z", ey: 8.2, top: 1 },
-  { d: "M5.2 3.4h5.6l2.7 2.7v4.4l-2.7 2.7H5.2l-2.7-2.7V6.1Z", ey: 8.3, top: 1 },
-  { d: "M6.8 3.2h2.4A3.8 3.8 0 0 1 13 7v2.2A3.8 3.8 0 0 1 9.2 13H6.8A3.8 3.8 0 0 1 3 9.2V7a3.8 3.8 0 0 1 3.8-3.8Z", ex: `<rect x="1.3" y="6" width="1.6" height="4.4" rx="0.8"/><rect x="13.1" y="6" width="1.6" height="4.4" rx="0.8"/>`, ey: 8.1, top: 1 },
-  { d: "M3.6 2.6q1.7 0 2.7 1.7h3.4q1-1.7 2.7-1.7 1.1 2.5 1.1 5.7A4.6 4.6 0 0 1 8.9 13.1H7.1a4.6 4.6 0 0 1-4.6-4.8q0-3.2 1.1-5.7Z", ey: 8.6, top: 0 },
-  { d: "M4.5 12.8h7a2.9 2.9 0 0 0 -.3 -5.6a3.3 3.3 0 1 0 -6.4 0a2.9 2.9 0 0 0 -.3 5.6Z", ey: 8.6, top: 0 },
-  { d: "M8 2.5a5 5 0 0 1 5 5v5.3q-1.2 1.2-2.4 0-1.3-1.2-2.6 0-1.3 1.2-2.6 0-1.2-1.2-2.4 0V7.5a5 5 0 0 1 5-5Z", ey: 7.6, top: 0 },
+  { d: "M5.8 2.8h4.4l3.2 3.2v4l-2.4 2.4V15H9.4v-2H6.6v2H5v-2.6L2.6 10V6Z", ey: 8.0, top: 1 },
+  { d: "M4.4 3.2h7.2l2 2.2v6l-2 2H4.4l-2-2v-6Z", ey: 8.2, top: 1 },
+  { d: "M8 2.6 13.6 5.4l-.8 6.4L8 14.4l-4.8-2.6-.8-6.4Z", ey: 8.0, top: 1 },
+  { d: "M5 3h6l2.8 3.6L12 13H4L2.2 6.6Z", ey: 8.2, top: 1 },
+  { d: "M5 3h6l1.9 2.4v5.8l-2.5 2.4H5.6l-2.5-2.4V5.4Z", ex: `<path d="M1.2 5.2 2.7 4.4v7l-1.5-.8Zm13.6 0-1.5-.8v7l1.5-.8Z"/>`, ey: 8.1, top: 1 },
+  { d: "M2.6 2.2 6 4.4h4l3.4-2.2.4 6.6-3.2 4.8H5.4L2.2 8.8Z", ey: 8.4, top: 0 },
+  { d: "M8 1.8 13.2 5.4l-.8 6.4-2.2 2H5.8l-2.2-2-.8-6.4Z", ey: 8.4, top: 0 },
+  { d: "M8 2 13.4 5.2v8.4l-2.4-2-1.6 2.2L8 12l-1.4 1.8-1.6-2.2-2.4 2V5.2Z", ey: 7.6, top: 0 },
 ];
 const vecEyes = (ey, k) => {
-  if (k === 0) return `M5.9 ${ey-1.6}a.75.75 0 0 1 .75.75v1.7a.75.75 0 0 1-1.5 0v-1.7a.75.75 0 0 1 .75-.75Zm4.2 0a.75.75 0 0 1 .75.75v1.7a.75.75 0 0 1-1.5 0v-1.7a.75.75 0 0 1 .75-.75Z`;
-  if (k === 1) return `M5.9 ${ey-1.05}a1.05 1.05 0 1 1 0 2.1 1.05 1.05 0 1 1 0-2.1Zm4.2 0a1.05 1.05 0 1 1 0 2.1 1.05 1.05 0 1 1 0-2.1Z`;
-  if (k === 2) return `M5.95 ${ey-1.35}h4.1a1.35 1.35 0 0 1 0 2.7h-4.1a1.35 1.35 0 0 1 0-2.7Z`;
-  return `M5.9 ${ey-1.5}a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0v-1.5a.75.75 0 0 1 .75-.75Zm3.3.9h1.8a.6.6 0 0 1 0 1.2H9.2a.6.6 0 0 1 0-1.2Z`;
+  if (k === 0) return `M4.1 ${ey-1.5}Q5.7 ${ey-0.7} 7.1 ${ey+0.5}Q5.1 ${ey+1.1} 4.1 ${ey-1.5}ZM11.9 ${ey-1.5}Q10.3 ${ey-0.7} 8.9 ${ey+0.5}Q10.9 ${ey+1.1} 11.9 ${ey-1.5}Z`;
+  if (k === 1) return `M4.2 ${ey-1.3}L7.1 ${ey-0.1}L6.8 ${ey+0.8}L4.2 ${ey-0.2}ZM11.8 ${ey-1.3}L8.9 ${ey-0.1}L9.2 ${ey+0.8}L11.8 ${ey-0.2}Z`;
+  if (k === 2) return `M4 ${ey-1.5}L8 ${ey-0.2}L12 ${ey-1.5}L11.3 ${ey+0.8}L8 ${ey+1.4}L4.7 ${ey+0.8}Z`;
+  return `M4.1 ${ey-1.4}L7.1 ${ey+0.2}L5 ${ey+0.9}ZM11.9 ${ey-0.8}L8.9 ${ey+0.1}L9.3 ${ey+0.7}L11.7 ${ey+0.2}Z`;
 };
 const VEC_TOPS = [
   "",
-  `<circle cx="8" cy="1.8" r="1"/><rect x="7.45" y="2.4" width="1.1" height="1.5"/>`,
-  `<circle cx="5.2" cy="1.9" r="0.85"/><rect x="4.7" y="2.4" width="1" height="1.6"/><circle cx="10.8" cy="1.9" r="0.85"/><rect x="10.3" y="2.4" width="1" height="1.6"/>`,
-  `<rect x="4.5" y="1.1" width="7" height="1.1" rx="0.55"/>`,
+  `<path d="M8 .3Q8 1.5 9.3 1.5Q8 1.5 8 2.7Q8 1.5 6.7 1.5Q8 1.5 8 .3Z"/>`,
+  `<path d="M3.8 1 6.2 2.4 5 3.4 3.4 2Zm8.4 0-2.4 1.4 1.2 1 1.6-1.4Z"/>`,
+  `<path d="M4.2 1.2h7.6l-1 1.1H5.2Z"/>`,
 ];
 function vecParts(mask) {
   if (mask & 0x8000) return { preset: VEC_PRESETS[mask] || VEC_PRESETS[0x8011], key: `p:${mask}` };
@@ -1102,7 +1152,7 @@ function renderAll() {
     return (raw.replace(/^(api|inference|llm|chat|v1|www)\./, "").split(".")[0] || raw);
   };
   const mp = $("btn-model-pill");
-  mp.innerHTML = `<span class="mp-name">${esc(STATE.provider.model)}</span><span class="mp-ext">${esc(shortEndpoint(STATE.provider.endpoint))}</span>`;
+  mp.innerHTML = `<span class="mp-name">${esc(STATE.provider.model)}</span><span class="mp-sep" aria-hidden="true">|</span><span class="mp-ext">${esc(shortEndpoint(STATE.provider.endpoint))}</span>`;
   mp.title = `${STATE.provider.model} (${STATE.provider.endpoint})`;
   $("btn-img").style.display = STATE.provider.is_local ? "none" : "inline-flex";
   disarmReset();
@@ -1171,13 +1221,15 @@ function renderAll() {
     const profileDesc = STATE.profile_descriptions?.[p.profile_name] || "";
     const shownRaw = customDesc || (showDesc ? profileDesc : "");
     const pDesc = shortDesc(shownRaw);
-    const badgeHtml = badgeMode === "none" ? "" : `<span class="proj-badge${badgeMode === "bots" ? " bot" : ""}${pDesc ? " lg" : ""}">${badgeMode === "bots" ? botSvg(p.name, pDesc ? 24 : 16) : esc(dname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || dname.slice(0, 2))}</span>`;
+    const badgeHtml = badgeMode === "none" ? "" : `<span class="proj-badge${badgeMode === "bots" ? " bot" : ""}${pDesc ? " lg" : ""}">${badgeMode === "bots" ? botSvg(p.name, pDesc ? 24 : 12) : esc(dname.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2) || dname.slice(0, 2))}</span>`;
     const callBtn = isBotMode() && p.name !== ap.name
       ? `<button type="button" class="proj-call" title="Call ${esc(dname)}"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3.5h11v7.5h-6l-3 2.5V11H2.5z"/></svg></button>`
       : "";
-    const delBtn = p.file_count > 0
-      ? `<button class="proj-del" title="Delete ${p.file_count} file(s)"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11"/><path d="M6 2.5h4"/><path d="M4.5 4.5l.7 9h5.6l.7-9"/></svg></button>`
-      : "";
+    const delBtn = p.external
+      ? `<button class="proj-del" title="Unlink external folder (keeps files on disk)"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></svg></button>`
+      : (p.file_count > 0
+        ? `<button class="proj-del" title="Delete ${p.file_count} file(s)"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 4.5h11"/><path d="M6 2.5h4"/><path d="M4.5 4.5l.7 9h5.6l.7-9"/></svg></button>`
+        : "");
     const nameHtml = pDesc
       ? `<span class="proj-meta"><span class="proj-name">${esc(dname)}</span><span class="proj-sub" title="${esc(shownRaw)}">${esc(pDesc)}</span></span>`
       : `<span class="proj-name">${esc(dname)}</span>`;
@@ -1195,8 +1247,13 @@ function renderAll() {
     if (db) {
       db.onclick = async (e) => {
         e.stopPropagation();
-        if (!confirm(`Delete ${p.file_count} file(s) in ${p.name}?`)) return;
-        await api("/api/project/clean", { name: p.name });
+        if (p.external) {
+          if (!confirm(`Unlink '${p.name}' from RailBot?\n(Files in ${p.path || p.name} will NOT be deleted.)`)) return;
+          await api("/api/project/unlink", { name: p.name });
+        } else {
+          if (!confirm(`Delete ${p.file_count} file(s) in ${p.name}?`)) return;
+          await api("/api/project/clean", { name: p.name });
+        }
         hc.classList.remove("open");
         await loadState();
       };
@@ -1204,7 +1261,8 @@ function renderAll() {
     el.onmouseenter = () => {
       const r = el.getBoundingClientRect();
       const filesTxt = p.file_count ? `${p.file_count} file(s)` : "empty";
-      const gitRow = p.has_git ? `<div class="ph-row"><span>Git</span><span>${p.dirty ? "modified" : "clean"}</span></div>` : "";
+      const extRow = p.external && p.path ? `<div class="ph-row"><span>Folder</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:155px;" title="${esc(p.path)}">${esc(p.path)}</span></div>` : "";
+      const gitRow = p.has_git ? `<div class="ph-row"><span>Git</span><span>${p.name === ap.name ? (p.dirty ? "modified" : "clean") : "initialized"}</span></div>` : "";
       
       let botRows = "";
       if (isBotMode()) {
@@ -1219,7 +1277,7 @@ function renderAll() {
         botRows = rows.join("");
       }
 
-      hc.innerHTML = `<div class="ph-top"><span>${esc(dname)}</span></div><div class="ph-row"><span>Profile</span><span>${esc(p.profile_name)}</span></div><div class="ph-row"><span>Workspace</span><span>${filesTxt}</span></div>${botRows}${gitRow}`;
+      hc.innerHTML = `<div class="ph-top"><span>${esc(dname)}</span></div><div class="ph-row"><span>Profile</span><span>${esc(p.profile_name)}</span></div><div class="ph-row"><span>Workspace</span><span>${filesTxt}</span></div>${extRow}${botRows}${gitRow}`;
       hc.style.left = `${r.right + 8}px`;
       hc.style.top = `${Math.min(r.top, window.innerHeight - 160)}px`;
       hc.classList.add("open");
@@ -1270,7 +1328,46 @@ function renderAll() {
     popR.appendChild(b);
   }
 
-
+  const secWrap = $("sec-pop-wrap");
+  if (secWrap) {
+    secWrap.style.display = ap.is_agent ? "inline-flex" : "none";
+    const isAllow = STATE.ui_prefs?.project_security?.[ap.name] === "allow";
+    $("sec-val").innerHTML = isAllow
+      ? `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8l5 2v4.1c0 3.1-2.1 5.2-5 6.1-2.9-.9-5-3-5-6.1V3.8l5-2z"/><path d="M8 5.2v3.3"/><circle cx="8" cy="10.8" r="0.6" fill="currentColor" stroke="none"/></svg>`
+      : `<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.8l5 2v4.1c0 3.1-2.1 5.2-5 6.1-2.9-.9-5-3-5-6.1V3.8l5-2z"/><path d="M6 8.2l1.4 1.4 2.8-2.8"/></svg>`;
+    const secBtn = $("btn-sec-pill");
+    secBtn.title = isAllow ? "Security: Allow All (autonomous; .env blocked)" : "Security: Zero Trust (confirm edits & commands)";
+    secBtn.classList.toggle("warn", isAllow);
+    secBtn.classList.toggle("muted", !isAllow);
+    const popS = $("pop-sec");
+    popS.innerHTML = "";
+    for (const [val, lbl, hint] of [
+      ["zero", "Zero Trust", "Confirm edits & commands"],
+      ["allow", "Allow All", "Autonomous (.env blocked)"],
+    ]) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.setAttribute("role", "menuitem");
+      const active = (val === "allow") === isAllow;
+      b.className = active ? "on" : "";
+      b.innerHTML = `<span>${esc(lbl)}<div class="muted" style="font-size:10.5px;">${esc(hint)}</div></span><span>${active ? "✓" : ""}</span>`;
+      b.onclick = async (e) => {
+        e.stopPropagation();
+        closeReasoningPop();
+        if (val === "allow" && !isAllow) {
+          const ok = confirm(`Enable Allow All (autonomous mode) for '${ap.name}'?\n\nFile edits and safe workspace commands will run without per-step confirmation.\n(.env remains blocked and SecurityBoundary system/rm gates remain enforced.)`);
+          if (!ok) return;
+        }
+        const nextSec = structuredClone(STATE.ui_prefs?.project_security || {});
+        if (val === "allow") nextSec[ap.name] = "allow";
+        else delete nextSec[ap.name];
+        const res = await api("/api/settings/ui", { project_security: nextSec });
+        STATE.ui_prefs.project_security = res.project_security || {};
+        renderAll();
+      };
+      popS.appendChild(b);
+    }
+  }
 
   const pinned = syncPinnedSkills(ap.name, ap.active_skills || []);
   const sbar = $("skills-bar");
@@ -1349,7 +1446,6 @@ function renderAll() {
 function renderHistory() {
   const stream = $("stream");
   const msgs = STATE.active_project.history || [];
-  document.querySelector(".center").classList.toggle("is-empty", !msgs.length);
   if (!msgs.length) {
     stream.innerHTML = "";
     stream.appendChild(createEmpty());
@@ -1432,7 +1528,7 @@ function buildAssistantEl(reasoning, content, elapsed, step) {
   if (reasoning) {
     const det = document.createElement("details");
     det.className = "think-box";
-    if (STATE?.ui_prefs?.show_thinking !== false) det.open = true;
+    if (getAppearance().showThink === true) det.open = true;
     det.innerHTML = `<summary><span class="think-step">${esc(stepTitle(step || 1))}</span><span class="think-meta">${thinkMeta(reasoning.length, elapsed)}</span>${THINK_CHEV}</summary><div class="think-body">${esc(reasoning)}</div>`;
     box.appendChild(det);
   }
@@ -1510,7 +1606,7 @@ async function runLocalSlash(text) {
   if (low === "/r" || low === "/reset") { await api("/api/reset", {}); await loadState(); return true; }
   if (low === "/p" || low === "/profile") { openSettings("profiles"); return true; }
   if (low === "/ms" || low === "/model") { openSettings("providers"); return true; }
-  if (low === "/tk" || low === "/think") { await api("/api/settings/ui", { show_thinking: STATE?.ui_prefs?.show_thinking === false }); await loadState(); return true; }
+  if (low === "/tk" || low === "/think") { applyAppearance({ showThink: getAppearance().showThink !== true }); renderAll(); return true; }
   if (low === "/s" || low === "/skill") { openSettings("skills"); return true; }
   if (low === "/call" || low.startsWith("/call ") || low.startsWith("/call:")) {
     if (!isBotMode()) return true;
@@ -1610,7 +1706,6 @@ async function sendMessage(overrideText, overrideImgs) {
 
   const stream = $("stream");
   if ($("empty-state")) stream.innerHTML = "";
-  document.querySelector(".center").classList.remove("is-empty");
   let wrap = stream.querySelector(".turn-wrap");
   if (!wrap) { wrap = document.createElement("div"); wrap.className = "turn-wrap"; stream.appendChild(wrap); }
 
@@ -1644,7 +1739,7 @@ async function sendMessage(overrideText, overrideImgs) {
       if (!thinkDet) {
         thinkDet = document.createElement("details");
         thinkDet.className = "think-box";
-        if (STATE?.ui_prefs?.show_thinking !== false) thinkDet.open = true;
+        if (getAppearance().showThink === true) thinkDet.open = true;
         thinkDet.innerHTML = `<summary><span class="think-step">${esc(stepTitle(liveStep))}</span><span class="think-meta"></span>${THINK_CHEV}</summary><div class="think-body"></div>`;
         thinkCount = thinkDet.querySelector(".think-meta");
         thinkBody = thinkDet.querySelector(".think-body");
@@ -1891,7 +1986,7 @@ function renderModalTab() {
       const pLabels = labelsMap[p.name] || [];
       const dname = projDisplay(p.name);
       const pDesc = descsMap[p.name] || "";
-      const subMeta = `${p.file_count} file(s)`;
+      const subMeta = p.external ? `${p.file_count} file(s) · linked` : `${p.file_count} file(s)`;
       const row = document.createElement("div");
       row.className = "setting-row" + (STATE.active_project.name === p.name ? " active-slot" : "");
       const descLineHtml = pDesc
@@ -2006,10 +2101,10 @@ function renderModalTab() {
       if (p.has_git) {
         const gChip = document.createElement("span");
         gChip.className = "proj-tag";
-        gChip.title = p.dirty ? "Git initialized (modified)" : "Git initialized (clean)";
-        gChip.innerHTML = `<span style="color:${p.dirty ? "var(--accent)" : "var(--text)"};">git</span><button title="Remove .git repository">×</button>`;
+        gChip.title = p.name === STATE.active_project.name ? (p.dirty ? "Git initialized (modified)" : "Git initialized (clean)") : "Git initialized";
+        gChip.innerHTML = `<span style="color:${p.dirty ? "var(--accent)" : "var(--text)"};">git</span>${p.external ? "" : '<button title="Remove .git repository">×</button>'}`;
         const gDel = gChip.querySelector("button");
-        gDel.onclick = async () => {
+        if (gDel) gDel.onclick = async () => {
           if (!gDel.classList.contains("arm")) {
             gDel.classList.add("arm");
             gDel.textContent = "del?";
@@ -2314,7 +2409,7 @@ function renderModalTab() {
 
     const thHead = document.createElement("div");
     thHead.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;";
-    thHead.innerHTML = `<div><div style="font-weight:600">Themes</div><div class="muted">Fallback + custom <code>plugins/rs-rail/themes/*.json</code></div></div><div style="display:flex;gap:6px;"><button class="btn btn-sm" id="btn-browse-noctalia">+ Noctalia</button><button class="btn btn-sm" id="btn-reload-themes">Reload</button></div>`;
+    thHead.innerHTML = `<div><div style="font-weight:600">Themes</div><div class="muted">Fallback + custom <code>plugins/railbot/themes/*.json</code></div></div><div style="display:flex;gap:6px;"><button class="btn btn-sm" id="btn-browse-noctalia">+ Noctalia</button><button class="btn btn-sm" id="btn-reload-themes">Reload</button></div>`;
     pane.appendChild(thHead);
     $("btn-browse-noctalia").onclick = () => { noctaliaBrowse = true; noctaliaSource = "core"; noctaliaWarn = ""; renderModalTab(); };
     $("btn-reload-themes").onclick = () => loadState();
@@ -2331,15 +2426,15 @@ function renderModalTab() {
       && (ap.logoStyle || "a") === DEFAULT_APPEARANCE.logoStyle
       && getBadgeMode(ap) === DEFAULT_APPEARANCE.microBots
       && (ap.showDesc !== false) === DEFAULT_APPEARANCE.showDesc
-      && STATE.ui_prefs.show_thinking === false;
+      && (ap.showThink === true) === DEFAULT_APPEARANCE.showThink;
     const ctrlHead = document.createElement("div");
     ctrlHead.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:2px;";
-    ctrlHead.innerHTML = `<div><div style="font-weight:600">Interface &amp; Layout</div><div class="muted">Fonts, logo, rs-bot style, and sidebar density</div></div><button class="btn btn-sm" id="btn-reset-appearance" ${isApDef ? "disabled" : ""}>↺ Reset defaults</button>`;
+    ctrlHead.innerHTML = `<div><div style="font-weight:600">Interface &amp; Layout</div><div class="muted">Fonts, logo, RailBot style, and sidebar density</div></div><button class="btn btn-sm" id="btn-reset-appearance" ${isApDef ? "disabled" : ""}>↺ Reset defaults</button>`;
     pane.appendChild(ctrlHead);
     $("btn-reset-appearance").onclick = async () => {
-      const { uiFont, uiSize, codeFont, codeSize, logoStyle, microBots, showDesc } = DEFAULT_APPEARANCE;
-      applyAppearance({ uiFont, uiSize, codeFont, codeSize, logoStyle, microBots, showDesc });
-      try { await api("/api/settings/ui", { show_thinking: false, bot_mode: true }); } catch {}
+      const { uiFont, uiSize, codeFont, codeSize, logoStyle, microBots, showDesc, showThink } = DEFAULT_APPEARANCE;
+      applyAppearance({ uiFont, uiSize, codeFont, codeSize, logoStyle, microBots, showDesc, showThink });
+      try { await api("/api/settings/ui", { bot_mode: true }); } catch {}
       await loadState();
     };
 
@@ -2381,9 +2476,9 @@ function renderModalTab() {
     const logoRow = document.createElement("div");
     logoRow.className = "setting-row";
     const curLogo = ap.logoStyle || "a";
-    logoRow.innerHTML = `<div><strong>Brand Logo</strong><div class="muted">Dynamic theme gradient or canonical monochrome</div></div>
+    logoRow.innerHTML = `<div><strong>RailBot Icon</strong><div class="muted">Topbar icon in solid accent or monochrome</div></div>
       <div style="display:flex;gap:4px;" class="rs-tabs">
-        <button class="rs-tab ${curLogo === "d" ? "active" : ""}" id="btn-logo-d">Gradient</button>
+        <button class="rs-tab ${curLogo === "d" ? "active" : ""}" id="btn-logo-d">Solid</button>
         <button class="rs-tab ${curLogo === "a" ? "active" : ""}" id="btn-logo-a">Monochrome</button>
       </div>`;
     pane.appendChild(logoRow);
@@ -2393,7 +2488,7 @@ function renderModalTab() {
     const botRow = document.createElement("div");
     botRow.className = "setting-row";
     const badgeMode = getBadgeMode(ap);
-    botRow.innerHTML = `<div><strong>rs-bot Style</strong><div class="muted">Vector or Pixel rs-bots (/call, auto-call), Letters, or None</div></div>
+    botRow.innerHTML = `<div><strong>RailBot Style</strong><div class="muted">Vector or Pixel RailBots (/call, auto-call), Letters, or None</div></div>
       <div style="display:flex;gap:4px;" class="rs-tabs">
         <button class="rs-tab ${badgeMode === "vector" ? "active" : ""}" id="btn-bots-vector">Vector</button>
         <button class="rs-tab ${badgeMode === "pixel" ? "active" : ""}" id="btn-bots-pixel">Pixel</button>
@@ -2416,14 +2511,14 @@ function renderModalTab() {
 
     const descRow = document.createElement("div");
     descRow.className = "setting-row";
-    descRow.innerHTML = `<div><strong>Sidebar Descriptions</strong><div class="muted">Show profile frontmatter descriptions in sidebar (custom notes always show)</div></div><button class="btn btn-sm">${ap.showDesc !== false ? "Shown" : "Hidden"}</button>`;
+    descRow.innerHTML = `<div><strong>Sidebar Density</strong><div class="muted">Show descriptions with larger sidebar icons (custom notes always show)</div></div><button class="btn btn-sm">${ap.showDesc !== false ? "Detailed" : "Compact"}</button>`;
     descRow.querySelector("button").onclick = () => { applyAppearance({ showDesc: ap.showDesc === false }); renderAll(); };
     pane.appendChild(descRow);
 
     const r = document.createElement("div");
     r.className = "setting-row";
-    r.innerHTML = `<div><strong>Auto-Expand Steps</strong><div class="muted">Expand reasoning steps by default (synced with CLI <code>/tk</code>)</div></div><button class="btn btn-sm">${STATE.ui_prefs.show_thinking !== false ? "Expanded" : "Collapsed"}</button>`;
-    r.querySelector("button").onclick = async () => { await api("/api/settings/ui", { show_thinking: STATE.ui_prefs.show_thinking === false }); await loadState(); };
+    r.innerHTML = `<div><strong>Auto-Expand Steps</strong><div class="muted">Expand reasoning steps by default in RailBot</div></div><button class="btn btn-sm">${ap.showThink === true ? "Expanded" : "Collapsed"}</button>`;
+    r.querySelector("button").onclick = () => { applyAppearance({ showThink: ap.showThink !== true }); renderAll(); };
     pane.appendChild(r);
   }
 }
@@ -2473,9 +2568,9 @@ async function pickAcItem(idx) {
 
 $("btn-toggle-proj").onclick = () => {
   const hidden = $("sidebar-left").classList.toggle("hidden");
-  localStorage.setItem("rs_rail_left_hidden", hidden ? "1" : "0");
+  localStorage.setItem("railbot_left_hidden", hidden ? "1" : "0");
 };
-if (localStorage.getItem("rs_rail_left_hidden") === "1") $("sidebar-left").classList.add("hidden");
+if ((localStorage.getItem("railbot_left_hidden") ?? localStorage.getItem("rs_rail_left_hidden")) === "1") $("sidebar-left").classList.add("hidden");
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeReasoningPop();
@@ -2828,11 +2923,10 @@ function renderBotPicker() {
   const curMask = projectBotMask(ap.name);
   const defMask = hashBotMask(ap.name);
   const isMono = (getAppearance().logoStyle || "a") === "a";
-  const fill = isMono ? "currentColor" : "url(#brandGrad)";
-  const defs = isMono ? "" : BRAND_GRAD_DEFS;
+  const fill = isMono ? "currentColor" : "var(--accent)";
   $("mb-proj").textContent = projDisplay(ap.name);
-  $("mb-sub").textContent = showIcons ? "Pick a unique rs-bot" : "Bot configuration";
-  $("mb-cur").innerHTML = botSvgFromMask(curMask, 22, fill, defs);
+  $("mb-sub").textContent = showIcons ? "Pick a unique RailBot" : "Bot configuration";
+  $("mb-cur").innerHTML = botSvgFromMask(curMask, 22, fill);
 
   const rb = $("btn-bot-reset");
   const sb = $("btn-bot-shuffle");
@@ -2841,7 +2935,7 @@ function renderBotPicker() {
   sb.style.display = showIcons ? "inline-flex" : "none";
   rb.style.display = showIcons && curMask !== defMask ? "inline-flex" : "none";
   rb.disabled = taken.has(defMask);
-  rb.title = taken.has(defMask) ? `Default used by ${taken.get(defMask)}` : "Restore default rs-bot";
+  rb.title = taken.has(defMask) ? `Default used by ${taken.get(defMask)}` : "Restore default RailBot";
 
   grid.innerHTML = "";
   if (showIcons) {
@@ -2849,7 +2943,7 @@ function renderBotPicker() {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "bot-opt" + (m === curMask ? " active" : "");
-      b.innerHTML = botSvgFromMask(m, 22, m === curMask ? fill : "currentColor", m === curMask ? defs : "");
+      b.innerHTML = botSvgFromMask(m, 22, m === curMask ? fill : "currentColor");
       const owner = taken.get(m);
       if (owner) {
         b.disabled = true;
@@ -2944,7 +3038,7 @@ $("btn-profiles-nav").onclick = () => openSettings("profiles");
 $("btn-close-app").onclick = async () => {
   try { await api("/api/shutdown", {}); } catch {}
   window.close();
-  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:var(--muted);">RS Rail closed.</div>`;
+  document.body.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100vh;color:var(--muted);">RailBot closed.</div>`;
 };
 $("btn-model-pill").onclick = () => openSettings("providers");
 $("btn-close-settings").onclick = () => $("modal-settings").classList.remove("open");
@@ -2969,9 +3063,24 @@ document.querySelectorAll(".nav-btn").forEach(b => b.onclick = () => {
 $("btn-reasoning-pill").onclick = (e) => {
   e.stopPropagation();
   closeAc();
-  const isOpen = $("pop-reasoning").classList.toggle("open");
-  $("btn-reasoning-pill").classList.toggle("open", isOpen);
-  $("btn-reasoning-pill").setAttribute("aria-expanded", String(isOpen));
+  const wasOpen = $("pop-reasoning").classList.contains("open");
+  closeReasoningPop();
+  if (!wasOpen) {
+    $("pop-reasoning").classList.add("open");
+    $("btn-reasoning-pill").classList.add("open");
+    $("btn-reasoning-pill").setAttribute("aria-expanded", "true");
+  }
+};
+$("btn-sec-pill").onclick = (e) => {
+  e.stopPropagation();
+  closeAc();
+  const wasOpen = $("pop-sec").classList.contains("open");
+  closeReasoningPop();
+  if (!wasOpen) {
+    $("pop-sec").classList.add("open");
+    $("btn-sec-pill").classList.add("open");
+    $("btn-sec-pill").setAttribute("aria-expanded", "true");
+  }
 };
 $("msg-input").addEventListener("input", () => { acHl = 0; resizeInput(); updateSendReady(); updateAutocomplete(); });
 $("msg-input").addEventListener("click", () => updateAutocomplete());
@@ -2989,22 +3098,80 @@ $("msg-input").addEventListener("keydown", (e) => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
 });
 
+let npDirCur = "", npDirParent = null, npNameDirty = false;
+const slugFromFolder = (name) => String(name || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48);
+function syncSlugFromPath(pathVal, folderName) {
+  if (npNameDirty && $("np-name").value.trim()) return;
+  const base = folderName || String(pathVal || "").replace(/\/+$/, "").split("/").pop();
+  const slug = slugFromFolder(base);
+  if (slug) $("np-name").value = slug;
+}
+async function loadDirBrowser(targetPath) {
+  $("np-err").textContent = "";
+  try {
+    const res = await api(`/api/fs/dirs${targetPath ? `?path=${encodeURIComponent(targetPath)}` : ""}`);
+    npDirCur = res.path || "";
+    npDirParent = res.parent || null;
+    $("np-dir-cur").textContent = npDirCur;
+    $("np-dir-cur").title = npDirCur;
+    $("btn-np-up").disabled = !npDirParent;
+    $("btn-np-use").disabled = !res.selectable;
+    $("btn-np-use").title = res.selectable ? "Use this folder" : "Select a subfolder (not /, $HOME, or rs-agent)";
+    const list = $("np-dir-list");
+    list.innerHTML = "";
+    if (!res.dirs || !res.dirs.length) {
+      list.innerHTML = `<div class="muted" style="padding:4px 6px;">No subfolders</div>`;
+      return;
+    }
+    for (const d of res.dirs) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dir-row";
+      btn.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">📁 ${esc(d.name)}</span>${d.has_git ? '<span class="muted" style="font-size:10px;">git</span>' : ""}`;
+      btn.onclick = () => loadDirBrowser(d.path);
+      list.appendChild(btn);
+    }
+  } catch (err) {
+    $("np-err").textContent = err.message;
+  }
+}
+$("btn-np-browse").onclick = () => {
+  const box = $("np-browser");
+  const open = box.classList.toggle("open");
+  if (open) loadDirBrowser($("np-path").value.trim());
+};
+$("btn-np-up").onclick = () => { if (npDirParent) loadDirBrowser(npDirParent); };
+$("btn-np-use").onclick = () => {
+  if (!npDirCur) return;
+  $("np-path").value = npDirCur;
+  syncSlugFromPath(npDirCur);
+  $("np-browser").classList.remove("open");
+  $("np-name").focus();
+};
+$("np-name").oninput = () => { npNameDirty = Boolean($("np-name").value.trim()); };
+$("np-path").oninput = () => { syncSlugFromPath($("np-path").value); };
 $("btn-new-proj").onclick = () => {
   $("np-err").textContent = "";
+  $("np-path").value = "";
+  $("np-name").value = "";
+  npNameDirty = false;
+  $("np-browser").classList.remove("open");
   const sel = $("np-prof");
   sel.innerHTML = (STATE?.profiles || ["chat"]).map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join("");
   $("modal-new-proj").classList.add("open");
   $("np-name").focus();
 };
-$("np-name").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); $("btn-create-np").click(); } };
+$("np-name").onkeydown = $("np-path").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); $("btn-create-np").click(); } };
 $("btn-close-new-proj").onclick = $("btn-cancel-np").onclick = () => $("modal-new-proj").classList.remove("open");
 $("btn-create-np").onclick = async () => {
-  const name = $("np-name").value.trim(), profile = $("np-prof").value;
+  const name = $("np-name").value.trim(), profile = $("np-prof").value, path = $("np-path").value.trim();
   if (!name) return;
   try {
-    const created = await api("/api/project/create", { name, profile });
+    const created = await api("/api/project/create", path ? { name, profile, path } : { name, profile });
     projectsAutoLabeled = false;
     $("np-name").value = "";
+    $("np-path").value = "";
+    $("np-browser").classList.remove("open");
     $("modal-new-proj").classList.remove("open");
     await loadState(created.name);
   } catch (err) {
@@ -3099,7 +3266,6 @@ async function executePeerCall(target, mode, prompt) {
   $("btn-stop").style.display = "inline-flex";
   const stream = $("stream");
   if ($("empty-state")) stream.innerHTML = "";
-  document.querySelector(".center").classList.remove("is-empty");
   let wrap = stream.querySelector(".turn-wrap");
   if (!wrap) { wrap = document.createElement("div"); wrap.className = "turn-wrap"; stream.appendChild(wrap); }
   const pending = document.createElement("div");

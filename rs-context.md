@@ -21,8 +21,8 @@ ai init ~/.config/rs-agent/projects/gem35 ---> gem35
 ~/.config/rs-agent/tools/rs-index/rs-index ---> index, idx
 
 # --- Plugins ---
-~/.config/rs-agent/plugins/rs-rail/launch.sh ---> rail, rr
-~/.config/rs-agent/plugins/rs-rail/launch.sh web ---> rail web, rr web
+~/.config/rs-agent/plugins/railbot/launch.sh ---> rail, rr
+~/.config/rs-agent/plugins/railbot/launch.sh web ---> rail web, rr web
 
 # --- Custom Tools ---
 curl -s "wttr.in/?format=3" ---> get weather
