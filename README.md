@@ -1,9 +1,8 @@
 <h1><img alt="" src="assets/logo.svg" width="36" height="36" /> Rs-Agent</h1>
 
   <p>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.9.2.svg?variant=secondary" alt="Version"></a>
+    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/version-v0.9.3.svg?variant=secondary" alt="Version"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/Rust.svg?variant=branded&brand=rust" alt="Language"></a>
-    <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/C%2B%2B.svg?variant=secondary&logo=cplusplus" alt="C++"></a>
     <a href="https://github.com/j5onrf/rs-agent/blob/main/LICENSE"><img src="https://shieldcn.dev/badge/license-MIT.svg?variant=secondary" alt="License"></a>
     <a href="https://github.com/j5onrf/rs-agent"><img src="https://shieldcn.dev/badge/status-beta.svg?variant=secondary" alt="Status"></a>
       <a href="https://j5onrf.github.io/railbot/"><img src="https://shieldcn.dev/badge/demo-live-22c55e.svg?variant=secondary" alt="Live Demo"></a>
@@ -39,7 +38,7 @@
 | Invocation | Mode | Description |
 | :--- | :--- | :--- |
 | `[shortcut]` | **Shell Teleport** | Sub-`0.2ms` router via `rs-context.md` (`lfm`, `ling`, etc.) |
-| `rr` · `rail` | **rs-rail App** | Native Rust desktop app surface on `http://127.0.0.1:24243` |
+| `rr` · `rail` | **RailBot plugin** | Native Rust desktop app surface on `http://127.0.0.1:24243` |
 | <img alt="" src="assets/prompt2.svg" width="14" height="14" /> `ai` | **Interactive Chat** | Pure conversational REPL (`~180t` profile, thinking gutters, `/pad`) |
 | <img alt="" src="assets/prompt2.svg" width="14" height="14" /> `ai init [path]` | **Workspace Agent** | Autonomous project workspace with tool execution & security sandbox |
 
@@ -115,14 +114,14 @@
 ·  ╰────╯  git: main · 6 modified   · · · · · ·
 · · · · · · · · · · · · · · · · · · · · · · · ·
 
-╭─── rs-agent v0.9.2 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.9.3 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  Ling-3.0-tiny                    │ purebash · t256 · adp · mcp:photocraft(7)   │
 │   │ Li │  artcraft/photocraft-l            │ Type / for commands · Tab completes         │
 │   ╰────╯  git: main · clean                │ ─────────────────────────────────────────── │
 │   ~/.config/rs-agent/projects/ling-tiny    │ ctx 8.2k · 15 steps · local                 │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 
-╭─── rs-agent v0.9.2 ──────────────────────────────────────────────────────────────────────╮
+╭─── rs-agent v0.9.3 ──────────────────────────────────────────────────────────────────────╮
 │   ╭────╮  nvidia/nemotron-3.5-lightning:fr…│ core4 · medium                              │
 │   │ nv │  nemo                             │ ─────────────────────────────────────────── │
 │   ╰────╯  git: main · 9 modified           │ ctx 65.5k · 10 steps · openrouter           │
