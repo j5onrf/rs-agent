@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="silver" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC" />
+      <stop offset="50%" stop-color="#CBD5E1" />
+      <stop offset="100%" stop-color="#94A3B8" />
+    </linearGradient>
+    <linearGradient id="armor" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#22252F" />
+      <stop offset="100%" stop-color="#0D0E13" />
+    </linearGradient>
+    <filter id="eyeGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <mask id="railCutout">
+      <rect width="256" height="256" fill="white" />
+      <rect x="91" y="152" width="26" height="65" fill="black" />
+      <rect x="139" y="152" width="26" height="65" fill="black" />
+    </mask>
+  </defs>
+
+  <g mask="url(#railCutout)">
+    <polygon
+      points="94,26 162,26 212,76 212,144 162,194 94,194 44,144 44,76"
+      fill="url(#armor)"
+      stroke="url(#silver)"
+      stroke-width="14"
+      stroke-linejoin="miter"
+    />
+    <path d="M 102 36 L 154 36 L 148 90 L 108 90 Z" fill="#FFFFFF" opacity="0.04" />
+  </g>
+
+  <path
+    d="M 64 80 Q 128 100 192 80 C 194 128 166 150 128 150 C 90 150 62 128 64 80 Z"
+    fill="#06070A"
+  />
+
+  <!-- Fierce swept glowing eyes -->
+  <g filter="url(#eyeGlow)">
+    <path d="M 79 107 Q 99 115 116 127 Q 92 133 79 107 Z" fill="#FFFFFF" />
+    <path d="M 177 107 Q 157 115 140 127 Q 164 133 177 107 Z" fill="#FFFFFF" />
+  </g>
+
+  <rect x="96" y="156" width="16" height="82" rx="1.5" fill="url(#silver)" />
+  <rect x="144" y="156" width="16" height="82" rx="1.5" fill="url(#silver)" />
+</svg>

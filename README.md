@@ -60,9 +60,9 @@
 
 ---
 
-## <img alt="rs-rail" src="assets/railbot-button.svg" width="27" height="27" /> RailBot (plugin / app)
+## <img alt="rs-rail" src="assets/railbot-button-e.svg" width="27" height="27" /> RailBot (plugin / app)
 
-**railbot** is a native web and desktop UI in a single Rust binary with `ui.html` compiled in, running on `http://127.0.0.1:24243` and built directly on `rs-agent`.
+**RailBot** is a native web and desktop UI in a single Rust binary with `ui.html` compiled in, running on `http://127.0.0.1:24243` and built directly on `rs-agent`.
 
 | **Interactive Demo** · [j5onrf.github.io/railbot](https://j5onrf.github.io/rs-agent/) |
 | :--- |
@@ -73,6 +73,10 @@
 | **Frameless App** | `rail` · `rr` | Dedicated standalone desktop app window (`--app=http://127.0.0.1:24243`) |
 | **Browser Tab** | `rail web` · `rr web` | Standard browser tab via `xdg-open` |
 | **Themes & Appearance** | Settings & Controls | live `Omarchy` & `Noctalia` desktop sync, `+ Noctalia` catalog browser (Core & Community, `Dark`/`Light`), custom JSON palettes (`Claude`, `DarkBot`), Vector / Pixel / Letter bot badges, and `JetBrains Mono` / `Geist` fonts |
+
+**Micro-Bots** (`railbot`)
+
+Use `/call` (or hover a project) to consult any peer bot read-only. Assign per-bot cloud providers in **Settings → Projects** and auto-collaborators in the bot badge menu.
 
 ---
 
@@ -200,10 +204,6 @@ mcp_tools: doc_new, doc_save  # Optional allowlist to keep local prefill low
 ```
 * **Skills (`skills/`):** Modular runtime directives toggled via `/s` or T3 Code's `$` picker (`ponytail.md`, `humanizer.md`, `ub-mode.md`).
 * **Global Rules (`system_instructions.md`):** Universal rules injected across every workspace and profile.
-
-## Micro-Bots (`rs-bot`)
-
-Use `/call` (or hover a project) to consult any peer bot read-only. Assign per-bot cloud providers in **Settings → Projects** and auto-collaborators in the bot badge menu.
 
 ---
 
