@@ -64,7 +64,7 @@
 
 **RailBot** is a native web and desktop UI in a single Rust binary with `ui.html` compiled in, running on `http://127.0.0.1:24243` and built directly on `rs-agent`.
 
-| **Interactive Demo** · [j5onrf.github.io/railbot](https://j5onrf.github.io/rs-agent/) |
+| **Interactive Demo** · [j5onrf.github.io/railbot](https://j5onrf.github.io/railbot) |
 | :--- |
 | [<img alt="RailBot — Local-First Desktop & Web UI" src="assets/railbot-demo.png" />](https://j5onrf.github.io/rs-agent/) |
 
