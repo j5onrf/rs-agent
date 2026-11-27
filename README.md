@@ -66,7 +66,7 @@
 
 | **Interactive Demo** · [j5onrf.github.io/railbot](https://j5onrf.github.io/railbot) |
 | :--- |
-| [<img alt="RailBot — Local-First Desktop & Web UI" src="assets/railbot-demo.png" />](https://j5onrf.github.io/rs-agent/) |
+| [<img alt="RailBot — Local-First Desktop & Web UI" src="assets/rb-rounded.png" />](https://j5onrf.github.io/rs-agent/) |
 
 | Feature | Mechanism | Behavior |
 | :--- | :--- | :--- |
