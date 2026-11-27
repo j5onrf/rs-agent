@@ -1,0 +1,16 @@
+{
+  "name": "Cobalt",
+  "mode": "dark",
+  "bg": "#131314",
+  "panel": "#1e1f20",
+  "card": "#282a2c",
+  "border": "#444746",
+  "text": "#e3e3e3",
+  "muted": "#c4c7c5",
+  "accent": "#7cacf8",
+  "cyan": "#a8c7fa",
+  "user_bg": "#282a2c",
+  "user_border": "#444746",
+  "active_bg": "rgba(124, 172, 248, 0.14)",
+  "active_border": "rgba(124, 172, 248, 0.42)"
+}

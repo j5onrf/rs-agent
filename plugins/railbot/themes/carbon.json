@@ -1,0 +1,14 @@
+{
+  "name": "Carbon",
+  "mode": "dark",
+  "bg": "#131314",
+  "panel": "#1e1f20",
+  "card": "#282a2c",
+  "border": "#3c4043",
+  "text": "#e3e3e3",
+  "muted": "#8e918f",
+  "accent": "#8ab4f8",
+  "cyan": "#c2e7ff",
+  "active_bg": "rgba(138, 180, 248, 0.14)",
+  "active_border": "rgba(138, 180, 248, 0.42)"
+}

@@ -896,6 +896,11 @@ fn finish_denied_batch(
 }
 
 #[inline]
+fn next_stall_count(cur: u8, round_progress: bool) -> u8 {
+    if round_progress { 0 } else { cur.saturating_add(1) }
+}
+
+#[inline]
 fn round_limit_note(is_agent: bool, exited_early: bool, cancelled: bool, max_rounds: usize) -> Option<String> {
     (is_agent && !exited_early && !cancelled && max_rounds < usize::MAX)
         .then(|| format!("Stopped: reached {max_rounds} step limit (`AI_MAX_AGENT_ROUNDS`)."))
@@ -3842,8 +3847,11 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             let mut last_stats = None;
             let mut round0_failed = false;
             let mut exited_early = false;
+            let mut seen_calls: HashSet<(String, String)> = HashSet::new();
+            let mut stalled_rounds: u8 = 0;
 
             'rounds: for _round in 0..max_rounds {
+                let mut round_progress = false;
                 if cancel_flag.load(Ordering::SeqCst) {
                     if new_ui_items.is_empty() {
                         round0_failed = true;
@@ -3978,18 +3986,21 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                             let args = if adapters { adapter::repair_tool_args(&c_name, raw_a) } else { raw_a.into() };
                             let parsed_ro = serde_json::from_str::<Value>(&args).unwrap_or_else(|_| json!({}));
                             let brief = parsed_ro
-                                .get("path")
-                                .or_else(|| parsed_ro.get("pattern"))
+                                .get("pattern")
+                                .or_else(|| parsed_ro.get("path"))
                                 .and_then(|x| x.as_str())
                                 .map(ToString::to_string)
                                 .unwrap_or_default();
                             let ws = workspace.clone();
                             let bnd = SecurityBoundary::new_headless(&ws);
                             let env_blocked = is_env_tool_blocked(&c_name, &parsed_ro, &bnd);
+                            let is_dup = !seen_calls.insert((c_name.clone(), args.trim().to_string()));
                             futs.push(async move {
                                 let t0 = Instant::now();
                                 let out = if env_blocked {
                                     Err(".env is always zero-trust".into())
+                                } else if is_dup {
+                                    Err("Duplicate call skipped (no workspace changes since last run)".into())
                                 } else {
                                     tools::execute_tool_with_auth(&c_name, &args, &ws, &bnd, false).await
                                 };
@@ -3998,7 +4009,10 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                         }
                         for (c_id, c_name, brief, res, elapsed) in futures_util::future::join_all(futs).await {
                             let (ok, summary, raw_txt, resp_txt) = match res {
-                                Ok(o) => (true, format!("{} line(s)", o.lines().count()), Some(o.clone()), o),
+                                Ok(o) => {
+                                    round_progress = true;
+                                    (true, format!("{} line(s)", o.lines().count()), Some(o.clone()), o)
+                                }
                                 Err(e) => (false, e.clone(), None, format!("[tool error] {e}")),
                             };
                             let item = UiTurnItem {
@@ -4065,6 +4079,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                                         } else {
                                             format!("Model: {}\n{}", out.model_info, out.trace.join("\n"))
                                         });
+                                        round_progress = true;
                                         let resp = out.synthesis.clone();
                                         (true, sum, out.synthesis, out.elapsed_s, raw_tr, resp)
                                     }
@@ -4100,6 +4115,24 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                         .and_then(|v| v.as_str())
                         .unwrap_or("")
                         .to_string();
+
+                    if !seen_calls.insert((fn_name.to_string(), final_args.trim().to_string())) {
+                        let msg = "Duplicate call skipped (no workspace changes since last run)".to_string();
+                        let item = UiTurnItem {
+                            role: "tool_card".into(),
+                            name: Some(fn_name.into()),
+                            brief: Some(brief),
+                            ok: Some(false),
+                            summary: Some(msg.clone()),
+                            elapsed_s: Some(0.0),
+                            ..Default::default()
+                        };
+                        let _ = tx.send(emit("tool_result", serde_json::to_value(&item).unwrap_or(json!({}))));
+                        new_ui_items.push(item);
+                        history.push(ChatMessage::tool_response(call_id, format!("[tool error] {msg}")));
+                        idx += 1;
+                        continue;
+                    }
 
                     if is_env_tool_blocked(fn_name, &parsed_args, &boundary) {
                         let msg = "Blocked: .env is always zero-trust".to_string();
@@ -4192,6 +4225,10 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
 
                     let (ok, summary, diff, raw_txt, resp_txt) = match res {
                         Ok(o) => {
+                            round_progress = true;
+                            if matches!(fn_name, "edit_file" | "write_file" | "delegate_task") {
+                                seen_calls.clear();
+                            }
                             if fn_name == "edit_file" || fn_name == "write_file" {
                                 let p = boundary.resolve_path(&brief);
                                 let new_txt = if !boundary.is_outside(&p) { fs::read_to_string(&p).ok() } else { None };
@@ -4224,6 +4261,19 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     new_ui_items.push(item);
                     history.push(ChatMessage::tool_response(call_id, resp_txt));
                     idx += 1;
+                }
+                stalled_rounds = next_stall_count(stalled_rounds, round_progress);
+                if stalled_rounds >= 2 {
+                    let note = "Stopped: no progress (repeated errors or duplicate calls).".to_string();
+                    let _ = tx.send(emit("chunk", json!({ "text": note })));
+                    new_ui_items.push(UiTurnItem {
+                        role: "assistant".into(),
+                        content: Some(note.clone()),
+                        ..Default::default()
+                    });
+                    history.push(ChatMessage::assistant(note));
+                    exited_early = true;
+                    break 'rounds;
                 }
             }
 
@@ -5172,5 +5222,12 @@ hi").unwrap();
         assert_eq!(parse_port_from_env("RAILBOT_PORT=\"notaport\"\nRS_RAIL_PORT=\"24501\"\n").as_deref(), Some("24501"));
         assert_eq!(parse_port_from_env("RS_RAIL_PORT=\"24501\"\nRAILBOT_PORT=\"24502\" # override\n").as_deref(), Some("24502"));
         assert_eq!(parse_port_from_env("RAILBOT_PORT=\"0\"\n"), None);
+    }
+
+    #[test]
+    fn test_next_stall_count_resets_on_progress() {
+        assert_eq!(next_stall_count(0, false), 1);
+        assert_eq!(next_stall_count(1, false), 2);
+        assert_eq!(next_stall_count(1, true), 0);
     }
 }

@@ -1,17 +1,12 @@
 {
   "name": "DarkBot",
   "mode": "dark",
-  "bg": "#181818",
-  "panel": "#181818",
-  "card": "#212121",
-  "border": "#282828",
-  "text": "#ececec",
-  "muted": "#8c8c8c",
-  "accent": "#e5e5e5",
-  "cyan": "#a3a3a3",
-  "active_bg": "#242424",
-  "active_border": "#303030",
-  "user_bg": "#242424",
-  "user_border": "#2e2e2e",
-  "topbar_bg": "#000000"
+  "bg": "#131313",
+  "panel": "#1b1b1b",
+  "card": "#1f1f1f",
+  "border": "#474747",
+  "text": "#e2e2e2",
+  "muted": "#c6c6c6",
+  "accent": "#ffffff",
+  "cyan": "#c6c6c6"
 }

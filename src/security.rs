@@ -77,6 +77,45 @@ fn contains_sys_dir_token(lower: &str, sys_dir: &str) -> bool {
     false
 }
 
+fn is_outside_path_token(tok: &str) -> bool {
+    if tok.is_empty() || tok.contains("://") {
+        return false;
+    }
+    let low = tok.to_ascii_lowercase();
+    tok == ".."
+        || tok.starts_with("../")
+        || tok.ends_with("/..")
+        || tok.contains("/../")
+        || tok.starts_with("~/")
+        || low == "/home"
+        || low.starts_with("/home/")
+        || low == "/users"
+        || low.starts_with("/users/")
+        || low == "/tmp"
+        || low.starts_with("/tmp/")
+        || low.starts_with("/mnt/")
+        || low.starts_with("/media/")
+        || low.starts_with("/srv/")
+        || (tok.starts_with('/') && !tok.starts_with("//") && Path::new(tok).exists())
+}
+
+fn contains_outside_path(boundary: &SecurityBoundary, cmd: &str) -> bool {
+    for seg in cmd.split([';', '|', '&', '\n', '(', ')', '`', '<', '>']) {
+        for raw in seg.split_whitespace() {
+            let tok = raw.trim_matches(|c| matches!(c, '\'' | '"' | '`'));
+            let candidate = if let Some((_, rhs)) = tok.split_once('=') {
+                rhs.trim_matches(|c| matches!(c, '\'' | '"' | '`'))
+            } else {
+                tok
+            };
+            if candidate == "~" || (is_outside_path_token(candidate) && boundary.is_outside(&boundary.resolve_path(candidate))) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// Detection of destructive rm commands across shell separators
 fn is_destructive_rm(cmd: &str) -> bool {
     for segment in cmd.split([';', '|', '&', '\n', '(', ')']) {
@@ -267,6 +306,11 @@ impl SecurityBoundary {
             }
         }
 
+        // 1b. Intercept shell paths resolving outside the active workspace
+        if contains_outside_path(self, cmd) {
+            return Some("outside workspace path");
+        }
+
         // 2. Python -m pip / venv module execution bypass (catches -mpip and -m pip)
         if get_python_pip_re().is_match(trimmed) {
             return Some("python -m pip/venv");
@@ -381,6 +425,28 @@ mod tests {
 
         assert!(b.is_outside(&b.resolve_path("nonexistent/../../outside_dir/file.txt")));
         assert!(!b.is_outside(&b.resolve_path("nonexistent/../inside_dir/file.txt")));
+
+        let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_check_command_gates_outside_workspace_paths_and_allows_inside() {
+        let tmp = std::env::temp_dir().join(format!("rs_sec_cmd_ws_{}", std::process::id()));
+        let ws = tmp.join("projects/ling-tiny");
+        let sib = tmp.join("projects/chat");
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(&ws).unwrap();
+        fs::create_dir_all(&sib).unwrap();
+        let b = SecurityBoundary::new_headless(&ws);
+
+        assert_eq!(b.check_command(&format!("find {} -type f 2>/dev/null", ws.display())), None);
+        assert_eq!(b.check_command("python3 -c 'print(1/2)'"), None);
+        assert_eq!(b.check_command("curl https://example.com/a/b"), None);
+        assert_eq!(b.check_command(&format!("ls -la {}", sib.display())), Some("outside workspace path"));
+        assert_eq!(b.check_command("ls ~"), Some("outside workspace path"));
+        assert_eq!(b.check_command("ls -la ~/.config/railbot/"), Some("outside workspace path"));
+        assert_eq!(b.check_command("ls .."), Some("outside workspace path"));
+        assert_eq!(b.check_command("cat /tmp/outside.txt"), Some("outside workspace path"));
 
         let _ = fs::remove_dir_all(&tmp);
     }
