@@ -879,6 +879,42 @@ fn is_protected_delete_path(rel: &str, target: &Path, root: &Path) -> bool {
     false
 }
 
+fn finish_denied_batch(
+    history: &mut Vec<ChatMessage>,
+    calls: &[Value],
+    denied_idx: usize,
+    denied_msg: &str,
+) {
+    let cid = calls[denied_idx]["id"].as_str().unwrap_or("call_0").to_string();
+    history.push(ChatMessage::tool_response(cid, format!("[denied] {denied_msg}")));
+    for rem in &calls[denied_idx + 1..] {
+        history.push(ChatMessage::tool_response(
+            rem["id"].as_str().unwrap_or("call_0").into(),
+            "[Cancelled]".into(),
+        ));
+    }
+}
+
+#[inline]
+fn round_limit_note(is_agent: bool, exited_early: bool, cancelled: bool, max_rounds: usize) -> Option<String> {
+    (is_agent && !exited_early && !cancelled && max_rounds < usize::MAX)
+        .then(|| format!("Stopped: reached {max_rounds} step limit (`AI_MAX_AGENT_ROUNDS`)."))
+}
+
+fn strip_sub_prefix(raw: &str) -> Option<&str> {
+    for pfx in ["/sub", "/delegate"] {
+        if let Some(rest) = raw.strip_prefix(pfx) {
+            if rest.starts_with(char::is_whitespace) {
+                let goal = rest.trim();
+                if !goal.is_empty() {
+                    return Some(goal);
+                }
+            }
+        }
+    }
+    None
+}
+
 fn is_valid_slug(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 48
@@ -3737,6 +3773,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
 
             set_profile_max_tokens(ctx_override);
             let is_task = raw_msg == "/task" || raw_msg.starts_with("/task ");
+            let sub_prompt = if is_agent { strip_sub_prefix(&raw_msg) } else { None };
+            let is_sub = sub_prompt.is_some();
             let effective_prompt = if is_task {
                 let arg = raw_msg.strip_prefix("/task").unwrap_or("").trim();
                 if !arg.is_empty() {
@@ -3748,6 +3786,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     let _ = tx.send(emit("done", json!({})));
                     return;
                 }
+            } else if let Some(goal) = sub_prompt {
+                goal.to_string()
             } else {
                 raw_msg.clone()
             };
@@ -3785,7 +3825,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 (Vec::new(), "last_turn".to_string())
             };
             let active_tools = if is_agent {
-                let mut base = tools::get_tools_schema_with_mcp(&tier, delegate, &mcp_servers, &mcp_tools).await;
+                let enable_delegate = delegate || is_sub;
+            let mut base = tools::get_tools_schema_with_mcp(&tier, enable_delegate, &mcp_servers, &mcp_tools).await;
                 if !collabs.is_empty() {
                     if let Value::Array(ref mut arr) = base {
                         arr.push(call_bot_schema(&collabs));
@@ -3800,12 +3841,14 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             let mut new_ui_items = Vec::new();
             let mut last_stats = None;
             let mut round0_failed = false;
+            let mut exited_early = false;
 
-            for _round in 0..max_rounds {
+            'rounds: for _round in 0..max_rounds {
                 if cancel_flag.load(Ordering::SeqCst) {
                     if new_ui_items.is_empty() {
                         round0_failed = true;
                     }
+                    exited_early = true;
                     break;
                 }
                 let tx_chunk = tx.clone();
@@ -3839,6 +3882,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                         if !cancel_flag.load(Ordering::SeqCst) {
                             let _ = tx.send(emit("error", json!({ "message": e.to_string(), "rolled_back": rolled_back })));
                         }
+                        exited_early = true;
                         break;
                     }
                 };
@@ -3885,16 +3929,19 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                         if new_ui_items.is_empty() {
                             round0_failed = true;
                         }
+                        exited_early = true;
                         break;
                     }
                     history.push(ChatMessage::assistant_with_reasoning(reply.clone(), opt_reasoning));
                     if cancel_flag.load(Ordering::SeqCst) {
+                        exited_early = true;
                         break;
                     }
                     if is_task && !tools::is_task_complete(&reply) {
                         history.push(ChatMessage::user("Continue with the next action."));
                         continue;
                     }
+                    exited_early = true;
                     break;
                 };
 
@@ -3911,7 +3958,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                                 "[Cancelled]".into(),
                             ));
                         }
-                        break;
+                        exited_early = true;
+                        break 'rounds;
                     }
 
                     let fn_name = calls[idx]["function"]["name"].as_str().unwrap_or("tool");
@@ -4122,9 +4170,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                             };
                             let _ = tx.send(emit("tool_result", serde_json::to_value(&item).unwrap_or(json!({}))));
                             new_ui_items.push(item);
-                            history.push(ChatMessage::tool_response(call_id, format!("[denied] {msg}")));
-                            idx += 1;
-                            continue;
+                            finish_denied_batch(&mut history, &calls, idx, &msg);
+                            exited_early = true;
+                            break 'rounds;
                         }
                         if set_preauth {
                             preauthorized = true;
@@ -4179,6 +4227,16 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 }
             }
 
+            if let Some(note) = round_limit_note(is_agent, exited_early, cancel_flag.load(Ordering::SeqCst), max_rounds) {
+                let _ = tx.send(emit("chunk", json!({ "text": note })));
+                new_ui_items.push(UiTurnItem {
+                    role: "assistant".into(),
+                    content: Some(note.clone()),
+                    ..Default::default()
+                });
+                history.push(ChatMessage::assistant(note));
+            }
+
             {
                 let mut lock = app_clone.sessions.lock().await;
                 if let Some(sess) = lock.get_mut(&active) {
@@ -4215,9 +4273,39 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
     write_http_err(&mut stream, 404, "Not found").await
 }
 
+fn parse_port_from_env(raw: &str) -> Option<String> {
+    for key in ["RAILBOT_PORT", "RS_RAIL_PORT"] {
+        for line in raw.lines() {
+            let t = line.trim();
+            if !t.starts_with('#') && is_env_key(t, key) {
+                let val = extract_quoted_val(t).trim();
+                if val.parse::<u16>().is_ok_and(|p| p > 0) {
+                    return Some(val.to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn resolve_railbot_port(default_port: &str) -> String {
+    for key in ["RAILBOT_PORT", "RS_RAIL_PORT"] {
+        if let Ok(p) = std::env::var(key) {
+            let t = p.trim();
+            if !t.is_empty() {
+                return t.to_string();
+            }
+        }
+    }
+    fs::read_to_string(get_env_path())
+        .ok()
+        .and_then(|s| parse_port_from_env(&s))
+        .unwrap_or_else(|| default_port.to_string())
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    let port = std::env::var("RAILBOT_PORT").or_else(|_| std::env::var("RS_RAIL_PORT")).unwrap_or_else(|_| "24243".into());
+    let port = resolve_railbot_port("24243");
     let addr = format!("127.0.0.1:{port}");
     let listener = TcpListener::bind(&addr).await?;
     println!("● railbot listening on http://{addr}");
@@ -5043,5 +5131,46 @@ hi").unwrap();
         assert!(!clean.contains_key("nemo"));
         assert!(!clean.contains_key("../bad"));
         let _ = fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn test_strip_sub_prefix_handles_whitespace_and_rejects_empty() {
+        assert_eq!(strip_sub_prefix("/sub audit src"), Some("audit src"));
+        assert_eq!(strip_sub_prefix("/sub\ncheck tests"), Some("check tests"));
+        assert_eq!(strip_sub_prefix("/delegate   inspect"), Some("inspect"));
+        assert_eq!(strip_sub_prefix("/sub"), None);
+        assert_eq!(strip_sub_prefix("/subdir foo"), None);
+    }
+
+    #[test]
+    fn test_finish_denied_batch_closes_all_tool_call_ids() {
+        let calls = vec![
+            json!({ "id": "call_a" }),
+            json!({ "id": "call_b" }),
+        ];
+        let mut history = Vec::new();
+        finish_denied_batch(&mut history, &calls, 0, "Denied by user (Zero Trust)");
+        assert_eq!(history.len(), 2);
+        assert_eq!(history[0].tool_call_id.as_deref(), Some("call_a"));
+        assert_eq!(history[0].content_as_str(), "[denied] Denied by user (Zero Trust)");
+        assert_eq!(history[1].tool_call_id.as_deref(), Some("call_b"));
+        assert_eq!(history[1].content_as_str(), "[Cancelled]");
+    }
+
+    #[test]
+    fn test_round_limit_note_only_triggers_when_agent_hits_cap() {
+        assert_eq!(round_limit_note(true, false, false, 10).as_deref(), Some("Stopped: reached 10 step limit (`AI_MAX_AGENT_ROUNDS`)."));
+        assert_eq!(round_limit_note(false, false, false, 1), None);
+        assert_eq!(round_limit_note(true, true, false, 10), None);
+        assert_eq!(round_limit_note(true, false, true, 10), None);
+        assert_eq!(round_limit_note(true, false, false, usize::MAX), None);
+    }
+
+    #[test]
+    fn test_parse_port_from_env_skips_comments_and_invalid() {
+        assert_eq!(parse_port_from_env("#RAILBOT_PORT=\"24999\"\n"), None);
+        assert_eq!(parse_port_from_env("RAILBOT_PORT=\"notaport\"\nRS_RAIL_PORT=\"24501\"\n").as_deref(), Some("24501"));
+        assert_eq!(parse_port_from_env("RS_RAIL_PORT=\"24501\"\nRAILBOT_PORT=\"24502\" # override\n").as_deref(), Some("24502"));
+        assert_eq!(parse_port_from_env("RAILBOT_PORT=\"0\"\n"), None);
     }
 }

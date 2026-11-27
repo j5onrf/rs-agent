@@ -66,13 +66,15 @@
 
 | **Interactive Demo** · [j5onrf.github.io/railbot](https://j5onrf.github.io/railbot) |
 | :--- |
-| [<img alt="RailBot — Local-First Desktop & Web UI" src="assets/rb-rounded.png" />](https://j5onrf.github.io/rs-agent/) |
+| [<img alt="RailBot — Local-First Desktop & Web UI" src="assets/rb-rounded.png" />](https://j5onrf.github.io/railbot) |
 
 | Feature | Mechanism | Behavior |
 | :--- | :--- | :--- |
 | **Frameless App** | `rail` · `rr` | Dedicated standalone desktop app window (`--app=http://127.0.0.1:24243`) |
 | **Browser Tab** | `rail web` · `rr web` | Standard browser tab via `xdg-open` |
 | **Themes & Appearance** | Settings & Controls | live `Omarchy` & `Noctalia` desktop sync, `+ Noctalia` catalog browser (Core & Community, `Dark`/`Light`), custom JSON palettes (`Claude`, `DarkBot`), Vector / Pixel / Letter bot badges, and `JetBrains Mono` / `Geist` fonts |
+| **Sub-Agent & Security** | `/sub <goal>` · Shield | One-turn `delegate_task` injection (`0t` overhead otherwise); composer shield toggles **Zero Trust** (confirm edits, commands & `/sub`) vs **Allow All** (autonomous, `.env` still locked) |
+| **Workspaces & Actions** | **Browse** · **Actions** | Link external folders outside RailBot internals, pin per-workspace **Actions**, and toggle `Live` / `Static` RailBot icon & streaming indicators |
 
 **Micro-Bots** (`railbot`)
 
@@ -291,6 +293,7 @@ CUSTOM1_MODEL="deepseek-v4.1-flash:free, mimo-v2.6-flash:free"
 
 # ── 4. MCP & Runtime Governors ────────────────────────────────────────────────
 #FIRECRAWL_API_KEY="fc-your-actual-api-key"
+#RAILBOT_PORT="24243"           # Optional: Override Web/Desktop UI port (default: 24243)
 AI_MAX_TOKENS="8192"
 AI_MAX_AGENT_ROUNDS="10"
 ```
