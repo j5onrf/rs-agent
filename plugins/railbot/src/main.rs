@@ -1338,25 +1338,60 @@ fn parse_theme_json_file(path: &Path) -> Option<Value> {
     Some(obj)
 }
 
-fn load_themes(themes_dir: &Path) -> Vec<Value> {
-    let mut out = Vec::new();
-    if let Some(home) = dirs::home_dir() {
-        let state_home = std::env::var_os("XDG_STATE_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".local/state"));
-        let cfg_home = std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".config"));
-        let omarchy_t = parse_omarchy_toml(&state_home.join("omarchy/current/theme"))
-            .or_else(|| parse_omarchy_toml(&cfg_home.join("omarchy/current/theme")));
-        if let Some(t) = omarchy_t {
-            out.push(t);
-        }
-        if let Some(t) = parse_noctalia_live_with_themes(themes_dir) {
-            out.push(t);
+fn ensure_noctalia_wallpaper_template(cfg_dir: &Path, themes_dir: &Path) {
+    if !cfg_dir.is_dir() {
+        return;
+    }
+    let tpl_dir = cfg_dir.join("templates");
+    let tpl_path = tpl_dir.join("railbot.json");
+    let cfg_path = cfg_dir.join("railbot.toml");
+    let out_path = themes_dir.join("noctalia.json");
+    let tpl_body = concat!(
+        "{\n",
+        "  \"name\": \"Noctalia\",\n",
+        "  \"mode\": \"{{ mode }}\",\n",
+        "  \"bg\": \"{{colors.surface.default.hex}}\",\n",
+        "  \"panel\": \"{{colors.surface_container_low.default.hex}}\",\n",
+        "  \"card\": \"{{colors.surface_container.default.hex}}\",\n",
+        "  \"border\": \"{{colors.outline_variant.default.hex}}\",\n",
+        "  \"text\": \"{{colors.on_surface.default.hex}}\",\n",
+        "  \"muted\": \"{{colors.on_surface_variant.default.hex}}\",\n",
+        "  \"accent\": \"{{colors.primary.default.hex}}\",\n",
+        "  \"cyan\": \"{{colors.secondary.default.hex}}\"\n",
+        "}\n"
+    );
+    let toml_body = format!(
+        "[theme.templates.user.railbot]\ninput_path = \"{}\"\noutput_path = \"{}\"\n",
+        tpl_path.display(),
+        out_path.display()
+    );
+    let _ = fs::create_dir_all(themes_dir);
+    let _ = atomic_write(&tpl_path, tpl_body);
+    let _ = atomic_write(&cfg_path, &toml_body);
+    if let Ok(status) = std::process::Command::new("noctalia")
+        .args(["msg", "templates-apply"])
+        .status()
+    {
+        if status.success() {
+            for _ in 0..6 {
+                if out_path.is_file() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
         }
     }
+}
+
+fn load_custom_themes(themes_dir: &Path) -> Vec<Value> {
+    let mut out = Vec::new();
     let mut files = Vec::new();
     if let Ok(rd) = fs::read_dir(themes_dir) {
         for ent in rd.flatten() {
             let p = ent.path();
-            if p.extension().and_then(|e| e.to_str()) == Some("json") {
+            if p.extension().and_then(|e| e.to_str()) == Some("json")
+                && p.file_stem().and_then(|s| s.to_str()) != Some("noctalia")
+            {
                 files.push(p);
             }
         }
@@ -1370,6 +1405,32 @@ fn load_themes(themes_dir: &Path) -> Vec<Value> {
     out
 }
 
+fn load_live_theme(themes_dir: &Path, target: &str) -> Option<Value> {
+    match target {
+        "omarchy" => {
+            let home = dirs::home_dir()?;
+            let state_home = std::env::var_os("XDG_STATE_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".local/state"));
+            let cfg_home = std::env::var_os("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|| home.join(".config"));
+            parse_omarchy_toml(&state_home.join("omarchy/current/theme"))
+                .or_else(|| parse_omarchy_toml(&cfg_home.join("omarchy/current/theme")))
+        }
+        "noctalia" => parse_noctalia_live_with_themes(themes_dir),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+fn load_themes(themes_dir: &Path) -> Vec<Value> {
+    let mut out = Vec::new();
+    if let Some(t) = load_live_theme(themes_dir, "omarchy") {
+        out.push(t);
+    }
+    if let Some(t) = load_live_theme(themes_dir, "noctalia") {
+        out.push(t);
+    }
+    out.extend(load_custom_themes(themes_dir));
+    out
+}
 fn is_valid_hex(s: &str) -> bool {
     let b = s.as_bytes();
     b.len() == 7 && b[0] == b'#' && b[1..].iter().all(|c| c.is_ascii_hexdigit())
@@ -1600,6 +1661,10 @@ fn parse_noctalia_live_raw_in(cfg_dir: &Path, state_dir: &Path, themes_dir: Opti
 
     if source == "wallpaper" {
         if let Some(td) = themes_dir {
+            if let Some(t) = parse_theme_json_file(&td.join("noctalia.json")) {
+                return Some(t);
+            }
+            ensure_noctalia_wallpaper_template(cfg_dir, td);
             if let Some(t) = parse_theme_json_file(&td.join("noctalia.json")) {
                 return Some(t);
             }
@@ -2801,7 +2866,24 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
     }
 
     if method == "GET" && path == "/api/themes" {
-        return write_http_json(&mut stream, 200, &json!({ "themes": load_themes(&app.root.join("plugins/railbot/themes")) })).await;
+        let td = app.root.join("plugins/railbot/themes");
+        let sync = query.split('&').find_map(|p| p.strip_prefix("sync=")).unwrap_or("");
+        let mut out = Vec::new();
+        match sync {
+            "omarchy" => {
+                if let Some(t) = load_live_theme(&td, "omarchy") { out.push(t); }
+            }
+            "noctalia" => {
+                if let Some(t) = load_live_theme(&td, "noctalia") { out.push(t); }
+            }
+            "all" => {
+                if let Some(t) = load_live_theme(&td, "omarchy") { out.push(t); }
+                if let Some(t) = load_live_theme(&td, "noctalia") { out.push(t); }
+            }
+            _ => {}
+        }
+        out.extend(load_custom_themes(&td));
+        return write_http_json(&mut stream, 200, &json!({ "themes": out })).await;
     }
 
     if method == "GET" && path == "/api/noctalia/catalog" {
@@ -3015,7 +3097,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     "env_max_tokens": env_tok,
                     "max_rounds": max_rounds
                 },
-                "themes": load_themes(&app.root.join("plugins/railbot/themes")),
+                "themes": load_custom_themes(&app.root.join("plugins/railbot/themes")),
                 "mcp_servers": mcp_list,
                 "ui_prefs": {
                     "pad": state::get_pad(),

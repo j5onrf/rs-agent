@@ -261,6 +261,34 @@
   .code-head { display: flex; justify-content: space-between; align-items: center; padding: 4px 10px; background: var(--code-head); border-bottom: 1px solid var(--code-border); font-size: 11px; color: var(--muted); font-family: var(--mono); }
   .code-wrap pre { margin: 0; padding: 10px 12px; overflow-x: auto; font-family: var(--mono); font-size: var(--code-size); line-height: 1.45; tab-size: 4; font-variant-ligatures: none; }
 
+  
+  .rb-svg { overflow: visible; display: block; }
+  .rb-eye, .rb-eye-glow { transform-box: fill-box; transform-origin: center; }
+  .rb-eye-glow { opacity: 0; pointer-events: none; }
+
+  @keyframes rbBlink {
+    0%   { transform: scaleY(1); }
+    30%  { transform: scaleY(0.12); }
+    65%  { transform: scaleY(1); }
+    100% { transform: scaleY(1); }
+  }
+  @keyframes rbGlint {
+    0%   { opacity: 0; }
+    35%  { opacity: 0.95; }
+    100% { opacity: 0; }
+  }
+
+  /* Tactical Eye Blink: Chassis stays frozen; only triggers in Solid mode */
+  body:not([data-bot-icon="mono"]) .proj-item:hover .rb-eye,
+  body:not([data-bot-icon="mono"]) #btn-brand-settings:hover .rb-eye {
+    animation: rbBlink .32s ease-in-out 1;
+  }
+  body:not([data-bot-icon="mono"]) .proj-item:hover .rb-eye-glow,
+  body:not([data-bot-icon="mono"]) #btn-brand-settings:hover .rb-eye-glow {
+    animation: rbGlint .42s ease-out 1;
+  }
+
+
   /* Tool Cards & Framed Error Card */
   .tool-card { border: 1px solid var(--border); background: var(--panel); border-radius: 6px; overflow: hidden; }
   .tool-head { padding: 6px 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-family: var(--mono); font-size: var(--code-size); font-variant-numeric: tabular-nums; cursor: pointer; }
@@ -843,6 +871,7 @@ function applyAppearance(next) {
   root.setProperty("--ui-size", `${cfg.uiSize || 13}px`);
   root.setProperty("--code-size", `${cfg.codeSize}px`);
   document.body.classList.toggle("theme-dark", !isLight);
+  document.body.dataset.botIcon = (cfg.logoStyle === "a") ? "mono" : "solid";
   renderBrandLogo(cfg);
   resizeInput();
 }
@@ -1017,33 +1046,25 @@ function unpinSkill(proj, sk) {
 
 const CHAT_BOT_MASK = 0x8010;
 const VEC_PRESETS = {
-  // 0x8010: Tactical Chat Bot (sharp chamfered hood + fierce swept eyes)
-  0x8010: `<path fill-rule="evenodd" d="M4.2 2.4h7.6L14 4.8v5l-2.4 2.2H6.2l-3 2.2V12L2 10.6V4.8ZM4.1 5.7q1.7.7 3 1.8-2 .6-3-1.8Zm7.8 0q-1.7.7-3 1.8 2 .6 3-1.8Z"/>`,
-  // 0x8011: Official RailBot (octagon shield + twin vertical rail fangs + fierce eyes)
-  0x8011: `<path fill-rule="evenodd" d="M5.7 1.8h4.6l3.2 3.2v4.4L11 11.9v3H9.4v-2.2H6.6v2.2H5v-3L2.5 9.4V5Zm-1.6 3.9q1.7.7 3.1 1.9-2.1.6-3.1-1.9Zm7.8 0q-1.7.7-3.1 1.9 2.1.6 3.1-1.9Z"/>`,
-  // 0x8012: Lead Speed-Pod (bullet-train helm + aggressive V-visor)
-  0x8012: `<path fill-rule="evenodd" d="M8 1.5 12.5 4.2 13.8 9.2 11.2 13.6H4.8L2.2 9.2 3.5 4.2ZM4 6.2 8 7.6 12 6.2 11.3 8.6 8 9.3 4.7 8.6Z"/>`,
-  // 0x8013: Pantograph Knight (swept twin brow fins + razor slit eyes)
-  0x8013: `<path fill-rule="evenodd" d="M3 2 5.8 4h4.4L13 2l.6 5.8-2 5.6H4.4L2.4 7.8Zm1.2 4.7 2.9 1.2-.3.9-2.6-1Zm7.6 0-2.9 1.2.3.9 2.6-1Z"/>`,
-  // 0x8014: Apex Stealth Interceptor (sharp diamond armor + swept eyes)
-  0x8014: `<path fill-rule="evenodd" d="M4.8 2.2h6.4l3 4-1.8 7L8 14.4 3.6 13.2 1.8 6.2Zm-.7 4.1q1.8.7 3.1 2-2.1.6-3.1-2Zm7.8 0q-1.8.7-3.1 2 2.1.6 3.1-2Z"/>`,
-  // 0x8015: Cyber Viper (predator swept ears + fierce eyes)
-  0x8015: `<path fill-rule="evenodd" d="M2.6 2 6 4.3h4L13.4 2l.4 6.6-3.2 5H5.4l-3.2-5Zm1.5 4.8q1.7.7 3 1.8-2 .5-3-1.8Zm7.8 0q-1.7.7-3 1.8 2 .5 3-1.8Z"/>`,
-  // 0x8016: Heavy Rail-Mech (angled side armor guards + razor visor slits)
-  0x8016: `<path d="M1.2 5.2 2.7 4.4v7l-1.5-.8Zm13.6 0-1.5-.8v7l1.5-.8Z"/><path fill-rule="evenodd" d="M5 2.6h6L12.9 5v6l-2.5 2.6H5.6L3.1 11V5Zm-.8 4.1 2.9 1.2-.3.9-2.6-1Zm7.6 0-2.9 1.2.3.9 2.6-1Z"/>`,
-  // 0x8017: Phantom Rail-Spectre (jagged cloaked crest + fierce eyes)
-  0x8017: `<path fill-rule="evenodd" d="M8 1.8 13.2 5.2l.4 8.6-2.4-2.2-1.8 2.2L8 12l-1.4 1.8-1.8-2.2-2.4 2.2.4-8.6ZM4.1 6.5q1.7.7 3.1 1.9-2.1.6-3.1-1.9Zm7.8 0q-1.7.7-3.1 1.9 2.1.6 3.1-1.9Z"/>`,
+  0x8010: { shell:`M4.2 2.4h7.6L14 4.8v5l-2.4 2.2H6.2l-3 2.2V12L2 10.6V4.8Z`, eyes:`M4.1 5.7q1.7.7 3 1.8-2 .6-3-1.8Zm7.8 0q-1.7.7-3 1.8 2 .6 3-1.8Z` },
+  0x8011: { shell:`M5.7 1.8h4.6l3.2 3.2v4.4L11 11.9v3H9.4v-2.2H6.6v2.2H5v-3L2.5 9.4V5Z`, eyes:`M4.1 5.7q1.7.7 3.1 1.9-2.1.6-3.1-1.9Zm7.8 0q-1.7.7-3.1 1.9 2.1.6 3.1-1.9Z` },
+  0x8012: { shell:`M8 1.5 12.5 4.2 13.8 9.2 11.2 13.6H4.8L2.2 9.2 3.5 4.2Z`, eyes:`M4 6.2 8 7.6 12 6.2 11.3 8.6 8 9.3 4.7 8.6Z` },
+  0x8013: { shell:`M3 2 5.8 4h4.4L13 2l.6 5.8-2 5.6H4.4L2.4 7.8Z`, eyes:`M4.2 6.7 7.1 7.9 6.8 8.8 4.2 7.8Zm7.6 0-2.9 1.2.3.9 2.6-1Z` },
+  0x8014: { shell:`M4.8 2.2h6.4l3 4-1.8 7L8 14.4 3.6 13.2 1.8 6.2Z`, eyes:`M4.1 6.3q1.8.7 3.1 2-2.1.6-3.1-2Zm7.8 0q-1.8.7-3.1 2 2.1.6 3.1-2Z` },
+  0x8015: { shell:`M2.6 2 6 4.3h4L13.4 2l.4 6.6-3.2 5H5.4l-3.2-5Z`, eyes:`M4.1 6.8q1.7.7 3 1.8-2 .5-3-1.8Zm7.8 0q-1.7.7-3 1.8 2 .5 3-1.8Z` },
+  0x8016: { shell:`M1.2 5.2 2.7 4.4v7l-1.5-.8Zm13.6 0-1.5-.8v7l1.5-.8ZM5 2.6h6L12.9 5v6l-2.5 2.6H5.6L3.1 11V5Z`, eyes:`M4.2 6.7 7.1 7.9 6.8 8.8 4.2 7.8Zm7.6 0-2.9 1.2.3.9 2.6-1Z` },
+  0x8017: { shell:`M8 1.8 13.2 5.2l.4 8.6-2.4-2.2-1.8 2.2L8 12l-1.4 1.8-1.8-2.2-2.4 2.2.4-8.6Z`, eyes:`M4.1 6.5q1.7.7 3.1 1.9-2.1.6-3.1-1.9Zm7.8 0q-1.7.7-3.1 1.9 2.1.6 3.1-1.9Z` }
 };
 const VEC_PRESET_IDS = Object.keys(VEC_PRESETS).map(Number);
 const VEC_BASES = [
-  { d: "M5.8 2.8h4.4l3.2 3.2v4l-2.4 2.4V15H9.4v-2H6.6v2H5v-2.6L2.6 10V6Z", ey: 8.0, top: 1 },
-  { d: "M4.4 3.2h7.2l2 2.2v6l-2 2H4.4l-2-2v-6Z", ey: 8.2, top: 1 },
-  { d: "M8 2.6 13.6 5.4l-.8 6.4L8 14.4l-4.8-2.6-.8-6.4Z", ey: 8.0, top: 1 },
-  { d: "M5 3h6l2.8 3.6L12 13H4L2.2 6.6Z", ey: 8.2, top: 1 },
-  { d: "M5 3h6l1.9 2.4v5.8l-2.5 2.4H5.6l-2.5-2.4V5.4Z", ex: `<path d="M1.2 5.2 2.7 4.4v7l-1.5-.8Zm13.6 0-1.5-.8v7l1.5-.8Z"/>`, ey: 8.1, top: 1 },
-  { d: "M2.6 2.2 6 4.4h4l3.4-2.2.4 6.6-3.2 4.8H5.4L2.2 8.8Z", ey: 8.4, top: 0 },
-  { d: "M8 1.8 13.2 5.4l-.8 6.4-2.2 2H5.8l-2.2-2-.8-6.4Z", ey: 8.4, top: 0 },
-  { d: "M8 2 13.4 5.2v8.4l-2.4-2-1.6 2.2L8 12l-1.4 1.8-1.6-2.2-2.4 2V5.2Z", ey: 7.6, top: 0 },
+  { d:"M5.8 2.8h4.4l3.2 3.2v4l-2.4 2.4V15H9.4v-2H6.6v2H5v-2.6L2.6 10V6Z", ey:8.0, top:1 },
+  { d:"M4.4 3.2h7.2l2 2.2v6l-2 2H4.4l-2-2v-6Z", ey:8.2, top:1 },
+  { d:"M8 2.6 13.6 5.4l-.8 6.4L8 14.4l-4.8-2.6-.8-6.4Z", ey:8.0, top:1 },
+  { d:"M5 3h6l2.8 3.6L12 13H4L2.2 6.6Z", ey:8.2, top:1 },
+  { d:"M5 3h6l1.9 2.4v5.8l-2.5 2.4H5.6l-2.5-2.4V5.4ZM1.2 5.2 2.7 4.4v7l-1.5-.8Zm13.6 0-1.5-.8v7l1.5-.8Z", ey:8.1, top:1 },
+  { d:"M2.6 2.2 6 4.4h4l3.4-2.2.4 6.6-3.2 4.8H5.4L2.2 8.8Z", ey:8.4, top:0 },
+  { d:"M8 1.8 13.2 5.4l-.8 6.4-2.2 2H5.8l-2.2-2-.8-6.4Z", ey:8.4, top:0 },
+  { d:"M8 2 13.4 5.2v8.4l-2.4-2-1.6 2.2L8 12l-1.4 1.8-1.6-2.2-2.4 2V5.2Z", ey:7.6, top:0 }
 ];
 const vecEyes = (ey, k) => {
   if (k === 0) return `M4.1 ${ey-1.5}Q5.7 ${ey-0.7} 7.1 ${ey+0.5}Q5.1 ${ey+1.1} 4.1 ${ey-1.5}ZM11.9 ${ey-1.5}Q10.3 ${ey-0.7} 8.9 ${ey+0.5}Q10.9 ${ey+1.1} 11.9 ${ey-1.5}Z`;
@@ -1051,12 +1072,8 @@ const vecEyes = (ey, k) => {
   if (k === 2) return `M4 ${ey-1.5}L8 ${ey-0.2}L12 ${ey-1.5}L11.3 ${ey+0.8}L8 ${ey+1.4}L4.7 ${ey+0.8}Z`;
   return `M4.1 ${ey-1.4}L7.1 ${ey+0.2}L5 ${ey+0.9}ZM11.9 ${ey-0.8}L8.9 ${ey+0.1}L9.3 ${ey+0.7}L11.7 ${ey+0.2}Z`;
 };
-const VEC_TOPS = [
-  "",
-  `<path d="M8 .3Q8 1.5 9.3 1.5Q8 1.5 8 2.7Q8 1.5 6.7 1.5Q8 1.5 8 .3Z"/>`,
-  `<path d="M3.8 1 6.2 2.4 5 3.4 3.4 2Zm8.4 0-2.4 1.4 1.2 1 1.6-1.4Z"/>`,
-  `<path d="M4.2 1.2h7.6l-1 1.1H5.2Z"/>`,
-];
+const VEC_TOPS = ["", `M8 .3Q8 1.5 9.3 1.5Q8 1.5 8 2.7Q8 1.5 6.7 1.5Q8 1.5 8 .3Z`, `M3.8 1 6.2 2.4 5 3.4 3.4 2Zm8.4 0-2.4 1.4 1.2 1 1.6-1.4Z`, `M4.2 1.2h7.6l-1 1.1H5.2Z`];
+let maskUid = 0;
 function vecParts(mask) {
   if (mask & 0x8000) return { preset: VEC_PRESETS[mask] || VEC_PRESETS[0x8011], key: `p:${mask}` };
   const bits = (mask & 0xf) | ((mask >> 1) & 0x3ff0);
@@ -1078,29 +1095,44 @@ function projectBotMask(name) {
   return parseBotVal(STATE?.ui_prefs?.project_bots?.[name]) ?? hashBotMask(name);
 }
 function botSvgFromMask(mask, size = 12, fill = "currentColor", defs = "") {
-  if (getBadgeMode() === "vector") {
-    const g = vecParts(mask);
-    if (g.preset) return `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="${fill}" aria-hidden="true">${defs}${g.preset}</svg>`;
-    const base = VEC_BASES[g.bIdx];
-    const body = `${VEC_TOPS[g.tIdx]}${base.ex || ""}<path fill-rule="evenodd" d="${base.d}${vecEyes(base.ey, g.eIdx)}"/>`;
-    return `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="${fill}" aria-hidden="true">${defs}${body}</svg>`;
-  }
-  const rects = [];
-  if (mask === CHAT_BOT_MASK) {
-    for (const [x, y] of [[1,0],[2,0],[3,0],[0,1],[2,1],[4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[1,3],[2,3],[3,3],[1,4]]) {
-      rects.push(`<rect x="${3 + x * 2}" y="${3 + y * 2}" width="2" height="2" rx="0.4"/>`);
-    }
-    return `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="${fill}" aria-hidden="true">${defs}${rects.join("")}</svg>`;
-  }
-  for (let y = 0; y < 5; y++) {
-    for (let x = 0; x < 3; x++) {
-      if ((mask >> (y * 3 + x)) & 1 || (y === 1 && x === 1)) {
+  if (getBadgeMode() === "pixel") {
+    const rects = [];
+    if (mask === CHAT_BOT_MASK) {
+      for (const [x, y] of [[1,0],[2,0],[3,0],[0,1],[2,1],[4,1],[0,2],[1,2],[2,2],[3,2],[4,2],[1,3],[2,3],[3,3],[1,4]]) {
         rects.push(`<rect x="${3 + x * 2}" y="${3 + y * 2}" width="2" height="2" rx="0.4"/>`);
-        if (x < 2) rects.push(`<rect x="${11 - x * 2}" y="${3 + y * 2}" width="2" height="2" rx="0.4"/>`);
+      }
+      return `<svg class="rb-svg" width="${size}" height="${size}" viewBox="0 0 16 16" fill="${fill}" aria-hidden="true">${defs}${rects.join("")}</svg>`;
+    }
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 3; x++) {
+        if ((mask >> (y * 3 + x)) & 1 || (y === 1 && x === 1)) {
+          rects.push(`<rect x="${3 + x * 2}" y="${3 + y * 2}" width="2" height="2" rx="0.4"/>`);
+          if (x < 2) rects.push(`<rect x="${11 - x * 2}" y="${3 + y * 2}" width="2" height="2" rx="0.4"/>`);
+        }
       }
     }
+    return `<svg class="rb-svg" width="${size}" height="${size}" viewBox="0 0 16 16" fill="${fill}" aria-hidden="true">${defs}${rects.join("")}</svg>`;
   }
-  return `<svg width="${size}" height="${size}" viewBox="0 0 16 16" fill="${fill}" aria-hidden="true">${defs}${rects.join("")}</svg>`;
+  const id = `rbm-${++maskUid}`;
+  let shell = "", eyes = "", crest = "";
+  if (mask & 0x8000) {
+    const pr = VEC_PRESETS[mask] || VEC_PRESETS[0x8011];
+    shell = pr.shell; eyes = pr.eyes;
+  } else {
+    const bits = (mask & 0xf) | ((mask >> 1) & 0x3ff0);
+    const bi = bits & 7, ei = (bits >> 3) & 3, ti = VEC_BASES[bi].top ? ((bits >> 5) & 3) : 0;
+    shell = VEC_BASES[bi].d;
+    eyes = vecEyes(VEC_BASES[bi].ey, ei);
+    crest = VEC_TOPS[ti];
+  }
+  return `<svg class="rb-svg" width="${size}" height="${size}" viewBox="0 0 16 16" fill="${fill}" aria-hidden="true">
+    ${defs}<defs><mask id="${id}"><rect width="16" height="16" fill="white"/><path class="rb-eye" d="${eyes}" fill="black"/></mask></defs>
+    <g class="rb-bot-grp">
+      ${crest ? `<path class="rb-crest" d="${crest}"/>` : ""}
+      <path class="rb-shell" d="${shell}" mask="url(#${id})"/>
+      <path class="rb-eye-glow" d="${eyes}" fill="var(--accent)"/>
+    </g>
+  </svg>`;
 }
 function botSvg(name, size = 12, fill = "currentColor", defs = "") {
   return botSvgFromMask(projectBotMask(name), size, fill, defs);
@@ -1145,14 +1177,10 @@ function renderAll() {
     $("tb-git").title = gitLabel.replace(" · ", " — ");
     $("tb-git-dot").classList.toggle("dirty", isDirty);
   }
-  const shortEndpoint = (ep) => {
-    const raw = String(ep || "").trim().toLowerCase().replace(/:\d+$/, "");
-    if (!raw || raw.startsWith("local") || raw.startsWith("127.0.0.1")) return "local";
-    if (raw === "googleapis" || raw.includes("googleapis.com")) return "gemini";
-    return (raw.replace(/^(api|inference|llm|chat|v1|www)\./, "").split(".")[0] || raw);
-  };
   const mp = $("btn-model-pill");
-  mp.innerHTML = `<span class="mp-name">${esc(STATE.provider.model)}</span><span class="mp-sep" aria-hidden="true">|</span><span class="mp-ext">${esc(shortEndpoint(STATE.provider.endpoint))}</span>`;
+  mp.innerHTML = STATE.provider.is_local
+    ? `<span class="mp-name">${esc(STATE.provider.model)}</span><span class="mp-ext">local</span>`
+    : `<span class="mp-name">${esc(STATE.provider.model)}</span>`;
   mp.title = `${STATE.provider.model} (${STATE.provider.endpoint})`;
   $("btn-img").style.display = STATE.provider.is_local ? "none" : "inline-flex";
   disarmReset();
@@ -2374,10 +2402,23 @@ function renderModalTab() {
       card.className = "theme-card" + (ap.theme === t.id ? " active" : "");
       card.setAttribute("role", "button");
       card.tabIndex = 0;
-      const tag = t.source === "live" ? `live ${t.mode}` : (t.source === "custom" ? `custom ${t.mode}` : "fallback");
+      const tag = t.source === "live" ? (t.pending ? "click to sync" : `live ${t.mode}`) : (t.source === "custom" ? `custom ${t.mode}` : "fallback");
       const delHtml = t.source === "custom" ? `<button class="theme-del" title="Delete theme">✕</button>` : "";
       card.innerHTML = `<span class="theme-swatch" style="background:linear-gradient(135deg, ${esc(t.bg)} 50%, ${esc(t.accent)} 50%)"></span><span class="theme-meta"><span class="theme-name">${esc(t.name)}</span><span class="theme-tag">${esc(tag)}</span></span>${delHtml}`;
-      card.onclick = () => { applyAppearance({ theme: t.id }); renderModalTab(); };
+      card.onclick = async () => {
+        if (t.source === "live") {
+          const ok = await syncThemes(true, t.id);
+          if (ok) applyAppearance({ theme: t.id });
+          else {
+            const tagEl = card.querySelector(".theme-tag");
+            if (tagEl) tagEl.textContent = "not found";
+          }
+          renderModalTab();
+          return;
+        }
+        applyAppearance({ theme: t.id });
+        renderModalTab();
+      };
       card.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); card.click(); } };
       const db = card.querySelector(".theme-del");
       if (db) {
@@ -2397,22 +2438,29 @@ function renderModalTab() {
     };
 
     pane.innerHTML = "";
-    if (liveThemes.length) {
-      const syncHead = document.createElement("div");
-      syncHead.innerHTML = `<div style="font-weight:600">Desktop Sync</div><div class="muted">Auto-syncs on focus with your active bar / desktop theme</div>`;
-      const syncGrid = document.createElement("div");
-      syncGrid.className = "theme-grid";
-      for (const t of liveThemes) syncGrid.appendChild(buildCard(t));
-      pane.appendChild(syncHead);
-      pane.appendChild(syncGrid);
-    }
+    const cachedTheme = (() => {
+      try { return JSON.parse((localStorage.getItem("railbot_theme_cache") ?? localStorage.getItem("rs_rail_theme_cache")) || "null"); }
+      catch { return null; }
+    })();
+    const deskTargets = [
+      { id:"omarchy",  name:"Omarchy",  bg:"#16161a", accent:"#8e8e98", mode:"light" },
+      { id:"noctalia", name:"Noctalia", bg:"#16161a", accent:"#8e8e98", mode:"dark" },
+    ].map((def) => liveThemes.find((x) => x.id === def.id) || (cachedTheme?.id === def.id ? cachedTheme : { ...def, source:"live", pending:true }));
+
+    const syncHead = document.createElement("div");
+    syncHead.innerHTML = `<div style="font-weight:600">Desktop Sync</div><div class="muted">On-demand sync — only runs when selected</div>`;
+    const syncGrid = document.createElement("div");
+    syncGrid.className = "theme-grid";
+    for (const t of deskTargets) syncGrid.appendChild(buildCard(t));
+    pane.appendChild(syncHead);
+    pane.appendChild(syncGrid);
 
     const thHead = document.createElement("div");
     thHead.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px;";
     thHead.innerHTML = `<div><div style="font-weight:600">Themes</div><div class="muted">Fallback + custom <code>plugins/railbot/themes/*.json</code></div></div><div style="display:flex;gap:6px;"><button class="btn btn-sm" id="btn-browse-noctalia">+ Noctalia</button><button class="btn btn-sm" id="btn-reload-themes">Reload</button></div>`;
     pane.appendChild(thHead);
     $("btn-browse-noctalia").onclick = () => { noctaliaBrowse = true; noctaliaSource = "core"; noctaliaWarn = ""; renderModalTab(); };
-    $("btn-reload-themes").onclick = () => loadState();
+    $("btn-reload-themes").onclick = async () => { await loadState(); const id = getAppearance().theme; if (id === "omarchy" || id === "noctalia") { await syncThemes(true, id); applyAppearance(); renderModalTab(); } };
 
     const grid = document.createElement("div");
     grid.className = "theme-grid";
@@ -3324,26 +3372,29 @@ loadState(params.get("project") || "").then(async () => {
       await loadState();
     } catch {}
   }
+  const curId = getAppearance().theme;
+  if (curId === "omarchy" || curId === "noctalia") syncThemes(true, curId);
 });
 
 let lastThemeSig = "", lastThemeSync = 0;
-async function syncThemes(force) {
-  if (document.hidden || !STATE) return;
-  const id = getAppearance().theme;
-  if (!force && id !== "omarchy" && id !== "noctalia" && !id.startsWith("custom:")) return;
+async function syncThemes(force, targetId) {
+  if (document.hidden || !STATE) return false;
+  const id = targetId || getAppearance().theme;
+  if (id !== "omarchy" && id !== "noctalia") return false;
   const now = Date.now();
-  if (!force && now - lastThemeSync < 1500) return;
+  if (!force && now - lastThemeSync < 1500) return false;
   lastThemeSync = now;
   try {
-    const res = await api("/api/themes");
+    const res = await api(`/api/themes?sync=${encodeURIComponent(id)}`);
     const sig = JSON.stringify(res.themes || []);
+    const hasLive = (res.themes || []).some((t) => t.id === id);
     if (sig !== lastThemeSig) {
       lastThemeSig = sig;
       STATE.themes = res.themes || [];
-      applyAppearance();
-      if ($("modal-settings").classList.contains("open") && ACTIVE_TAB === "appearance") renderModalTab();
+      if (hasLive && !targetId) applyAppearance();
     }
-  } catch {}
+    return hasLive;
+  } catch { return false; }
 }
 window.addEventListener("focus", () => syncThemes(false));
 document.addEventListener("visibilitychange", () => { if (!document.hidden) syncThemes(false); });
