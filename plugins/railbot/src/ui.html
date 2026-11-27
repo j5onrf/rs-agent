@@ -287,6 +287,7 @@
   body:not([data-bot-icon="mono"]) #btn-brand-settings:hover .rb-eye-glow {
     animation: rbGlint .42s ease-out 1;
   }
+  #btn-brand-settings .rb-eye-glow, .proj-item.active .rb-eye-glow { fill: var(--text); }
 
 
   /* Tool Cards & Framed Error Card */
@@ -812,6 +813,7 @@ function applyAppearance(next) {
     } catch {}
   }
   if (!t) t = BUILTIN_THEMES[0];
+  document.body.dataset.botIcon = (cfg.logoStyle || "a") === "a" ? "mono" : "solid";
   const sig = JSON.stringify([cfg, t]);
   if (sig === lastAppearanceSig) {
     renderBrandLogo(cfg);
@@ -871,7 +873,6 @@ function applyAppearance(next) {
   root.setProperty("--ui-size", `${cfg.uiSize || 13}px`);
   root.setProperty("--code-size", `${cfg.codeSize}px`);
   document.body.classList.toggle("theme-dark", !isLight);
-  document.body.dataset.botIcon = (cfg.logoStyle === "a") ? "mono" : "solid";
   renderBrandLogo(cfg);
   resizeInput();
 }
@@ -1114,7 +1115,7 @@ function botSvgFromMask(mask, size = 12, fill = "currentColor", defs = "") {
     return `<svg class="rb-svg" width="${size}" height="${size}" viewBox="0 0 16 16" fill="${fill}" aria-hidden="true">${defs}${rects.join("")}</svg>`;
   }
   const id = `rbm-${++maskUid}`;
-  let shell = "", eyes = "", crest = "";
+  let shell = "", eyes = "", crest = "", extra = "";
   if (mask & 0x8000) {
     const pr = VEC_PRESETS[mask] || VEC_PRESETS[0x8011];
     shell = pr.shell; eyes = pr.eyes;
@@ -1122,6 +1123,7 @@ function botSvgFromMask(mask, size = 12, fill = "currentColor", defs = "") {
     const bits = (mask & 0xf) | ((mask >> 1) & 0x3ff0);
     const bi = bits & 7, ei = (bits >> 3) & 3, ti = VEC_BASES[bi].top ? ((bits >> 5) & 3) : 0;
     shell = VEC_BASES[bi].d;
+    extra = VEC_BASES[bi].ex || "";
     eyes = vecEyes(VEC_BASES[bi].ey, ei);
     crest = VEC_TOPS[ti];
   }
@@ -1129,6 +1131,7 @@ function botSvgFromMask(mask, size = 12, fill = "currentColor", defs = "") {
     ${defs}<defs><mask id="${id}"><rect width="16" height="16" fill="white"/><path class="rb-eye" d="${eyes}" fill="black"/></mask></defs>
     <g class="rb-bot-grp">
       ${crest ? `<path class="rb-crest" d="${crest}"/>` : ""}
+      ${extra}
       <path class="rb-shell" d="${shell}" mask="url(#${id})"/>
       <path class="rb-eye-glow" d="${eyes}" fill="var(--accent)"/>
     </g>
@@ -2524,10 +2527,10 @@ function renderModalTab() {
     const logoRow = document.createElement("div");
     logoRow.className = "setting-row";
     const curLogo = ap.logoStyle || "a";
-    logoRow.innerHTML = `<div><strong>RailBot Icon</strong><div class="muted">Topbar icon in solid accent or monochrome</div></div>
+    logoRow.innerHTML = `<div><strong>RailBot Icons</strong><div class="muted">Accent color with eye blink on hover, or static monochrome</div></div>
       <div style="display:flex;gap:4px;" class="rs-tabs">
-        <button class="rs-tab ${curLogo === "d" ? "active" : ""}" id="btn-logo-d">Solid</button>
-        <button class="rs-tab ${curLogo === "a" ? "active" : ""}" id="btn-logo-a">Monochrome</button>
+        <button class="rs-tab ${curLogo === "d" ? "active" : ""}" id="btn-logo-d">Live</button>
+        <button class="rs-tab ${curLogo === "a" ? "active" : ""}" id="btn-logo-a">Static</button>
       </div>`;
     pane.appendChild(logoRow);
     $("btn-logo-d").onclick = () => { applyAppearance({ logoStyle: "d" }); renderModalTab(); };
