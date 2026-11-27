@@ -8,7 +8,8 @@
 .rs/
 state.json
 target/
-projects/chat/
+projects/chat/*
+!projects/chat/.gitkeep
 ta_probe.txt
 plugins/mcp/*.db
 rustfmt.toml
