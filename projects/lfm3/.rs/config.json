@@ -1,7 +1,0 @@
-{
-  "profile_name": "lfm3",
-  "is_agent": true,
-  "tier": "Smol",
-  "adapters": true,
-  "delegate": false
-}

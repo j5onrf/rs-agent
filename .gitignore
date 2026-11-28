@@ -1,29 +1,36 @@
 /target
+target/
 .env
 *.tmp*
 .active_sessions
 *.db
 *.db-wal
 *.db-shm
-.rs/
-state.json
-target/
-projects/chat/*
-!projects/chat/.gitkeep
-ta_probe.txt
-plugins/mcp/*.db
 rustfmt.toml
+
+# RailBot runtime data, sessions, scratchpads, and transcripts
+**/.rs/
+.rs/
+.rs/scratchpad.log
+state.json
+config.json
+plugins/railbot/config.json
+
+# Ignore all user-created files inside project workspaces, preserve folder structure
+projects/*/*
+!projects/*/.gitkeep
+
+# Plugin workspace paths (if projects live under plugins/railbot/projects)
+plugins/railbot/projects/*/*
+!plugins/railbot/projects/*/.gitkeep
 
 # Python execution caches
 __pycache__/
 *.pyc
 *.pyo
 
-# Ephemeral scratchpads
-.rs/scratchpad.log
-
-# T3 Code ACP URI artifacts
+# Temporary ACP artifacts
 **/acp:*
 acp:*
-
-plugins/railbot/config.json
+ta_probe.txt
+plugins/mcp/*.db
