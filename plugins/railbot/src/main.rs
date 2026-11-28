@@ -66,6 +66,10 @@ struct RailConfig {
     project_paths: HashMap<String, String>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     project_security: HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    model_projects: HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    model_unlinked: Vec<String>,
 }
 
 impl Default for RailConfig {
@@ -84,6 +88,8 @@ impl Default for RailConfig {
             project_actions: HashMap::new(),
             project_paths: HashMap::new(),
             project_security: HashMap::new(),
+            model_projects: HashMap::new(),
+            model_unlinked: Vec::new(),
         }
     }
 }
@@ -381,6 +387,175 @@ fn sanitize_project_security(obj: &serde_json::Map<String, Value>) -> HashMap<St
         }
     }
     out
+}
+
+fn norm_model_key(s: &str) -> String {
+    let t = s.trim();
+    let stripped = t.strip_suffix(".gguf").or_else(|| t.strip_suffix(".GGUF")).unwrap_or(t);
+    stripped.replace(['-', '_', ' '], "").to_ascii_lowercase()
+}
+
+fn sanitize_model_projects(
+    obj: &serde_json::Map<String, Value>,
+    root: &Path,
+    cfg: &RailConfig,
+) -> HashMap<String, String> {
+    let mut out = HashMap::new();
+    for (model_raw, val) in obj {
+        let m = model_raw.trim();
+        let Some(proj) = val.as_str().map(str::trim) else { continue };
+        if m.is_empty()
+            || m.len() > 160
+            || m.chars().any(char::is_control)
+            || !is_valid_slug(proj)
+            || matches!(proj, "chat" | "chatbot")
+            || !project_dir_in(root, cfg, proj).is_dir()
+        {
+            continue;
+        }
+        out.insert(m.to_string(), proj.to_string());
+    }
+    out
+}
+
+fn sanitize_model_unlinked(raw: &[Value]) -> Vec<String> {
+    let mut out: Vec<String> = raw
+        .iter()
+        .filter_map(|v| v.as_str())
+        .filter(|s| is_valid_slug(s) && !matches!(*s, "chat" | "chatbot"))
+        .map(ToString::to_string)
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
+fn auto_match_project_for_model(root: &Path, cfg: &RailConfig, raw_model: &str) -> Option<(String, String)> {
+    let m_norm = norm_model_key(raw_model).replace('.', "");
+    if m_norm.len() < 3 {
+        return None;
+    }
+    let profiles_dir = root.join("profiles");
+    let hidden: HashSet<&str> = cfg.hidden_projects.iter().map(String::as_str).collect();
+    let unlinked: HashSet<&str> = cfg.model_unlinked.iter().map(String::as_str).collect();
+
+    let mut best: Option<(usize, String, String)> = None;
+    let mut tie = false;
+
+    for (name, p, _) in list_all_project_dirs(root, cfg) {
+        if matches!(name.as_str(), "chat" | "chatbot")
+            || hidden.contains(name.as_str())
+            || unlinked.contains(name.as_str())
+        {
+            continue;
+        }
+        let ws_cfg = resolve_project_cfg(&profiles_dir, &p, &name);
+        let desc = cfg
+            .project_descriptions
+            .get(&name)
+            .cloned()
+            .or_else(|| profile_tagline_in(&profiles_dir, &ws_cfg.profile_name))
+            .unwrap_or_default();
+
+        let mut score = 0usize;
+        let mut matched_tok = String::new();
+        let d_norm = norm_model_key(&desc).replace('.', "");
+        if !d_norm.is_empty() && d_norm.contains(&m_norm) {
+            score = m_norm.len() + 200;
+            matched_tok = raw_model.trim().to_string();
+        } else {
+            for raw_w in desc.split_whitespace() {
+                let w = raw_w.trim_matches(|c: char| !c.is_ascii_alphanumeric());
+                if w.len() >= 4 && w.chars().any(|c| c.is_ascii_alphabetic()) && w.chars().any(|c| c.is_ascii_digit()) {
+                    let w_norm = norm_model_key(w).replace('.', "");
+                    if w_norm.len() >= 4 && (m_norm.contains(&w_norm) || w_norm.contains(&m_norm)) && w_norm.len() + 100 > score {
+                        score = w_norm.len() + 100;
+                        matched_tok = w.to_string();
+                    }
+                }
+            }
+        }
+        if score == 0 {
+            let p_norm = norm_model_key(&name).replace('.', "");
+            let prof_stem = ws_cfg.profile_name.split('/').next_back().unwrap_or(&ws_cfg.profile_name);
+            let prof_norm = norm_model_key(prof_stem).replace('.', "");
+            let parts: Vec<String> = name.split(['-', '_']).map(|t| t.to_ascii_lowercase()).filter(|t| t.len() >= 3).collect();
+            if p_norm.len() >= 3 && m_norm.contains(&p_norm) {
+                score = p_norm.len() + 20;
+                matched_tok = name.clone();
+            } else if prof_norm.len() >= 3 && m_norm.contains(&prof_norm) {
+                score = prof_norm.len() + 10;
+                matched_tok = prof_stem.to_string();
+            } else if parts.len() > 1 && parts.iter().all(|t| m_norm.contains(t.as_str())) {
+                score = parts.iter().map(String::len).sum();
+                matched_tok = name.clone();
+            }
+        }
+        if score > 0 {
+            match best {
+                Some((bs, _, _)) if score > bs => { best = Some((score, name, matched_tok)); tie = false; }
+                Some((bs, _, _)) if score == bs => { tie = true; }
+                None => { best = Some((score, name, matched_tok)); tie = false; }
+                _ => {}
+            }
+        }
+    }
+    if tie { None } else { best.map(|(_, p, tok)| (p, tok)) }
+}
+
+fn resolve_project_for_model(root: &Path, cfg: &RailConfig, raw_model: &str) -> Option<String> {
+    let m = raw_model.trim();
+    if m.is_empty() || m.eq_ignore_ascii_case("local-model") || m.eq_ignore_ascii_case("default") {
+        return None;
+    }
+    let hidden: HashSet<&str> = cfg.hidden_projects.iter().map(String::as_str).collect();
+    let usable = |p: &str| !matches!(p, "chat" | "chatbot") && !hidden.contains(p) && project_dir_in(root, cfg, p).is_dir();
+
+    if let Some(p) = cfg.model_projects.get(m).filter(|p| usable(p)) {
+        return Some(p.clone());
+    }
+    if let Some((_, p)) = cfg.model_projects.iter().find(|(k, p)| k.eq_ignore_ascii_case(m) && usable(p)) {
+        return Some(p.clone());
+    }
+    let m_norm = norm_model_key(m);
+    let mut best: Option<(usize, String)> = None;
+    for (k, p) in &cfg.model_projects {
+        if !usable(p) {
+            continue;
+        }
+        let k_norm = norm_model_key(k);
+        if !k_norm.is_empty() && (m_norm == k_norm || m_norm.contains(&k_norm) || k_norm.contains(&m_norm)) {
+            let score = k_norm.len();
+            if best.as_ref().is_none_or(|(len, _)| score > *len) {
+                best = Some((score, p.clone()));
+            }
+        }
+    }
+    best.map(|(_, p)| p)
+        .or_else(|| auto_match_project_for_model(root, cfg, m).map(|(p, _)| p))
+}
+
+async fn maybe_switch_project_for_model(app: &AppRuntime, cur_model: &str) {
+    let changed = {
+        let mut lm = app.last_model.lock().await;
+        let ch = lm.as_deref().is_some_and(|prev| prev != cur_model);
+        *lm = Some(cur_model.to_string());
+        ch
+    };
+    if !changed {
+        return;
+    }
+    let root_m = app.root.clone();
+    let model_c = cur_model.to_string();
+    if let Ok(Some(proj)) = tokio::task::spawn_blocking(move || {
+        let rcfg = RailConfig::load(&root_m.join("plugins/railbot/config.json"));
+        resolve_project_for_model(&root_m, &rcfg, &model_c)
+    })
+    .await
+    {
+        set_last_project(&app.root, &proj);
+        *app.active_project.lock().await = proj;
+    }
 }
 
 fn is_env_path(p: &Path) -> bool {
@@ -694,6 +869,51 @@ struct UiTurnItem {
     raw: Option<String>,
 }
 
+fn compute_turn_metrics(
+    prompt_tokens: usize,
+    raw_completion: usize,
+    raw_reasoning: usize,
+    total_tokens: usize,
+    predicted_tps: Option<f64>,
+    decode_secs: Option<f64>,
+    reply: &str,
+    opt_reasoning: Option<&str>,
+    llm_elapsed: f64,
+) -> (usize, usize, f64) {
+    let est_reasoning = opt_reasoning.map(|r| (r.chars().count() / 4).max(1)).unwrap_or(0);
+    let (completion_tokens, reasoning_tokens) = if raw_completion > 0 {
+        if total_tokens > prompt_tokens + raw_completion {
+            // Provider excluded thinking from completion_tokens (e.g. Gemini)
+            let hidden = total_tokens - prompt_tokens - raw_completion;
+            (raw_completion, raw_reasoning.max(hidden))
+        } else {
+            // OpenAI / OpenRouter / llama.cpp: completion_tokens already includes reasoning_tokens
+            let r = if raw_reasoning > 0 { raw_reasoning } else { est_reasoning.min(raw_completion) };
+            (raw_completion.saturating_sub(r), r)
+        }
+    } else {
+        let vis = (reply.chars().count() / 4).max(usize::from(!reply.is_empty()));
+        let r = if raw_reasoning > 0 { raw_reasoning } else { est_reasoning };
+        (vis, r)
+    };
+
+    let gen_toks = completion_tokens + reasoning_tokens;
+    let tps = if let Some(hw_tps) = predicted_tps {
+        hw_tps
+    } else if opt_reasoning.is_none() && reasoning_tokens > 0 {
+        // Hidden thinking occurred before first visible delta; use full turn elapsed
+        if llm_elapsed > 0.01 { gen_toks as f64 / llm_elapsed } else { 0.0 }
+    } else if let Some(dec_s) = decode_secs.filter(|&d| d >= 0.08 && gen_toks >= 8) {
+        gen_toks as f64 / dec_s
+    } else if llm_elapsed > 0.01 {
+        gen_toks as f64 / llm_elapsed
+    } else {
+        0.0
+    };
+
+    (completion_tokens, reasoning_tokens, tps)
+}
+
 #[derive(Clone, Serialize, Deserialize)]
 struct TurnStats {
     prompt_tokens: usize,
@@ -756,6 +976,7 @@ struct AppRuntime {
     http: reqwest::Client,
     noctalia_catalog: Mutex<Option<Vec<Value>>>,
     noctalia_registry: Mutex<HashMap<String, Value>>,
+    last_model: Mutex<Option<String>>,
 }
 
 impl AppRuntime {
@@ -790,6 +1011,7 @@ impl AppRuntime {
             http,
             noctalia_catalog: Mutex::new(None),
             noctalia_registry: Mutex::new(HashMap::new()),
+            last_model: Mutex::new(None),
         }
     }
 
@@ -3023,12 +3245,20 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
     }
 
     if method == "GET" && path == "/api/state" {
+        let state_provider = ProviderConfig::load().await;
         let rail_cfg = RailConfig::load(&app.root.join("plugins/railbot/config.json"));
-        if let Some(sel) = query.split('&').find_map(|p| p.strip_prefix("project=")).map(url_decode).filter(|s| !s.is_empty()) {
+        let explicit_proj = query.split('&').find_map(|p| p.strip_prefix("project=")).map(url_decode).filter(|s| !s.is_empty());
+        if let Some(sel) = explicit_proj {
             if is_valid_slug(&sel) && project_dir_in(&app.root, &rail_cfg, &sel).is_dir() {
                 set_last_project(&app.root, &sel);
                 *app.active_project.lock().await = sel;
             }
+            let mut lm = app.last_model.lock().await;
+            if lm.is_none() {
+                *lm = Some(state_provider.model.clone());
+            }
+        } else {
+            maybe_switch_project_for_model(&app, &state_provider.model).await;
         }
 
         let active_name = app.active_project.lock().await.clone();
@@ -3109,7 +3339,7 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
             })
         };
 
-        let provider = ProviderConfig::load().await;
+        let provider = state_provider;
         let (slots, env_tok, _env_rnd) = read_env_slots(&get_env_path());
         let mcp_map = mcp::load_servers_config();
         let mut mcp_list: Vec<Value> = mcp_map
@@ -3152,7 +3382,9 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                     "project_providers": rail_cfg.project_providers,
                     "project_collabs": rail_cfg.project_collabs,
                     "project_actions": rail_cfg.project_actions,
-                    "project_security": rail_cfg.project_security
+                    "project_security": rail_cfg.project_security,
+                    "model_projects": rail_cfg.model_projects,
+                    "model_unlinked": rail_cfg.model_unlinked
                 }
             }),
         )
@@ -3550,6 +3782,14 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 cfg.project_security = sanitize_project_security(obj);
                 dirty_cfg = true;
             }
+            if let Some(obj) = payload.get("model_projects").and_then(|v| v.as_object()) {
+                cfg.model_projects = sanitize_model_projects(obj, &app.root, &cfg);
+                dirty_cfg = true;
+            }
+            if let Some(arr) = payload.get("model_unlinked").and_then(|v| v.as_array()) {
+                cfg.model_unlinked = sanitize_model_unlinked(arr);
+                dirty_cfg = true;
+            }
             if payload.get("auto_label").and_then(|v| v.as_bool()) == Some(true)
                 && apply_auto_labels(&app.root, &mut cfg) > 0
             {
@@ -3578,6 +3818,8 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 "project_collabs": cfg.project_collabs,
                 "project_actions": cfg.project_actions,
                 "project_security": cfg.project_security,
+                "model_projects": cfg.model_projects,
+                "model_unlinked": cfg.model_unlinked,
                 "bot_mode": cfg.bot_mode
             }),
         )
@@ -3899,18 +4141,17 @@ async fn handle_client(mut stream: TcpStream, app: Arc<AppRuntime>) -> Result<()
                 } else {
                     history.iter().map(|m| m.content_as_str().chars().count()).sum::<usize>() / 4
                 };
-                let completion_tokens = if stats.completion_tokens > 0 {
-                    stats.completion_tokens
-                } else {
-                    (reply.chars().count() / 4).max(usize::from(!reply.is_empty()))
-                };
-                let reasoning_tokens = if stats.reasoning_tokens > 0 {
-                    stats.reasoning_tokens
-                } else {
-                    opt_reasoning.as_ref().map(|r| (r.chars().count() / 4).max(1)).unwrap_or(0)
-                };
-                let gen_toks = completion_tokens + reasoning_tokens;
-                let tps = if llm_elapsed > 0.01 { gen_toks as f64 / llm_elapsed } else { 0.0 };
+                let (completion_tokens, reasoning_tokens, tps) = compute_turn_metrics(
+                    prompt_tokens,
+                    stats.completion_tokens,
+                    stats.reasoning_tokens,
+                    stats.total_tokens,
+                    stats.predicted_tps,
+                    stats.decode_secs,
+                    &reply,
+                    opt_reasoning.as_deref(),
+                    llm_elapsed,
+                );
                 last_stats = Some(TurnStats {
                     prompt_tokens,
                     completion_tokens,
@@ -5229,5 +5470,45 @@ hi").unwrap();
         assert_eq!(next_stall_count(0, false), 1);
         assert_eq!(next_stall_count(1, false), 2);
         assert_eq!(next_stall_count(1, true), 0);
+    }
+
+    #[test]
+    fn test_compute_turn_metrics_avoids_double_count_and_recovers_hidden_thinking() {
+        // OpenRouter/OpenAI: completion_tokens (150) already includes reasoning_tokens (120)
+        let (vis, r, tps) = compute_turn_metrics(1000, 150, 120, 1150, None, Some(1.0), "done", Some("think"), 1.5);
+        assert_eq!((vis, r), (30, 120));
+        assert!((tps - 150.0).abs() < 0.01);
+
+        // Google Gemini: hidden thinking omitted from completion_tokens (40), included in total_tokens (1240)
+        let (vis_g, r_g, tps_g) = compute_turn_metrics(1000, 40, 0, 1240, None, Some(0.1), "ok", None, 2.0);
+        assert_eq!((vis_g, r_g), (40, 200));
+        assert!((tps_g - 120.0).abs() < 0.01);
+
+        // Local llama.cpp: prefers hardware predicted_tps
+        let (_, _, tps_l) = compute_turn_metrics(500, 100, 40, 600, Some(87.4), Some(1.2), "ok", Some("t"), 1.3);
+        assert!((tps_l - 87.4).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_auto_match_model_skips_chatbot_and_respects_unlinked() {
+        let tmp = std::env::temp_dir().join(format!("rs_rail_auto_mp_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&tmp);
+        fs::create_dir_all(tmp.join("profiles")).unwrap();
+        fs::create_dir_all(tmp.join("projects/chatbot")).unwrap();
+        fs::create_dir_all(tmp.join("projects/ling-tiny")).unwrap();
+        fs::write(tmp.join("profiles/lingtiny.md"), "---\ndescription: \"Ling-3.0-tiny Agent\"\n---\nhi").unwrap();
+        WorkspaceConfig { profile_name: "lingtiny".into(), is_agent: true, tier: ToolTier::Smol, adapters: true, delegate: false }
+            .save(tmp.join("projects/ling-tiny")).unwrap();
+
+        let mut cfg = RailConfig::default();
+        assert_eq!(resolve_project_for_model(&tmp, &cfg, "Ling-3.0-tiny.gguf").as_deref(), Some("ling-tiny"));
+
+        cfg.model_unlinked = vec!["ling-tiny".into()];
+        assert_eq!(resolve_project_for_model(&tmp, &cfg, "Ling-3.0-tiny.gguf"), None);
+
+        let mut raw = serde_json::Map::new();
+        raw.insert("Ling-3.0-tiny".into(), json!("chatbot"));
+        assert!(sanitize_model_projects(&raw, &tmp, &cfg).is_empty());
+        let _ = fs::remove_dir_all(&tmp);
     }
 }

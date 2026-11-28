@@ -7,6 +7,9 @@ pub struct UsageStats {
     pub completion_tokens: usize,
     pub reasoning_tokens: usize,
     pub cached_tokens: usize,
+    pub total_tokens: usize,
+    pub predicted_tps: Option<f64>,
+    pub decode_secs: Option<f64>,
 }
 
 pub struct StreamRenderer {
@@ -264,7 +267,7 @@ impl StreamRenderer {
         };
         parts.push(format!("{:.1}%/{}", ctx_pct, max_ctx_s));
 
-        let speed = out_tok as f64 / elapsed_gen;
+        let speed = stats.predicted_tps.unwrap_or(out_tok as f64 / elapsed_gen);
         parts.push(format!("{:.1}s @ {:.1} t/s", elapsed_gen, speed));
 
         let stat_line = parts.join(" · ");

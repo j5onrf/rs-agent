@@ -293,6 +293,9 @@ fn parse_usage_and_timings(json: &Value, stats: &mut UsageStats) {
         if let Some(c) = usage.get("completion_tokens").and_then(|v| v.as_u64()) {
             stats.completion_tokens = c as usize;
         }
+        if let Some(t) = usage.get("total_tokens").and_then(|v| v.as_u64()) {
+            stats.total_tokens = t as usize;
+        }
         if let Some(cached) = usage
             .get("prompt_tokens_details")
             .and_then(|d| d.get("cached_tokens"))
@@ -314,6 +317,9 @@ fn parse_usage_and_timings(json: &Value, stats: &mut UsageStats) {
                 stats.cached_tokens = cache_n as usize;
             }
         }
+        if let Some(tps) = timings.get("predicted_per_second").and_then(|v| v.as_f64()).filter(|&v| v > 0.0) {
+            stats.predicted_tps = Some(tps);
+        }
     }
 }
 
@@ -321,11 +327,38 @@ fn parse_usage_and_timings(json: &Value, stats: &mut UsageStats) {
 fn accumulate_tool_calls(delta: &Value, tool_calls_map: &mut BTreeMap<usize, (String, String, String, Option<Value>)>) {
     if let Some(tc_array) = delta.get("tool_calls").and_then(|v| v.as_array()) {
         for tc in tc_array {
-            let idx = tc.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+            let tc_id = tc.get("id").and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+            let tc_fn = tc.get("function");
+            let tc_fn_name = tc_fn.and_then(|f| f.get("name")).and_then(|v| v.as_str()).filter(|s| !s.is_empty());
+
+            // Resilient index resolution: handle standard OpenAI index or Google's missing index
+            let idx = if let Some(i) = tc.get("index").and_then(|v| v.as_u64()) {
+                i as usize
+            } else if let Some(id) = tc_id {
+                if let Some((&existing_idx, _)) = tool_calls_map.iter().find(|(_, entry)| entry.0 == id) {
+                    existing_idx
+                } else if tool_calls_map.is_empty() {
+                    0
+                } else {
+                    tool_calls_map.keys().max().map_or(0, |m| m + 1)
+                }
+            } else if let Some(name) = tc_fn_name {
+                if let Some((&last_idx, last_entry)) = tool_calls_map.iter().next_back() {
+                    if !last_entry.1.is_empty() && (!last_entry.2.is_empty() || last_entry.1 != name) {
+                        last_idx + 1
+                    } else {
+                        last_idx
+                    }
+                } else {
+                    0
+                }
+            } else {
+                tool_calls_map.keys().next_back().copied().unwrap_or(0)
+            };
+
             let entry = tool_calls_map.entry(idx).or_insert_with(|| {
                 (
-                    tc.get("id")
-                        .and_then(|v| v.as_str())
+                    tc_id
                         .map(ToString::to_string)
                         .unwrap_or_else(|| format!("call_{idx}")),
                     String::new(),
@@ -334,19 +367,21 @@ fn accumulate_tool_calls(delta: &Value, tool_calls_map: &mut BTreeMap<usize, (St
                 )
             });
 
-            if let Some(id) = tc.get("id").and_then(|v| v.as_str()) {
-                if !id.is_empty() {
-                    entry.0 = id.to_string();
-                }
+            if let Some(id) = tc_id {
+                entry.0 = id.to_string();
             }
-            if let Some(fn_obj) = tc.get("function") {
-                if let Some(name) = fn_obj.get("name").and_then(|v| v.as_str()) {
-                    if !name.is_empty() {
-                        entry.1 = name.to_string();
-                    }
-                }
+            if let Some(name) = tc_fn_name {
+                entry.1 = name.to_string();
+            }
+            if let Some(fn_obj) = tc_fn {
                 if let Some(args) = fn_obj.get("arguments").and_then(|v| v.as_str()) {
                     entry.2.push_str(args);
+                } else if let Some(params) = fn_obj.get("parameters") {
+                    if let Some(s) = params.as_str() {
+                        entry.2.push_str(s);
+                    } else if params.is_object() {
+                        entry.2.push_str(&params.to_string());
+                    }
                 }
             }
             if let Some(ec) = tc.get("extra_content") {
@@ -445,9 +480,42 @@ impl LlmClient {
 
         if is_google {
             if let Some(arr) = sanitized_messages.as_array_mut() {
+                let mut tool_names: std::collections::HashMap<String, String> = std::collections::HashMap::new();
                 for msg in arr {
-                    if msg.get("role").and_then(|r| r.as_str()) == Some("assistant") {
+                    if let Some(obj) = msg.as_object_mut() {
+                        obj.remove("reasoning_content");
+                    }
+                    let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("").to_string();
+                    if role == "tool" {
+                        if let Some(obj) = msg.as_object_mut() {
+                            let call_id = obj.get("tool_call_id").and_then(|v| v.as_str()).unwrap_or("");
+                            if let Some(name) = tool_names.get(call_id) {
+                                obj.insert("name".to_string(), Value::String(name.clone()));
+                            }
+                        }
+                        continue;
+                    }
+                    if role == "assistant" {
                         if let Some(tcs) = msg.get_mut("tool_calls").and_then(|v| v.as_array_mut()) {
+                            for tc in tcs.iter_mut() {
+                                let tc_id = tc.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                if let Some(fn_obj) = tc.get_mut("function").and_then(|f| f.as_object_mut()) {
+                                    if let Some(name) = fn_obj.get("name").and_then(|v| v.as_str()) {
+                                        if !tc_id.is_empty() {
+                                            tool_names.insert(tc_id, name.to_string());
+                                        }
+                                    }
+                                    if let Some(args_val) = fn_obj.get_mut("arguments") {
+                                        let needs_heal = match args_val.as_str() {
+                                            Some(s) => s.trim().is_empty() || serde_json::from_str::<Value>(s).is_err(),
+                                            None => true,
+                                        };
+                                        if needs_heal {
+                                            *args_val = Value::String("{}".to_string());
+                                        }
+                                    }
+                                }
+                            }
                             // Gemini 4 parallel tool turns carry thought_signature only on the first call
                             let first_has_sig = tcs
                                 .first()
@@ -601,6 +669,8 @@ impl LlmClient {
         let mut saw_done = false;
         let mut saw_finish = false;
         let mut has_emitted = false;
+        let mut first_token_at: Option<std::time::Instant> = None;
+        let mut last_token_at: Option<std::time::Instant> = None;
         let mut stats = UsageStats::default();
         let mut tool_calls_map: BTreeMap<usize, (String, String, String, Option<Value>)> = BTreeMap::new();
         let mut stream_err: Option<(anyhow::Error, bool, bool, Option<u64>)> = None;
@@ -659,6 +729,8 @@ impl LlmClient {
             }
 
             if let Ok(json) = serde_json::from_str::<Value>(&event.data) {
+                let prev_bytes = full_response.len() + full_reasoning.len();
+                let prev_tc_bytes: usize = tool_calls_map.values().map(|e| e.1.len() + e.2.len()).sum();
                 if let Some(err_msg) = extract_stream_error(&json) {
                     stream_err = Some((anyhow::anyhow!("Stream error from LLM endpoint: {}", err_msg), !has_emitted, false, None));
                     break;
@@ -706,6 +778,15 @@ impl LlmClient {
                         }
                     }
                 }
+                let new_bytes = full_response.len() + full_reasoning.len();
+                let new_tc_bytes: usize = tool_calls_map.values().map(|e| e.1.len() + e.2.len()).sum();
+                if new_bytes > prev_bytes || new_tc_bytes > prev_tc_bytes {
+                    let now = std::time::Instant::now();
+                    if first_token_at.is_none() {
+                        first_token_at = Some(now);
+                    }
+                    last_token_at = Some(now);
+                }
             }
         }
 
@@ -752,7 +833,10 @@ impl LlmClient {
             Some(
                 tool_calls_map
                     .into_values()
-                    .map(|(id, name, args, extra_content)| {
+                    .map(|(id, name, mut args, extra_content)| {
+                        if args.trim().is_empty() {
+                            args = "{}".to_string();
+                        }
                         let mut call = serde_json::json!({
                             "id": id,
                             "type": "function",
@@ -767,6 +851,10 @@ impl LlmClient {
             )
         };
 
+        stats.decode_secs = match (first_token_at, last_token_at) {
+            (Some(f), Some(l)) if l > f => Some(l.duration_since(f).as_secs_f64()),
+            _ => first_token_at.map(|f| f.elapsed().as_secs_f64()),
+        };
         let opt_reasoning = if !full_reasoning.is_empty() { Some(full_reasoning) } else { None };
         Ok((full_response, opt_reasoning, tool_calls, stats))
     }
@@ -1142,5 +1230,46 @@ mod tests {
         assert_eq!(entry.0, "call_1");
         assert_eq!(entry.1, "read_file");
         assert_eq!(entry.2, r#"{"path":"a.rs"}"#);
+    }
+
+    #[test]
+    fn test_accumulate_tool_calls_gemini_missing_index() {
+        let mut map = BTreeMap::new();
+        accumulate_tool_calls(
+            &serde_json::json!({
+                "tool_calls": [{
+                    "id": "call_read",
+                    "function": { "name": "read_file", "arguments": r#"{"path":"math_demo.py"}"# }
+                }]
+            }),
+            &mut map,
+        );
+        accumulate_tool_calls(
+            &serde_json::json!({
+                "tool_calls": [{
+                    "id": "call_bash",
+                    "function": { "name": "run_command", "arguments": r#"{"command":"python3 math_demo.py"}"# }
+                }]
+            }),
+            &mut map,
+        );
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.get(&0).unwrap().1, "read_file");
+        assert_eq!(map.get(&1).unwrap().1, "run_command");
+    }
+
+    #[test]
+    fn test_parse_usage_and_timings_captures_total_and_predicted_tps() {
+        let mut stats = UsageStats::default();
+        let payload = serde_json::json!({
+            "usage": { "prompt_tokens": 500, "completion_tokens": 20, "total_tokens": 720 },
+            "timings": { "cache_n": 100, "predicted_per_second": 94.5 }
+        });
+        parse_usage_and_timings(&payload, &mut stats);
+        assert_eq!(stats.prompt_tokens, 500);
+        assert_eq!(stats.completion_tokens, 20);
+        assert_eq!(stats.total_tokens, 720);
+        assert_eq!(stats.cached_tokens, 100);
+        assert_eq!(stats.predicted_tps, Some(94.5));
     }
 }

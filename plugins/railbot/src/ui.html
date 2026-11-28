@@ -1928,12 +1928,22 @@ function renderModalTab() {
 
     const namesMap = STATE.ui_prefs?.project_names || {};
     const descsMap = STATE.ui_prefs?.project_descriptions || {};
+    const modelMap = STATE.ui_prefs?.model_projects || {};
+    const unlinkedSet = new Set(STATE.ui_prefs?.model_unlinked || []);
+    const curModel = STATE.provider?.model || "";
+    const validModel = (m) => m && m !== "local-model" && m !== "default";
+    const knownModels = Array.from(new Set([
+      curModel,
+      ...(STATE.providers || []).flatMap((s) => String(s.model || "").split(",").map((x) => x.trim())),
+    ].filter(validModel)));
     const patchProjPrefs = async (patch) => {
       const res = await api("/api/settings/ui", patch);
       if ("hidden_projects" in patch) STATE.ui_prefs.hidden_projects = res.hidden_projects || patch.hidden_projects;
       if ("project_labels" in patch) STATE.ui_prefs.project_labels = res.project_labels || patch.project_labels;
       if ("project_names" in patch) STATE.ui_prefs.project_names = res.project_names || patch.project_names;
       if ("project_descriptions" in patch) STATE.ui_prefs.project_descriptions = res.project_descriptions || patch.project_descriptions;
+      if ("model_projects" in patch) STATE.ui_prefs.model_projects = res.model_projects || patch.model_projects;
+      if ("model_unlinked" in patch) STATE.ui_prefs.model_unlinked = res.model_unlinked || patch.model_unlinked;
       const curHidden = new Set(STATE.ui_prefs.hidden_projects || []);
       if (curHidden.has(STATE.active_project.name)) {
         const next = STATE.projects.find((p) => p.name === "chat" && !curHidden.has("chat"))
@@ -1959,6 +1969,10 @@ function renderModalTab() {
     dl.id = "proj-labels-dl";
     dl.innerHTML = allLabels.map((l) => `<option value="${esc(l)}"></option>`).join("");
     pane.appendChild(dl);
+    const mdlDl = document.createElement("datalist");
+    mdlDl.id = "proj-models-dl";
+    mdlDl.innerHTML = knownModels.map((m) => `<option value="${esc(m)}"></option>`).join("");
+    pane.appendChild(mdlDl);
 
     if (allLabels.length) {
       const lbar = document.createElement("div");
@@ -2187,6 +2201,74 @@ function renderModalTab() {
         dBtn.title = "Add project description";
         dBtn.onclick = () => editDesc(dBtn);
         tagsBox.appendChild(dBtn);
+      }
+
+      if (p.name !== "chat" && p.name !== "chatbot") {
+        const linkedModels = Object.entries(modelMap).filter(([, proj]) => proj === p.name).map(([m]) => m);
+        if (linkedModels.length) {
+          for (const m of linkedModels) {
+            const mTag = document.createElement("span");
+            mTag.className = "proj-tag";
+            mTag.title = `Auto-selects ${p.name} when ${m} is active`;
+            mTag.innerHTML = `<span>model: ${esc(m)}</span><button title="Unlink model">×</button>`;
+            mTag.querySelector("button").onclick = () => {
+              const nextMap = structuredClone(modelMap);
+              delete nextMap[m];
+              const nextUnlinked = Array.from(new Set([...unlinkedSet, p.name]));
+              patchProjPrefs({ model_projects: nextMap, model_unlinked: nextUnlinked });
+            };
+            tagsBox.appendChild(mTag);
+          }
+        } else if (!unlinkedSet.has(p.name)) {
+          const aTag = document.createElement("span");
+          aTag.className = "proj-tag";
+          aTag.title = "Auto-selects when matching model loads (click × to disable)";
+          aTag.innerHTML = `<span>auto</span><button title="Disable auto-select for this project">×</button>`;
+          aTag.querySelector("button").onclick = () => {
+            const nextUnlinked = Array.from(new Set([...unlinkedSet, p.name]));
+            patchProjPrefs({ model_unlinked: nextUnlinked });
+          };
+          tagsBox.appendChild(aTag);
+        } else {
+          const mBtn = document.createElement("button");
+          mBtn.className = "btn btn-sm";
+          mBtn.style.cssText = "padding:1px 7px;border-radius:999px;font-size:10.5px;";
+          mBtn.textContent = "+ link";
+          mBtn.title = "Enable auto-link or pin a specific model name";
+          mBtn.onclick = () => {
+            const inp = document.createElement("input");
+            inp.className = "tag-inp";
+            inp.style.width = "175px";
+            inp.placeholder = "model (empty = auto)...";
+            inp.value = validModel(curModel) && !modelMap[curModel] ? curModel : "";
+            inp.setAttribute("list", "proj-models-dl");
+            mBtn.replaceWith(inp);
+            inp.focus();
+            inp.select();
+            let done = false;
+            const commit = async () => {
+              if (done) return;
+              done = true;
+              const v = inp.value.trim();
+              const nextUnlinked = Array.from(unlinkedSet).filter((x) => x !== p.name);
+              if (!v) {
+                await patchProjPrefs({ model_unlinked: nextUnlinked });
+                return;
+              }
+              if (modelMap[v] && modelMap[v] !== p.name) {
+                alert(`'${v}' is already linked to '${modelMap[v]}'. Unlink it first.`);
+                renderModalTab();
+                return;
+              }
+              const nextMap = structuredClone(modelMap);
+              nextMap[v] = p.name;
+              await patchProjPrefs({ model_projects: nextMap, model_unlinked: nextUnlinked });
+            };
+            inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); commit(); } else if (e.key === "Escape") { done = true; renderModalTab(); } };
+            inp.onblur = commit;
+          };
+          tagsBox.appendChild(mBtn);
+        }
       }
 
       const provSel = row.querySelector(".proj-prov");
